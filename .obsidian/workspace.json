@@ -222,6 +222,10 @@
   },
   "active": "07bb8ee6cae4a42a",
   "lastOpenFiles": [
+    "hack-docs/design/tokens.css",
+    "hack-docs/design",
+    "CLAUDE.md",
+    "hack-docs/ROADMAP.md",
     "hack-docs/requirements/data-model.md",
     "hack-docs/requirements/nfr.md",
     "hack-docs/requirements/ux-flows.md",
@@ -253,11 +257,7 @@
     "hack-docs/interview",
     "hack-docs/research/MINDMAP.md",
     "hack-docs/adr/README.md.tmp.31256.9b70c483088b",
-    "hack-docs/adr",
     "hack-docs/GENERAL_PLAN.md",
-    "hack-docs/research/legal-framework.md",
-    "hack-docs/research/risks.md",
-    "hack-docs/research/judging-criteria.md",
     "Без названия.canvas"
   ]
 }

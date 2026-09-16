@@ -1,0 +1,1356 @@
+<meta charset="utf-8">
+<title>Адресная табличка</title>
+<meta name="description" content="Прототип и визуальная система мини-приложения MAX для коллективных заявок по общему имуществу дома">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sofia+Sans+Extra+Condensed:wght@600..900&family=Sofia+Sans:wght@300..800&display=swap">
+<style>
+:root {
+  --font-ui: "Sofia Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-plate: "Sofia Sans Extra Condensed", "Sofia Sans", "Arial Narrow", system-ui, sans-serif;
+
+  --enamel: #1b3f94;
+  --enamel-pressed: #142f70;
+  --enamel-text: #1b3f94;
+  --plate-ink: #ffffff;
+  --surik: #c23a22;
+  --stencil-green: #2c7548;
+  --amber-text: #8a5a00;
+
+  --page: #dfe2e8;
+  --surface: #edeef2;
+  --surface-card: #ffffff;
+  --surface-secondary: #f5f7fa;
+  --control: #e9ebf1;
+  --text: #060708;
+  --text-2: rgb(6 7 8 / 0.68);
+  --text-3: rgb(6 7 8 / 0.6);
+  --separator: rgb(6 7 8 / 0.1);
+  --bezel: #1d2029;
+  --bubble-me: #d9e3fb;
+  --sheet-shadow: 0 -12px 32px rgb(20 30 60 / 0.16);
+  --backdrop: rgb(6 7 8 / 0.36);
+
+  /* печатные объекты не меняются вместе с темой */
+  --print-paper: #ffffff;
+  --print-ink: #0a0b0d;
+  --print-enamel: #1b3f94;
+
+  --radius-plate: 6px;
+  --radius-plate-rule: 3px;
+  --radius-control: 12px;
+  --radius-button: 14px;
+  --radius-island: 12px;
+  --radius-sheet: 16px;
+
+  --stamp-duration: 380ms;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --enamel: #3a5fc4;
+    --enamel-pressed: #2f50aa;
+    --enamel-text: #93aaf2;
+    --plate-ink: #f4f6fb;
+    --surik: #e2583f;
+    --stencil-green: #56a877;
+    --amber-text: #e0a83a;
+    --page: #1b1d23;
+    --surface: #0f0f12;
+    --surface-card: #17181c;
+    --surface-secondary: #25262d;
+    --control: #2c2d35;
+    --text: #ffffff;
+    --text-2: rgb(255 255 255 / 0.8);
+    --text-3: rgb(255 255 255 / 0.62);
+    --separator: rgb(255 255 255 / 0.1);
+    --bezel: #33363f;
+    --bubble-me: #26335a;
+    --sheet-shadow: 0 -12px 32px rgb(0 0 0 / 0.5);
+    --backdrop: rgb(0 0 0 / 0.55);
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --enamel: #3a5fc4;
+  --enamel-pressed: #2f50aa;
+  --enamel-text: #93aaf2;
+  --plate-ink: #f4f6fb;
+  --surik: #e2583f;
+  --stencil-green: #56a877;
+  --amber-text: #e0a83a;
+  --page: #1b1d23;
+  --surface: #0f0f12;
+  --surface-card: #17181c;
+  --surface-secondary: #25262d;
+  --control: #2c2d35;
+  --text: #ffffff;
+  --text-2: rgb(255 255 255 / 0.8);
+  --text-3: rgb(255 255 255 / 0.62);
+  --separator: rgb(255 255 255 / 0.1);
+  --bezel: #33363f;
+  --bubble-me: #26335a;
+  --sheet-shadow: 0 -12px 32px rgb(0 0 0 / 0.5);
+  --backdrop: rgb(0 0 0 / 0.55);
+  color-scheme: dark;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+body {
+  background: var(--page);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 16px;
+  line-height: 1.35;
+  -webkit-font-smoothing: antialiased;
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 2.5px solid var(--enamel-text); outline-offset: 2px; }
+.i { width: 20px; height: 20px; fill: currentColor; flex: none; }
+.i--sm { width: 16px; height: 16px; }
+.visually-hidden { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* ---------- доска ---------- */
+.page {
+  max-width: 1320px;
+  margin: 0 auto;
+  padding-inline: 16px;
+  padding-block: 28px 72px;
+  display: grid;
+  gap: 56px;
+}
+.board-head {
+  display: grid;
+  gap: 20px;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+}
+.board-head .plate { padding: 18px 26px 20px; max-width: 760px; }
+.board-head .plate__num { margin: 0; font-size: clamp(44px, 7vw, 76px); }
+.board-head .plate__street { font-size: 17px; font-weight: 500; max-width: 46ch; }
+.board-tools { display: grid; gap: 12px; justify-items: end; }
+.note { margin: 0; color: var(--text-2); font-size: 14px; max-width: 34ch; text-align: right; }
+.theme-toggle {
+  display: inline-flex; align-items: center; gap: 8px;
+  border: 0; border-radius: var(--radius-control);
+  background: var(--surface-card); color: var(--text);
+  padding: 10px 14px; font-size: 15px; font-weight: 600;
+}
+@media (max-width: 760px) {
+  .board-head { grid-template-columns: minmax(0, 1fr); }
+  .board-tools { justify-items: start; }
+  .note { text-align: left; }
+}
+
+.group { display: grid; gap: 20px; }
+.group > h2 { margin: 0; font-size: 26px; font-weight: 700; letter-spacing: -0.01em; }
+.group > p { margin: -12px 0 0; color: var(--text-2); max-width: 62ch; }
+.frames {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 390px));
+  gap: 36px 28px;
+  align-items: start;
+}
+.frame { margin: 0; display: grid; gap: 14px; min-width: 0; }
+.frame figcaption { color: var(--text-2); font-size: 14px; line-height: 1.45; max-width: 46ch; }
+.frame figcaption strong { color: var(--text); font-weight: 650; }
+
+/* ---------- телефон ---------- */
+.phone {
+  position: relative;
+  width: 100%;
+  max-width: 390px;
+  height: 790px;
+  border: 10px solid var(--bezel);
+  border-radius: 42px;
+  background: var(--surface);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  font-size: 17px;
+}
+.appbar {
+  display: grid;
+  grid-template-columns: 72px 1fr 72px;
+  align-items: center;
+  min-height: 52px;
+  padding: 6px 8px 0;
+  background: var(--surface-card);
+  border-bottom: 1px solid var(--separator);
+}
+.appbar__back {
+  justify-self: start;
+  display: inline-flex; align-items: center; gap: 2px;
+  border: 0; background: none; color: var(--enamel-text);
+  font-size: 16px; padding: 8px 6px; border-radius: 10px;
+}
+.appbar__title { text-align: center; font-size: 16px; font-weight: 650; }
+.appbar__close { justify-self: end; color: var(--enamel-text); font-size: 16px; padding-right: 6px; }
+.screens { position: relative; flex: 1; min-height: 0; }
+.screen {
+  position: absolute; inset: 0;
+  overflow-y: auto;
+  padding: 16px 16px 0;
+  display: flex; flex-direction: column; gap: 16px;
+  scrollbar-width: thin;
+}
+.screen:focus { outline: none; }
+.screen > :last-child:not(.actionbar) { margin-bottom: 16px; }
+.actionbar {
+  position: sticky; bottom: 0;
+  margin: auto -16px 0;
+  padding: 12px 16px 18px;
+  background: var(--surface);
+  border-top: 1px solid var(--separator);
+  display: grid; gap: 10px;
+}
+
+/* ---------- табличка ---------- */
+.plate {
+  position: relative;
+  display: inline-grid;
+  gap: 4px;
+  background: var(--enamel);
+  color: var(--plate-ink);
+  border-radius: var(--radius-plate);
+  padding: 14px 18px 15px;
+}
+.plate::after {
+  content: "";
+  position: absolute;
+  inset: 4px;
+  border: 1.5px solid var(--plate-ink);
+  border-radius: var(--radius-plate-rule);
+  pointer-events: none;
+}
+.plate__num {
+  font-family: var(--font-plate);
+  font-weight: 850;
+  line-height: 0.9;
+  letter-spacing: -0.005em;
+  font-variant-numeric: tabular-nums;
+}
+.plate__street { font-size: 15px; font-weight: 600; line-height: 1.2; }
+.plate__label { font-size: 13px; font-weight: 500; line-height: 1.1; }
+.plate--house { display: grid; padding: 16px 20px 18px; }
+.plate--house .plate__num { font-size: 64px; }
+.plate--house .plate__street { font-size: 17px; }
+.plate--entrance { padding: 8px 14px 9px; }
+.plate--entrance .plate__num { font-size: 22px; font-weight: 800; }
+.plate--entrance::after { inset: 3px; border-width: 1.25px; }
+.plate--issue { padding: 10px 16px 12px; }
+.plate--issue .plate__num { font-size: 40px; }
+
+.house { display: grid; gap: 10px; }
+.house__meta { display: flex; align-items: center; gap: 12px; color: var(--text-2); font-size: 15px; }
+
+/* ---------- штамп ---------- */
+.stamp {
+  --stamp-color: var(--text-2);
+  display: inline-block;
+  font-family: var(--font-plate);
+  font-weight: 820;
+  font-size: 21px;
+  line-height: 1;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--stamp-color);
+  padding: 8px 12px 7px;
+  border: 2.5px solid currentColor;
+  border-radius: 7px;
+  outline: 1px solid currentColor;
+  outline-offset: -6px;
+  transform: rotate(-4deg);
+  opacity: 0.92;
+  filter: url(#ink);
+  white-space: nowrap;
+  transform-origin: 50% 60%;
+}
+.stamp[data-status="accepted"] { --stamp-color: var(--enamel-text); }
+.stamp[data-status="progress"] { --stamp-color: var(--amber-text); }
+.stamp[data-status="done"] { --stamp-color: var(--stencil-green); }
+.stamp[data-status="rejected"] { --stamp-color: var(--surik); }
+.stamp.is-landing { animation: stamp-land var(--stamp-duration) var(--ease-out) both; }
+@keyframes stamp-land {
+  0%   { opacity: 0; transform: scale(1.35) rotate(-10deg); }
+  70%  { opacity: 0.92; transform: scale(0.97) rotate(-3deg); }
+  100% { opacity: 0.92; transform: scale(1) rotate(-4deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .stamp.is-landing { animation: none; }
+  .count-bump { animation: none !important; }
+}
+
+/* ---------- кнопки и поля ---------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  width: 100%; min-height: 50px; padding: 0 18px;
+  border: 0; border-radius: var(--radius-button);
+  font-size: 17px; font-weight: 650; text-align: center;
+  transition: background-color 120ms ease, transform 80ms ease;
+}
+.btn:active:not(:disabled) { transform: translateY(1px); }
+.btn:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn--primary { background: var(--enamel); color: #ffffff; }
+.btn--primary:active:not(:disabled) { background: var(--enamel-pressed); }
+.btn--secondary { background: var(--control); color: var(--text); }
+.btn--quiet {
+  width: auto; min-height: 40px; padding: 0 10px;
+  background: none; color: var(--enamel-text); font-weight: 600; font-size: 16px;
+}
+.btn--row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+.field { display: grid; gap: 6px; }
+.field > label, .field > .field__label { font-size: 15px; font-weight: 600; color: var(--text); }
+.field__help { font-size: 13px; color: var(--text-2); }
+.input, .textarea, .select {
+  width: 100%;
+  border: 1.5px solid var(--separator);
+  border-radius: var(--radius-control);
+  background: var(--surface-card);
+  padding: 12px 14px;
+  font-size: 17px;
+  line-height: 1.35;
+}
+.textarea { min-height: 112px; resize: vertical; }
+.input:focus-visible, .textarea:focus-visible, .select:focus-visible { outline: none; border-color: var(--enamel-text); box-shadow: 0 0 0 1.5px var(--enamel-text); }
+.select-wrap { position: relative; }
+.select { appearance: none; padding-right: 40px; }
+.select-wrap .i { position: absolute; right: 12px; top: 50%; translate: 0 -50%; transform: rotate(90deg); color: var(--text-3); pointer-events: none; }
+
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 0; border-radius: var(--radius-control);
+  background: var(--control); color: var(--text);
+  padding: 9px 12px; font-size: 15px; font-weight: 550;
+}
+.chip[aria-pressed="true"] { background: var(--enamel); color: #ffffff; }
+
+.switch-row { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: start; }
+.switch {
+  appearance: none; margin: 2px 0 0;
+  width: 51px; height: 31px; border-radius: 999px;
+  background: var(--control); position: relative;
+  transition: background-color 150ms ease;
+}
+.switch::after {
+  content: ""; position: absolute; top: 2px; left: 2px;
+  width: 27px; height: 27px; border-radius: 50%;
+  background: #ffffff; box-shadow: 0 1px 3px rgb(0 0 0 / 0.25);
+  transition: translate 150ms var(--ease-out);
+}
+.switch:checked { background: var(--enamel); }
+.switch:checked::after { translate: 20px 0; }
+@media (prefers-reduced-motion: reduce) { .switch, .switch::after { transition: none; } }
+
+/* ---------- списки ---------- */
+.section-title { margin: 8px 0 -6px; font-size: 20px; font-weight: 700; }
+.section-title--sm { font-size: 15px; font-weight: 650; color: var(--text-2); margin: 4px 0 -8px; }
+.island { list-style: none; margin: 0; padding: 0; background: var(--surface-card); border-radius: var(--radius-island); overflow: hidden; }
+.island > li + li::before { content: ""; display: block; height: 1px; background: var(--separator); margin-left: 76px; }
+.island--plain > li + li::before { margin-left: 16px; }
+.row {
+  display: grid; grid-template-columns: 52px minmax(0, 1fr) auto;
+  gap: 12px; align-items: center;
+  width: 100%; padding: 12px 12px 12px 12px;
+  border: 0; background: none; text-align: left;
+}
+.row:active { background: var(--surface-secondary); }
+.row > .i { color: var(--text-3); }
+.count { display: grid; justify-items: center; gap: 2px; }
+.count b {
+  font-family: var(--font-plate); font-weight: 820; font-size: 34px; line-height: 0.9;
+  font-variant-numeric: tabular-nums;
+}
+.count small { font-size: 12px; color: var(--text-3); line-height: 1; }
+.row__body { display: grid; gap: 2px; min-width: 0; }
+.row__title { font-size: 17px; font-weight: 650; }
+.row__sub { font-size: 15px; color: var(--text-2); }
+.deadline { display: flex; align-items: center; gap: 6px; font-size: 15px; color: var(--text-2); }
+.deadline--overdue { color: var(--surik); font-weight: 650; }
+.cell {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto auto; gap: 8px; align-items: center;
+  width: 100%; padding: 14px 12px 14px 16px; border: 0; background: none; text-align: left; font-size: 17px;
+}
+.cell .i { color: var(--text-3); }
+.badge {
+  min-width: 24px; padding: 2px 7px; border-radius: 999px;
+  background: var(--control); font-size: 14px; font-weight: 650; text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.org {
+  display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center;
+  background: var(--surface-card); border-radius: var(--radius-island); padding: 12px 8px 12px 16px;
+}
+.org__name { font-weight: 650; }
+.org__sub { font-size: 15px; color: var(--text-2); }
+
+/* ---------- карточка проблемы ---------- */
+.issue-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-top: 4px; }
+.issue-title { margin: 0; font-size: 26px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01em; text-wrap: balance; }
+.issue-place { margin: -10px 0 0; color: var(--text-2); font-size: 16px; }
+.figures { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.figure { background: var(--surface-card); border-radius: var(--radius-island); padding: 12px 14px; display: grid; gap: 4px; align-content: start; }
+.figure__num { font-family: var(--font-plate); font-weight: 820; font-size: 46px; line-height: 0.9; font-variant-numeric: tabular-nums; display: inline-block; }
+.figure__label { font-size: 15px; color: var(--text-2); line-height: 1.25; }
+.figure--overdue .figure__num, .figure--overdue .figure__label { color: var(--surik); }
+.count-bump { animation: count-bump 260ms var(--ease-out); }
+@keyframes count-bump { from { transform: translateY(40%); opacity: 0; } to { transform: none; opacity: 1; } }
+.facts { margin: 0; background: var(--surface-card); border-radius: var(--radius-island); padding: 4px 16px; }
+.facts > div { display: grid; gap: 2px; padding: 10px 0; }
+.facts > div + div { border-top: 1px solid var(--separator); }
+.facts dt { font-size: 13px; color: var(--text-2); }
+.facts dd { margin: 0; font-size: 16px; }
+.timeline { list-style: none; margin: 0; padding: 0 0 0 20px; display: grid; gap: 14px; position: relative; }
+.timeline::before { content: ""; position: absolute; left: 5px; top: 6px; bottom: 6px; width: 1.5px; background: var(--separator); }
+.timeline li { position: relative; display: grid; gap: 2px; }
+.timeline li::before {
+  content: ""; position: absolute; left: -20px; top: 5px;
+  width: 11px; height: 11px; border-radius: 3px; background: var(--surface); border: 2px solid var(--text-3);
+}
+.timeline li:last-child::before { background: var(--enamel); border-color: var(--enamel); }
+.timeline time { font-size: 13px; color: var(--text-2); }
+.timeline span { font-size: 16px; }
+.escalate {
+  display: grid; gap: 10px;
+  background: var(--surface-card); border-radius: var(--radius-island); padding: 14px 16px;
+  border-left: 4px solid var(--surik);
+}
+.escalate p { margin: 0; font-size: 15px; color: var(--text-2); }
+.escalate strong { color: var(--text); }
+
+.hint {
+  display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start;
+  background: var(--surface-secondary); border-radius: var(--radius-island); padding: 12px 14px;
+  font-size: 15px; color: var(--text-2);
+}
+.hint .i { color: var(--enamel-text); margin-top: 1px; }
+.hint strong { color: var(--text); }
+
+.similar {
+  display: grid; gap: 12px;
+  background: var(--surface-card); border-radius: var(--radius-island); padding: 14px;
+  box-shadow: inset 0 0 0 1.5px var(--enamel-text);
+}
+.similar__top { display: grid; grid-template-columns: 52px 1fr; gap: 12px; align-items: center; }
+.similar p { margin: 0; }
+.similar__title { font-weight: 650; }
+.similar__sub { font-size: 15px; color: var(--text-2); }
+
+.photos { display: flex; gap: 8px; }
+.photo-add {
+  width: 76px; height: 76px; border-radius: var(--radius-control);
+  border: 1.5px dashed var(--text-3); background: none; color: var(--text-2);
+  display: grid; place-items: center; align-content: center; gap: 2px; font-size: 12px;
+}
+
+.steps { margin: 0; font-size: 15px; color: var(--text-2); font-weight: 600; }
+.screen-title { margin: -8px 0 0; font-size: 26px; font-weight: 700; line-height: 1.15; letter-spacing: -0.01em; text-wrap: balance; }
+.lead { margin: -6px 0 0; color: var(--text-2); font-size: 16px; }
+.summary { margin: 0; background: var(--surface-card); border-radius: var(--radius-island); padding: 4px 16px; }
+.summary > div { display: grid; grid-template-columns: 110px 1fr; gap: 12px; padding: 11px 0; font-size: 16px; }
+.summary > div + div { border-top: 1px solid var(--separator); }
+.summary dt { color: var(--text-2); }
+.summary dd { margin: 0; }
+.consent { background: var(--surface-card); border-radius: var(--radius-island); padding: 14px 16px; display: grid; gap: 8px; }
+.consent label { font-size: 16px; font-weight: 600; }
+.consent p { margin: 0; font-size: 14px; color: var(--text-2); }
+.consent a { color: var(--enamel-text); }
+
+.sent { display: grid; gap: 18px; justify-items: start; padding-top: 18px; }
+.sent__head { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.sent p { margin: 0; color: var(--text-2); }
+.sent h2 { margin: 0; font-size: 26px; line-height: 1.15; }
+
+/* ---------- состояния ---------- */
+.seg {
+  display: grid; grid-auto-flow: column; grid-auto-columns: 1fr;
+  background: var(--control); border-radius: var(--radius-control); padding: 3px; gap: 3px;
+}
+.seg button {
+  border: 0; border-radius: 9px; background: none; padding: 7px 8px;
+  font-size: 15px; font-weight: 600; color: var(--text-2);
+}
+.seg button[aria-selected="true"] { background: var(--surface-card); color: var(--text); box-shadow: 0 1px 2px rgb(0 0 0 / 0.12); }
+.skeleton { background: var(--control); border-radius: 8px; animation: pulse 1.6s ease-in-out infinite; }
+@keyframes pulse { 50% { opacity: 0.55; } }
+@media (prefers-reduced-motion: reduce) { .skeleton { animation: none; } }
+.skel-row { display: grid; grid-template-columns: 52px 1fr; gap: 12px; align-items: center; padding: 12px; }
+.empty, .error { display: grid; gap: 12px; justify-items: start; padding: 20px 4px; }
+.empty h3, .error h3 { margin: 0; font-size: 20px; }
+.empty p, .error p { margin: 0; color: var(--text-2); }
+.error .i { width: 28px; height: 28px; color: var(--surik); }
+
+/* ---------- УК ---------- */
+.metric { margin: 0; font-size: 19px; line-height: 1.3; background: var(--surface-card); border-radius: var(--radius-island); padding: 16px; text-wrap: pretty; }
+.metric .num { font-family: var(--font-plate); font-weight: 820; font-size: 40px; line-height: 0.9; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.metric--warn .num { color: var(--surik); }
+.muted-note { margin: 0; font-size: 13px; color: var(--text-2); }
+
+/* ---------- лист ---------- */
+.sheet-layer { position: absolute; inset: 0; z-index: 5; display: grid; align-items: end; }
+.sheet-layer[hidden] { display: none; }
+.sheet-backdrop { position: absolute; inset: 0; background: var(--backdrop); border: 0; padding: 0; }
+.sheet {
+  position: relative; background: var(--surface);
+  border-radius: var(--radius-sheet) var(--radius-sheet) 0 0;
+  padding: 10px 16px 18px; display: grid; gap: 14px;
+  box-shadow: var(--sheet-shadow);
+  animation: sheet-in 220ms var(--ease-out);
+}
+@keyframes sheet-in { from { transform: translateY(24%); opacity: 0; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .sheet { animation: none; } }
+.sheet__grip { justify-self: center; width: 36px; height: 5px; border-radius: 3px; background: var(--text-3); opacity: 0.5; }
+.sheet h3 { margin: 0; font-size: 20px; }
+.options { list-style: none; margin: 0; padding: 0; background: var(--surface-card); border-radius: var(--radius-island); }
+.options li + li { border-top: 1px solid var(--separator); margin-left: 16px; }
+.option { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 10px; padding: 13px 14px 13px 16px; font-size: 17px; cursor: pointer; }
+.options li + li .option { padding-left: 0; }
+.option input { appearance: none; width: 22px; height: 22px; border-radius: 50%; border: 2px solid var(--text-3); margin: 0; display: grid; place-items: center; }
+.option input:checked { border-color: var(--enamel); background: var(--enamel); box-shadow: inset 0 0 0 4px var(--surface-card); }
+
+.toast {
+  position: absolute; left: 12px; right: 12px; bottom: 96px; z-index: 6;
+  background: var(--text); color: var(--surface-card);
+  border-radius: var(--radius-control); padding: 12px 14px; font-size: 15px;
+  display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start;
+}
+.toast[hidden] { display: none; }
+
+/* ---------- чат ---------- */
+.chat { position: absolute; inset: 0; overflow-y: auto; padding: 16px 12px; display: flex; flex-direction: column; gap: 8px; justify-content: flex-end; }
+.day { align-self: center; font-size: 13px; color: var(--text-2); background: var(--surface-card); padding: 3px 10px; border-radius: 999px; margin-bottom: 4px; }
+.msg { max-width: 86%; padding: 9px 12px 8px; border-radius: 16px; font-size: 16px; line-height: 1.35; }
+.msg p { margin: 0; }
+.msg p + p { margin-top: 8px; }
+.msg--me { align-self: flex-end; background: var(--bubble-me); border-bottom-right-radius: 6px; }
+.msg--bot { align-self: flex-start; background: var(--surface-card); border-bottom-left-radius: 6px; }
+.msg__meta { display: block; text-align: right; font-size: 12px; color: var(--text-3); margin-top: 4px; }
+.msg__status { transition: color 200ms ease; }
+.keyboard { align-self: flex-start; width: 86%; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
+.keyboard button { border: 0; border-radius: 10px; background: var(--surface-card); color: var(--enamel-text); font-size: 15px; font-weight: 600; padding: 10px 8px; }
+.chat-input { display: grid; grid-template-columns: 1fr auto; gap: 8px; align-items: center; padding: 8px 12px 14px; background: var(--surface-card); border-top: 1px solid var(--separator); }
+.chat-input span { background: var(--surface); border-radius: 18px; padding: 9px 14px; color: var(--text-3); font-size: 16px; }
+.chat-input .i { color: var(--enamel-text); width: 24px; height: 24px; }
+.bot-avatar { width: 30px; height: 30px; border-radius: 8px; background: var(--enamel); color: #fff; display: inline-grid; place-items: center; vertical-align: middle; margin-right: 6px; }
+.bot-avatar .i { width: 18px; height: 18px; }
+
+/* ---------- наклейка ---------- */
+.sticker {
+  width: 100%; max-width: 340px; aspect-ratio: 105 / 148;
+  background: var(--print-paper); color: var(--print-ink);
+  border-radius: 10px; padding: 18px;
+  display: grid; grid-template-rows: auto auto 1fr auto auto; gap: 12px;
+  box-shadow: 0 1px 0 rgb(0 0 0 / 0.08), 0 10px 28px rgb(20 30 60 / 0.18);
+}
+.sticker .plate { background: var(--print-enamel); color: #ffffff; display: grid; }
+.sticker .plate::after { border-color: #ffffff; }
+.sticker .plate__num { font-size: 48px; }
+.sticker__lead { margin: 0; font-size: 22px; font-weight: 750; line-height: 1.15; }
+.sticker__text { margin: -4px 0 0; font-size: 14px; line-height: 1.35; }
+.qr { width: 100%; max-width: 150px; justify-self: center; align-self: center; }
+.qr svg { display: block; width: 100%; height: auto; }
+.sticker__sos { margin: 0; font-size: 13px; line-height: 1.3; padding-top: 10px; border-top: 1.5px solid var(--print-ink); }
+.sticker__sos b { font-family: var(--font-plate); font-size: 19px; font-weight: 800; white-space: nowrap; }
+.sticker__brand { margin: 0; font-size: 12px; opacity: 0.7; }
+
+/* ---------- основа ---------- */
+.basis { display: grid; gap: 28px; grid-template-columns: repeat(auto-fit, minmax(min(100%, 300px), 1fr)); }
+.basis h3 { margin: 0 0 12px; font-size: 18px; }
+.swatches { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.swatch { display: grid; grid-template-columns: 44px 1fr; gap: 12px; align-items: center; }
+.swatch__chip { width: 44px; height: 44px; border-radius: var(--radius-plate); box-shadow: inset 0 0 0 1px var(--separator); }
+.swatch__name { font-weight: 650; }
+.swatch__meta { font-size: 14px; color: var(--text-2); }
+.specimen { display: grid; gap: 10px; background: var(--surface-card); border-radius: var(--radius-island); padding: 16px; }
+.specimen__plate { font-family: var(--font-plate); font-weight: 850; font-size: 56px; line-height: 0.9; }
+.specimen__row { display: grid; grid-template-columns: 48px 1fr; gap: 10px; align-items: baseline; }
+.specimen__row span:first-child { font-size: 13px; color: var(--text-3); font-variant-numeric: tabular-nums; }
+.stamps { display: flex; flex-wrap: wrap; gap: 18px 16px; padding: 18px 16px; background: var(--surface-card); border-radius: var(--radius-island); }
+.rules { margin: 0; padding-left: 18px; display: grid; gap: 8px; color: var(--text-2); max-width: 60ch; }
+.rules strong { color: var(--text); }
+.demo-control { justify-self: start; }
+</style>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <filter id="ink" x="-5%" y="-10%" width="110%" height="120%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.85" numOctaves="2" seed="11" result="noise"/>
+      <feDisplacementMap in="SourceGraphic" in2="noise" scale="1.4" xChannelSelector="R" yChannelSelector="G"/>
+    </filter>
+    <!-- Иконки: Phosphor Icons (MIT), набор regular -->
+    <symbol id="i-caret-left" viewBox="0 0 256 256"><path d="M165.66,202.34a8,8,0,0,1-11.32,11.32l-80-80a8,8,0,0,1,0-11.32l80-80a8,8,0,0,1,11.32,11.32L91.31,128Z"/></symbol>
+    <symbol id="i-caret-right" viewBox="0 0 256 256"><path d="M181.66,133.66l-80,80a8,8,0,0,1-11.32-11.32L164.69,128,90.34,53.66a8,8,0,0,1,11.32-11.32l80,80A8,8,0,0,1,181.66,133.66Z"/></symbol>
+    <symbol id="i-phone" viewBox="0 0 256 256"><path d="M222.37,158.46l-47.11-21.11-.13-.06a16,16,0,0,0-15.17,1.4,8.12,8.12,0,0,0-.75.56L134.87,160c-15.42-7.49-31.34-23.29-38.83-38.51l20.78-24.71c.2-.25.39-.5.57-.77a16,16,0,0,0,1.32-15.06l0-.12L97.54,33.64a16,16,0,0,0-16.62-9.52A56.26,56.26,0,0,0,32,80c0,79.4,64.6,144,144,144a56.26,56.26,0,0,0,55.88-48.92A16,16,0,0,0,222.37,158.46ZM176,208A128.14,128.14,0,0,1,48,80,40.2,40.2,0,0,1,82.87,40a.61.61,0,0,0,0,.12l21,47L83.2,111.86a6.13,6.13,0,0,0-.57.77,16,16,0,0,0-1,15.7c9.06,18.53,27.73,37.06,46.46,46.11a16,16,0,0,0,15.75-1.14,8.44,8.44,0,0,0,.74-.56L168.89,152l47,21.05h0s.08,0,.11,0A40.21,40.21,0,0,1,176,208Z"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 256 256"><path d="M224,128a8,8,0,0,1-8,8H136v80a8,8,0,0,1-16,0V136H40a8,8,0,0,1,0-16h80V40a8,8,0,0,1,16,0v80h80A8,8,0,0,1,224,128Z"/></symbol>
+    <symbol id="i-share" viewBox="0 0 256 256"><path d="M176,160a39.89,39.89,0,0,0-28.62,12.09l-46.1-29.63a39.8,39.8,0,0,0,0-28.92l46.1-29.63a40,40,0,1,0-8.66-13.45l-46.1,29.63a40,40,0,1,0,0,55.82l46.1,29.63A40,40,0,1,0,176,160Zm0-128a24,24,0,1,1-24,24A24,24,0,0,1,176,32ZM64,152a24,24,0,1,1,24-24A24,24,0,0,1,64,152Zm112,72a24,24,0,1,1,24-24A24,24,0,0,1,176,224Z"/></symbol>
+    <symbol id="i-file-pdf" viewBox="0 0 256 256"><path d="M224,152a8,8,0,0,1-8,8H192v16h16a8,8,0,0,1,0,16H192v16a8,8,0,0,1-16,0V152a8,8,0,0,1,8-8h32A8,8,0,0,1,224,152ZM92,172a28,28,0,0,1-28,28H56v8a8,8,0,0,1-16,0V152a8,8,0,0,1,8-8H64A28,28,0,0,1,92,172Zm-16,0a12,12,0,0,0-12-12H56v24h8A12,12,0,0,0,76,172Zm88,8a36,36,0,0,1-36,36H112a8,8,0,0,1-8-8V152a8,8,0,0,1,8-8h16A36,36,0,0,1,164,180Zm-16,0a20,20,0,0,0-20-20h-8v40h8A20,20,0,0,0,148,180ZM40,112V40A16,16,0,0,1,56,24h96a8,8,0,0,1,5.66,2.34l56,56A8,8,0,0,1,216,88v24a8,8,0,0,1-16,0V96H152a8,8,0,0,1-8-8V40H56v72a8,8,0,0,1-16,0ZM160,80h28.69L160,51.31Z"/></symbol>
+    <symbol id="i-check" viewBox="0 0 256 256"><path d="M229.66,77.66l-128,128a8,8,0,0,1-11.32,0l-56-56a8,8,0,0,1,11.32-11.32L96,188.69,218.34,66.34a8,8,0,0,1,11.32,11.32Z"/></symbol>
+    <symbol id="i-warning" viewBox="0 0 256 256"><path d="M128,24A104,104,0,1,0,232,128,104.11,104.11,0,0,0,128,24Zm0,192a88,88,0,1,1,88-88A88.1,88.1,0,0,1,128,216Zm-8-80V80a8,8,0,0,1,16,0v56a8,8,0,0,1-16,0Zm20,36a12,12,0,1,1-12-12A12,12,0,0,1,140,172Z"/></symbol>
+    <symbol id="i-retry" viewBox="0 0 256 256"><path d="M240,56v48a8,8,0,0,1-8,8H184a8,8,0,0,1,0-16H211.4L184.81,71.64l-.25-.24a80,80,0,1,0-1.67,114.78,8,8,0,0,1,11,11.63A95.44,95.44,0,0,1,128,224h-1.32A96,96,0,1,1,195.75,60L224,85.8V56a8,8,0,1,1,16,0Z"/></symbol>
+    <symbol id="i-moon" viewBox="0 0 256 256"><path d="M233.54,142.23a8,8,0,0,0-8-2,88.08,88.08,0,0,1-109.8-109.8,8,8,0,0,0-10-10,104.84,104.84,0,0,0-52.91,37A104,104,0,0,0,136,224a103.09,103.09,0,0,0,62.52-20.88,104.84,104.84,0,0,0,37-52.91A8,8,0,0,0,233.54,142.23ZM188.9,190.34A88,88,0,0,1,65.66,67.11a89,89,0,0,1,31.4-26A106,106,0,0,0,96,56,104.11,104.11,0,0,0,200,160a106,106,0,0,0,14.92-1.06A89,89,0,0,1,188.9,190.34Z"/></symbol>
+    <symbol id="i-sun" viewBox="0 0 256 256"><path d="M120,40V16a8,8,0,0,1,16,0V40a8,8,0,0,1-16,0Zm72,88a64,64,0,1,1-64-64A64.07,64.07,0,0,1,192,128Zm-16,0a48,48,0,1,0-48,48A48.05,48.05,0,0,0,176,128ZM58.34,69.66A8,8,0,0,0,69.66,58.34l-16-16A8,8,0,0,0,42.34,53.66Zm0,116.68-16,16a8,8,0,0,0,11.32,11.32l16-16a8,8,0,0,0-11.32-11.32ZM192,72a8,8,0,0,0,5.66-2.34l16-16a8,8,0,0,0-11.32-11.32l-16,16A8,8,0,0,0,192,72Zm5.66,114.34a8,8,0,0,0-11.32,11.32l16,16a8,8,0,0,0,11.32-11.32ZM48,128a8,8,0,0,0-8-8H16a8,8,0,0,0,0,16H40A8,8,0,0,0,48,128Zm80,80a8,8,0,0,0-8,8v24a8,8,0,0,0,16,0V216A8,8,0,0,0,128,208Zm112-88H216a8,8,0,0,0,0,16h24a8,8,0,0,0,0-16Z"/></symbol>
+    <symbol id="i-bulb" viewBox="0 0 256 256"><path d="M176,232a8,8,0,0,1-8,8H88a8,8,0,0,1,0-16h80A8,8,0,0,1,176,232Zm40-128a87.55,87.55,0,0,1-33.64,69.21A16.24,16.24,0,0,0,176,186v6a16,16,0,0,1-16,16H96a16,16,0,0,1-16-16v-6a16,16,0,0,0-6.23-12.66A87.59,87.59,0,0,1,40,104.49C39.74,56.83,78.26,17.14,125.88,16A88,88,0,0,1,216,104Zm-16,0a72,72,0,0,0-73.74-72c-39,.92-70.47,33.39-70.26,72.39a71.65,71.65,0,0,0,27.64,56.3A32,32,0,0,1,96,186v6h64v-6a32.15,32.15,0,0,1,12.47-25.35A71.65,71.65,0,0,0,200,104Zm-16.11-9.34a57.6,57.6,0,0,0-46.56-46.55,8,8,0,0,0-2.66,15.78c16.57,2.79,30.63,16.85,33.44,33.45A8,8,0,0,0,176,104a9,9,0,0,0,1.35-.11A8,8,0,0,0,183.89,94.66Z"/></symbol>
+    <symbol id="i-elevator" viewBox="0 0 256 256"><path d="M208,32H48A16,16,0,0,0,32,48V208a16,16,0,0,0,16,16H208a16,16,0,0,0,16-16V48A16,16,0,0,0,208,32Zm-32,80v96H136V112Zm-56,96H80V112h40Zm88,0H192V104a8,8,0,0,0-8-8H72a8,8,0,0,0-8,8V208H48V48H208V208ZM152,72a8,8,0,0,1-8,8H112a8,8,0,0,1,0-16h32A8,8,0,0,1,152,72Z"/></symbol>
+    <symbol id="i-drop" viewBox="0 0 256 256"><path d="M174,47.75a254.19,254.19,0,0,0-41.45-38.3,8,8,0,0,0-9.18,0A254.19,254.19,0,0,0,82,47.75C54.51,79.32,40,112.6,40,144a88,88,0,0,0,176,0C216,112.6,201.49,79.32,174,47.75ZM128,216a72.08,72.08,0,0,1-72-72c0-57.23,55.47-105,72-118,16.53,13,72,60.75,72,118A72.08,72.08,0,0,1,128,216Zm55.89-62.66a57.6,57.6,0,0,1-46.56,46.55A8.75,8.75,0,0,1,136,200a8,8,0,0,1-1.32-15.89c16.57-2.79,30.63-16.85,33.44-33.45a8,8,0,0,1,15.78,2.68Z"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 256 256"><path d="M216,48H176V40a24,24,0,0,0-24-24H104A24,24,0,0,0,80,40v8H40a8,8,0,0,0,0,16h8V208a16,16,0,0,0,16,16H192a16,16,0,0,0,16-16V64h8a8,8,0,0,0,0-16ZM96,40a8,8,0,0,1,8-8h48a8,8,0,0,1,8,8v8H96Zm96,168H64V64H192ZM112,104v64a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Zm48,0v64a8,8,0,0,1-16,0V104a8,8,0,0,1,16,0Z"/></symbol>
+    <symbol id="i-thermo" viewBox="0 0 256 256"><path d="M212,56a28,28,0,1,0,28,28A28,28,0,0,0,212,56Zm0,40a12,12,0,1,1,12-12A12,12,0,0,1,212,96Zm-84,57V88a8,8,0,0,0-16,0v65a32,32,0,1,0,16,0Zm-8,47a16,16,0,1,1,16-16A16,16,0,0,1,120,200Zm40-66V48a40,40,0,0,0-80,0v86a64,64,0,1,0,80,0Zm-40,98a48,48,0,0,1-27.42-87.4A8,8,0,0,0,96,138V48a24,24,0,0,1,48,0v90a8,8,0,0,0,3.42,6.56A48,48,0,0,1,120,232Z"/></symbol>
+    <symbol id="i-door" viewBox="0 0 256 256"><path d="M232,216H208V40a16,16,0,0,0-16-16H64A16,16,0,0,0,48,40V216H24a8,8,0,0,0,0,16H232a8,8,0,0,0,0-16ZM64,40H192V216H64Zm104,92a12,12,0,1,1-12-12A12,12,0,0,1,168,132Z"/></symbol>
+    <symbol id="i-send" viewBox="0 0 256 256"><path d="M227.32,28.68a16,16,0,0,0-15.66-4.08l-.15,0L19.57,82.84a16,16,0,0,0-2.49,29.8L102,154l41.3,84.87A15.86,15.86,0,0,0,157.74,248q.69,0,1.38-.06a15.88,15.88,0,0,0,14-11.51l58.2-191.94c0-.05,0-.1,0-.15A16,16,0,0,0,227.32,28.68ZM157.83,231.85l-.05.14,0-.07-40.06-82.3,48-48a8,8,0,0,0-11.31-11.31l-48,48L24.08,98.25l-.07,0,.14,0L216,40Z"/></symbol>
+    <symbol id="i-clock" viewBox="0 0 256 256"><path d="M232,136.66A104.12,104.12,0,1,1,119.34,24,8,8,0,0,1,120.66,40,88.12,88.12,0,1,0,216,135.34,8,8,0,0,1,232,136.66ZM120,72v56a8,8,0,0,0,8,8h56a8,8,0,0,0,0-16H136V72a8,8,0,0,0-16,0Zm40-24a12,12,0,1,0-12-12A12,12,0,0,0,160,48Zm36,24a12,12,0,1,0-12-12A12,12,0,0,0,196,72Zm24,36a12,12,0,1,0-12-12A12,12,0,0,0,220,108Z"/></symbol>
+    <symbol id="i-chat" viewBox="0 0 256 256"><path d="M168,112a8,8,0,0,1-8,8H96a8,8,0,0,1,0-16h64A8,8,0,0,1,168,112Zm-8,24H96a8,8,0,0,0,0,16h64a8,8,0,0,0,0-16Zm72-8A104,104,0,0,1,79.12,219.82L45.07,231.17a16,16,0,0,1-20.24-20.24l11.35-34.05A104,104,0,1,1,232,128Zm-16,0A88,88,0,1,0,51.81,172.06a8,8,0,0,1,.66,6.54L40,216,77.4,203.53a7.85,7.85,0,0,1,2.53-.42,8,8,0,0,1,4,1.08A88,88,0,0,0,216,128Z"/></symbol>
+  </defs>
+</svg>
+
+<main class="page">
+  <header class="board-head">
+    <div class="plate">
+      <h1 class="plate__num">Адресная табличка</h1>
+      <span class="plate__street">Визуальная система мини-приложения MAX, в котором жители сообщают о поломках общего имущества дома всем домом</span>
+    </div>
+    <div class="board-tools">
+      <p class="note">Адреса, организации и цифры выдуманы для примера. Название продукта пока не выбрано.</p>
+      <button class="theme-toggle" id="themeToggle" type="button" aria-pressed="false">
+        <svg class="i" aria-hidden="true"><use href="#i-moon"/></svg><span>Тёмная тема</span>
+      </button>
+    </div>
+  </header>
+
+  <!-- ================= ЖИТЕЛЬ ================= -->
+  <section class="group" aria-labelledby="g-resident">
+    <h2 id="g-resident">Житель</h2>
+    <p>Главный путь проходится в первом телефоне: дом, новая проблема, отправка, карточка. Остальные экраны показывают просрочку и служебные состояния.</p>
+    <div class="frames">
+
+      <figure class="frame">
+        <div class="phone" id="phoneResident">
+          <div class="appbar">
+            <button class="appbar__back" type="button" data-back hidden><svg class="i" aria-hidden="true"><use href="#i-caret-left"/></svg>Назад</button>
+            <span class="appbar__title">‹Название›</span>
+            <span class="appbar__close" aria-hidden="true">Закрыть</span>
+          </div>
+          <div class="screens">
+
+            <!-- Хаб -->
+            <div class="screen" data-screen="hub" tabindex="-1" aria-label="Мой дом">
+              <div class="house">
+                <div class="plate plate--house">
+                  <span class="plate__num">17к2</span>
+                  <span class="plate__street">Ореховый бульвар</span>
+                </div>
+                <div class="house__meta">
+                  <span class="plate plate--entrance"><span class="plate__num">Подъезд 2</span></span>
+                  <span>кв. 37-72</span>
+                </div>
+              </div>
+
+              <div class="org">
+                <div>
+                  <div class="org__name">УК «Ореховый квартал»</div>
+                  <div class="org__sub">Диспетчерская круглосуточно</div>
+                </div>
+                <button class="btn btn--quiet" type="button"><svg class="i" aria-hidden="true"><use href="#i-phone"/></svg>Позвонить</button>
+              </div>
+
+              <h3 class="section-title">Сейчас в доме</h3>
+              <ul class="island" id="hubList"></ul>
+
+              <ul class="island island--plain">
+                <li><button class="cell" type="button"><span>Мои заявки</span><span class="badge">2</span><svg class="i" aria-hidden="true"><use href="#i-caret-right"/></svg></button></li>
+              </ul>
+
+              <div class="actionbar">
+                <button class="btn btn--primary" type="button" data-go="step1"><svg class="i" aria-hidden="true"><use href="#i-plus"/></svg>Сообщить о проблеме</button>
+              </div>
+            </div>
+
+            <!-- Шаг 1 -->
+            <div class="screen" data-screen="step1" tabindex="-1" aria-label="Новая проблема, шаг 1" hidden>
+              <p class="steps">Шаг 1 из 3</p>
+              <h2 class="screen-title">Что случилось?</h2>
+              <div class="chips" role="group" aria-label="Частые проблемы">
+                <button class="chip" type="button" aria-pressed="true"><svg class="i i--sm" aria-hidden="true"><use href="#i-elevator"/></svg>Лифт</button>
+                <button class="chip" type="button" aria-pressed="false"><svg class="i i--sm" aria-hidden="true"><use href="#i-bulb"/></svg>Свет</button>
+                <button class="chip" type="button" aria-pressed="false"><svg class="i i--sm" aria-hidden="true"><use href="#i-drop"/></svg>Протечка</button>
+                <button class="chip" type="button" aria-pressed="false"><svg class="i i--sm" aria-hidden="true"><use href="#i-thermo"/></svg>Отопление</button>
+                <button class="chip" type="button" aria-pressed="false"><svg class="i i--sm" aria-hidden="true"><use href="#i-door"/></svg>Дверь подъезда</button>
+                <button class="chip" type="button" aria-pressed="false"><svg class="i i--sm" aria-hidden="true"><use href="#i-trash"/></svg>Мусоропровод</button>
+              </div>
+              <div class="field">
+                <label for="desc">Опишите своими словами</label>
+                <textarea class="textarea" id="desc">Лифт во втором подъезде не приезжает, кнопка вызова горит. Со вчерашнего вечера.</textarea>
+                <span class="field__help">Коротко и как есть. Фото можно добавить на следующем шаге.</span>
+              </div>
+              <div class="actionbar">
+                <button class="btn btn--primary" type="button" id="step1Next" data-go="step2">Продолжить</button>
+              </div>
+            </div>
+
+            <!-- Шаг 2 -->
+            <div class="screen" data-screen="step2" tabindex="-1" aria-label="Новая проблема, шаг 2" hidden>
+              <p class="steps">Шаг 2 из 3</p>
+              <h2 class="screen-title">Проверьте заявку</h2>
+              <div class="hint">
+                <svg class="i" aria-hidden="true"><use href="#i-bulb"/></svg>
+                <span><strong>Подсказка.</strong> Поля заполнены по вашему описанию. Проверьте их, прежде чем отправлять.</span>
+              </div>
+              <div class="field">
+                <label for="cat">Что сломалось</label>
+                <div class="select-wrap">
+                  <select class="select" id="cat">
+                    <option selected>Лифт не работает</option>
+                    <option>Лифт застревает между этажами</option>
+                    <option>Не горит свет в подъезде</option>
+                    <option>Другое</option>
+                  </select>
+                  <svg class="i" aria-hidden="true"><use href="#i-caret-right"/></svg>
+                </div>
+              </div>
+              <div class="field">
+                <label for="where">Где</label>
+                <div class="select-wrap">
+                  <select class="select" id="where">
+                    <option selected>Подъезд 2, пассажирский лифт</option>
+                    <option>Подъезд 2, грузовой лифт</option>
+                  </select>
+                  <svg class="i" aria-hidden="true"><use href="#i-caret-right"/></svg>
+                </div>
+              </div>
+              <div class="field">
+                <span class="field__label">Фото</span>
+                <div class="photos">
+                  <button class="photo-add" type="button"><svg class="i" aria-hidden="true"><use href="#i-plus"/></svg>Добавить</button>
+                </div>
+                <span class="field__help">Необязательно. Фото помогает УК быстрее понять, что случилось.</span>
+              </div>
+
+              <div class="similar" role="region" aria-labelledby="similarTitle">
+                <div class="similar__top">
+                  <span class="count"><b id="similarCount">12</b><small>соседей</small></span>
+                  <div>
+                    <p class="similar__title" id="similarTitle">Об этом уже сообщили</p>
+                    <p class="similar__sub">Лифт не работает, подъезд 2. УК приняла заявку.</p>
+                  </div>
+                </div>
+                <button class="btn btn--primary" type="button" id="joinBtn">Это и у меня</button>
+                <button class="btn btn--secondary" type="button" data-go="step3">У меня другая проблема</button>
+              </div>
+            </div>
+
+            <!-- Шаг 3 -->
+            <div class="screen" data-screen="step3" tabindex="-1" aria-label="Новая проблема, шаг 3" hidden>
+              <p class="steps">Шаг 3 из 3</p>
+              <h2 class="screen-title">Отправить заявку</h2>
+              <dl class="summary">
+                <div><dt>Что</dt><dd>Лифт застревает между этажами</dd></div>
+                <div><dt>Где</dt><dd>Подъезд 2, грузовой лифт</dd></div>
+                <div><dt>Отвечает</dt><dd>УК «Ореховый квартал»</dd></div>
+                <div><dt>Срок ответа</dt><dd>до 22 сентября, по справочнику сроков</dd></div>
+              </dl>
+              <div class="consent">
+                <div class="switch-row">
+                  <label for="consent">Согласие на обработку данных для этой заявки</label>
+                  <input class="switch" type="checkbox" role="switch" id="consent">
+                </div>
+                <p>Соседи увидят только число сообщивших. Имя и телефон получит только УК. <a href="#" onclick="return false">Политика обработки данных</a></p>
+              </div>
+              <div class="actionbar">
+                <button class="btn btn--primary" type="button" id="sendBtn" disabled><svg class="i" aria-hidden="true"><use href="#i-send"/></svg>Отправить заявку</button>
+              </div>
+            </div>
+
+            <!-- Отправлено -->
+            <div class="screen" data-screen="sent" tabindex="-1" aria-label="Заявка отправлена" hidden>
+              <div class="sent">
+                <div class="sent__head">
+                  <span class="plate plate--issue"><span class="plate__label">Заявка</span><span class="plate__num">№ 0149</span></span>
+                  <span class="stamp" id="sentStamp" data-status="sent">Отправлено</span>
+                </div>
+                <h2>Заявка ушла в УК «Ореховый квартал»</h2>
+                <p>Бот пришлёт в чат карточку со статусом и сроком. Когда УК ответит, карточка обновится сама.</p>
+                <p>Соседям, у которых та же проблема, отправьте карточку в чат дома: они присоединятся, а не будут писать заново.</p>
+              </div>
+              <div class="actionbar">
+                <button class="btn btn--primary" type="button"><svg class="i" aria-hidden="true"><use href="#i-share"/></svg>Отправить в чат дома</button>
+                <button class="btn btn--secondary" type="button" data-home>Вернуться к дому</button>
+              </div>
+            </div>
+
+            <!-- Карточка -->
+            <div class="screen" data-screen="card" tabindex="-1" aria-label="Карточка проблемы" hidden>
+              <div id="residentCard" style="display:contents"></div>
+            </div>
+
+          </div>
+          <div class="toast" role="status" aria-live="polite" hidden></div>
+        </div>
+        <figcaption><strong>Основной путь.</strong> Нажмите «Сообщить о проблеме»: на втором шаге можно присоединиться к уже открытой заявке или отправить новую. Штамп ложится на карточку, когда меняется статус.</figcaption>
+      </figure>
+
+      <figure class="frame">
+        <div class="phone">
+          <div class="appbar">
+            <span class="appbar__back"><svg class="i" aria-hidden="true"><use href="#i-caret-left"/></svg>Назад</span>
+            <span class="appbar__title">‹Название›</span>
+            <span class="appbar__close" aria-hidden="true">Закрыть</span>
+          </div>
+          <div class="screens">
+            <div class="screen" id="overdueCard"></div>
+          </div>
+        </div>
+        <figcaption><strong>Просрочка.</strong> Сурик появляется только здесь: когда срок истёк. Сразу под цифрами предложен следующий шаг.</figcaption>
+      </figure>
+
+      <figure class="frame">
+        <div class="phone" id="phoneStates">
+          <div class="appbar">
+            <span></span>
+            <span class="appbar__title">‹Название›</span>
+            <span class="appbar__close" aria-hidden="true">Закрыть</span>
+          </div>
+          <div class="screens">
+            <div class="screen">
+              <div class="seg" role="tablist" aria-label="Состояние экрана">
+                <button type="button" role="tab" aria-selected="true" aria-controls="st-loading" id="tab-loading">Загрузка</button>
+                <button type="button" role="tab" aria-selected="false" aria-controls="st-empty" id="tab-empty">Пусто</button>
+                <button type="button" role="tab" aria-selected="false" aria-controls="st-error" id="tab-error">Ошибка</button>
+              </div>
+
+              <div id="st-loading" role="tabpanel" aria-labelledby="tab-loading" style="display:grid;gap:16px">
+                <div class="skeleton" style="height:112px;border-radius:6px"></div>
+                <div class="skeleton" style="height:36px;width:60%"></div>
+                <div class="island" aria-label="Загружаем проблемы дома">
+                  <div class="skel-row"><div class="skeleton" style="height:40px"></div><div style="display:grid;gap:8px"><div class="skeleton" style="height:16px;width:70%"></div><div class="skeleton" style="height:14px;width:45%"></div></div></div>
+                  <div class="skel-row"><div class="skeleton" style="height:40px"></div><div style="display:grid;gap:8px"><div class="skeleton" style="height:16px;width:62%"></div><div class="skeleton" style="height:14px;width:50%"></div></div></div>
+                  <div class="skel-row"><div class="skeleton" style="height:40px"></div><div style="display:grid;gap:8px"><div class="skeleton" style="height:16px;width:74%"></div><div class="skeleton" style="height:14px;width:38%"></div></div></div>
+                </div>
+              </div>
+
+              <div id="st-empty" role="tabpanel" aria-labelledby="tab-empty" hidden>
+                <div class="plate plate--house">
+                  <span class="plate__num">17к2</span>
+                  <span class="plate__street">Ореховый бульвар</span>
+                </div>
+                <div class="empty">
+                  <h3>В доме нет открытых проблем</h3>
+                  <p>Если что-то сломалось, сообщите. Соседи увидят заявку и смогут присоединиться.</p>
+                  <button class="btn btn--primary" type="button"><svg class="i" aria-hidden="true"><use href="#i-plus"/></svg>Сообщить о проблеме</button>
+                </div>
+              </div>
+
+              <div id="st-error" role="tabpanel" aria-labelledby="tab-error" hidden>
+                <div class="error">
+                  <svg class="i" aria-hidden="true"><use href="#i-warning"/></svg>
+                  <h3>Не удалось загрузить проблемы дома</h3>
+                  <p>Нет связи с сервером. Проверьте интернет и попробуйте ещё раз. Заявки, которые вы уже отправили, сохранены.</p>
+                  <button class="btn btn--secondary" type="button"><svg class="i" aria-hidden="true"><use href="#i-retry"/></svg>Повторить</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <figcaption><strong>Состояния.</strong> Скелетон повторяет форму таблички и строк. Пустой экран зовёт к действию, ошибка объясняет, что случилось и что делать.</figcaption>
+      </figure>
+
+    </div>
+  </section>
+
+  <!-- ================= УК ================= -->
+  <section class="group" aria-labelledby="g-uk">
+    <h2 id="g-uk">Сотрудник УК</h2>
+    <p>Смените статус заявки про лифт: штамп обновится здесь, в карточке жителя и в сообщении бота.</p>
+    <div class="frames">
+      <figure class="frame">
+        <div class="phone" id="phoneUk">
+          <div class="appbar">
+            <button class="appbar__back" type="button" data-back hidden><svg class="i" aria-hidden="true"><use href="#i-caret-left"/></svg>Назад</button>
+            <span class="appbar__title">‹Название› для УК</span>
+            <span class="appbar__close" aria-hidden="true">Закрыть</span>
+          </div>
+          <div class="screens">
+            <div class="screen" data-screen="list" tabindex="-1" aria-label="Проблемы домов УК">
+              <div class="seg" role="tablist" aria-label="Раздел">
+                <button type="button" role="tab" aria-selected="true" aria-controls="uk-issues" id="uk-tab-issues">Проблемы</button>
+                <button type="button" role="tab" aria-selected="false" aria-controls="uk-metrics" id="uk-tab-metrics">Метрики</button>
+              </div>
+
+              <div id="uk-issues" role="tabpanel" aria-labelledby="uk-tab-issues" style="display:grid;gap:16px">
+                <h3 class="section-title--sm">Просрочено</h3>
+                <ul class="island" data-uk-list="overdue"></ul>
+                <h3 class="section-title--sm">Срок в ближайшие 2 дня</h3>
+                <ul class="island" data-uk-list="soon"></ul>
+                <h3 class="section-title--sm">Новые</h3>
+                <ul class="island" data-uk-list="new"></ul>
+              </div>
+
+              <div id="uk-metrics" role="tabpanel" aria-labelledby="uk-tab-metrics" style="display:grid;gap:12px" hidden>
+                <p class="metric">Первого ответа УК жители ждут в среднем <span class="num">5 ч 40 мин</span></p>
+                <p class="metric">На одну проблему приходится <span class="num">6</span> сообщений соседей. Раньше это были бы шесть отдельных звонков или заявок.</p>
+                <p class="metric metric--warn">Просрочено <span class="num">9</span> заявок из <span class="num">54</span>, две из них жители отправили в жилинспекцию.</p>
+                <p class="muted-note">Пример данных за сентябрь. Считается по событиям заявок: создание, присоединение, смена статуса.</p>
+              </div>
+            </div>
+
+            <div class="screen" data-screen="ukcard" tabindex="-1" aria-label="Заявка" hidden>
+              <div id="ukCard" style="display:contents"></div>
+              <div class="actionbar">
+                <button class="btn btn--primary" type="button" id="openSheet">Сменить статус</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="sheet-layer" id="statusSheet" hidden>
+            <button class="sheet-backdrop" type="button" aria-label="Закрыть" data-close-sheet tabindex="-1"></button>
+            <div class="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetTitle">
+              <span class="sheet__grip" aria-hidden="true"></span>
+              <h3 id="sheetTitle">Сменить статус</h3>
+              <ul class="options" role="radiogroup" aria-labelledby="sheetTitle">
+                <li><label class="option"><span>В работе</span><input type="radio" name="st" value="progress" checked></label></li>
+                <li><label class="option"><span>Выполнено</span><input type="radio" name="st" value="done"></label></li>
+                <li><label class="option"><span>Отклонено</span><input type="radio" name="st" value="rejected"></label></li>
+              </ul>
+              <div class="field">
+                <label for="stComment" id="stCommentLabel">Комментарий для жителей</label>
+                <textarea class="textarea" id="stComment" style="min-height:80px">Мастер приедет сегодня до 18:00.</textarea>
+                <span class="field__help" id="stCommentHelp">Его увидят все, кто сообщил о проблеме.</span>
+              </div>
+              <button class="btn btn--primary" type="button" id="saveStatus">Сохранить статус</button>
+            </div>
+          </div>
+          <div class="toast" role="status" aria-live="polite" hidden></div>
+        </div>
+        <figcaption><strong>Список и метрики.</strong> Сверху то, что горит. Метрики написаны фразами: их читает руководитель УК, а не аналитик.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- ================= БОТ И ПЕЧАТЬ ================= -->
+  <section class="group" aria-labelledby="g-bot">
+    <h2 id="g-bot">Бот и наклейка</h2>
+    <p>Живая карточка в чате редактируется, а не присылается заново. Наклейка висит в лифте и ведёт прямо к заявке по этому лифту.</p>
+    <div class="frames">
+      <figure class="frame">
+        <div class="phone">
+          <div class="appbar">
+            <span></span>
+            <span class="appbar__title"><span class="bot-avatar" aria-hidden="true"><svg class="i"><use href="#i-chat"/></svg></span>‹Название›</span>
+            <span></span>
+          </div>
+          <div class="screens">
+            <div class="chat">
+              <span class="day">Сегодня</span>
+              <div class="msg msg--me"><p>Во втором подъезде не работает лифт</p><span class="msg__meta">08:10</span></div>
+              <div class="msg msg--bot">
+                <p><strong>Заявка № 0142</strong><br>Лифт не работает, подъезд 2</p>
+                <p>Статус: <span class="msg__status" id="botStatus">принята УК «Ореховый квартал»</span><br>Срок: до 19 сентября<br>Сообщили соседи: <span id="botCount">12</span></p>
+                <p id="botComment" hidden></p>
+                <span class="msg__meta"><span id="botEdited" hidden>изменено </span>08:12</span>
+              </div>
+              <div class="keyboard">
+                <button type="button">Открыть заявку</button>
+                <button type="button">Поделиться</button>
+              </div>
+            </div>
+          </div>
+          <div class="chat-input"><span>Сообщение</span><svg class="i" aria-hidden="true"><use href="#i-send"/></svg></div>
+        </div>
+        <figcaption><strong>Шаблон сообщения бота.</strong> Markdown без эмодзи: номер жирным, статус, срок и число соседей отдельными строками. Кнопки ведут в мини-приложение.</figcaption>
+      </figure>
+
+      <figure class="frame">
+        <div class="sticker" role="img" aria-label="Наклейка для лифта с QR-кодом">
+          <div class="plate">
+            <span class="plate__num">Лифт</span>
+            <span class="plate__street">Ореховый бульвар, 17к2, подъезд 2</span>
+          </div>
+          <p class="sticker__lead">Лифт не работает?</p>
+          <div class="qr" id="qr"></div>
+          <p class="sticker__text">Наведите камеру телефона на код. В MAX откроется заявка по этому лифту, дом и подъезд уже будут указаны.</p>
+          <p class="sticker__sos">Застряли в лифте, звоните в диспетчерскую<br><b>+7 (495) 000-17-02</b></p>
+        </div>
+        <figcaption><strong>Наклейка A6 для печати.</strong> Выглядит как домовая табличка, поэтому ей доверяют. Экстренный случай вынесен отдельно: застрявшим нужна диспетчерская, а не заявка.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- ================= ОСНОВА ================= -->
+  <section class="group" aria-labelledby="g-basis">
+    <h2 id="g-basis">Основа системы</h2>
+    <div class="basis">
+      <div>
+        <h3>Краска</h3>
+        <ul class="swatches">
+          <li class="swatch"><span class="swatch__chip" style="background:var(--enamel)"></span><span><span class="swatch__name">Эмаль</span><br><span class="swatch__meta">#1B3F94, тёмная тема #3A5FC4. Таблички и главная кнопка. Единственный фирменный цвет.</span></span></li>
+          <li class="swatch"><span class="swatch__chip" style="background:var(--surik)"></span><span><span class="swatch__name">Сурик</span><br><span class="swatch__meta">#C23A22. Только просрочка, отказ и удаление.</span></span></li>
+          <li class="swatch"><span class="swatch__chip" style="background:var(--amber-text)"></span><span><span class="swatch__name">Сигнальный янтарь</span><br><span class="swatch__meta">#8A5A00, тёмная тема #E0A83A. Статус «в работе».</span></span></li>
+          <li class="swatch"><span class="swatch__chip" style="background:var(--stencil-green)"></span><span><span class="swatch__name">Трафаретный зелёный</span><br><span class="swatch__meta">#2C7548. Статус «выполнено».</span></span></li>
+          <li class="swatch"><span class="swatch__chip" style="background:var(--surface)"></span><span><span class="swatch__name">Поверхности MAX</span><br><span class="swatch__meta">#EDEEF2 и #FFFFFF, тёмные #0F0F12 и #17181C. Нативная база без изменений.</span></span></li>
+        </ul>
+      </div>
+      <div>
+        <h3>Шрифт</h3>
+        <div class="specimen">
+          <span class="specimen__plate">17к2 № 0142</span>
+          <div class="specimen__row"><span>64/44</span><span>Sofia Sans Extra Condensed, только цифры и надписи табличек</span></div>
+          <div class="specimen__row"><span>26</span><span style="font-size:26px;font-weight:700;line-height:1.1">Лифт не работает</span></div>
+          <div class="specimen__row"><span>17</span><span style="font-size:17px">Sofia Sans, основной текст интерфейса</span></div>
+          <div class="specimen__row"><span>13</span><span style="font-size:13px;color:var(--text-2)">Подписи и пояснения</span></div>
+        </div>
+      </div>
+      <div>
+        <h3>Штамп статуса</h3>
+        <div class="stamps">
+          <span class="stamp" data-status="sent">Отправлено</span>
+          <span class="stamp" data-status="accepted">Принято</span>
+          <span class="stamp" data-status="progress">В работе</span>
+          <span class="stamp" data-status="done">Выполнено</span>
+          <span class="stamp" data-status="rejected">Отклонено</span>
+        </div>
+        <ul class="rules" style="margin-top:14px">
+          <li><strong>Табличка</strong> только для адреса, номера заявки и наклейки.</li>
+          <li><strong>Штамп</strong> ложится с анимацией лишь при смене статуса.</li>
+          <li><strong>Цифры</strong> узким шрифтом там, где масштаб и срок важнее слов.</li>
+        </ul>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcode-generator/1.4.4/qrcode.min.js"></script>
+<script>
+(() => {
+  const root = document.documentElement;
+  const reduceMotion = matchMedia("(prefers-reduced-motion: reduce)");
+
+  /* ---------- тема ---------- */
+  const toggle = document.getElementById("themeToggle");
+  const darkMedia = matchMedia("(prefers-color-scheme: dark)");
+  const currentTheme = () => root.dataset.theme || (darkMedia.matches ? "dark" : "light");
+  const renderToggle = () => {
+    const dark = currentTheme() === "dark";
+    toggle.setAttribute("aria-pressed", String(dark));
+    toggle.querySelector("span").textContent = dark ? "Светлая тема" : "Тёмная тема";
+    toggle.querySelector("use").setAttribute("href", dark ? "#i-sun" : "#i-moon");
+  };
+  try {
+    const saved = localStorage.getItem("plate-theme");
+    if (saved === "dark" || saved === "light") root.dataset.theme = saved;
+  } catch (e) { /* хранилище недоступно */ }
+  toggle.addEventListener("click", () => {
+    const next = currentTheme() === "dark" ? "light" : "dark";
+    root.dataset.theme = next;
+    try { localStorage.setItem("plate-theme", next); } catch (e) { /* ignore */ }
+    renderToggle();
+  });
+  darkMedia.addEventListener("change", renderToggle);
+  renderToggle();
+
+  /* ---------- данные примера ---------- */
+  const STATUS = { sent: "Отправлено", accepted: "Принято", progress: "В работе", done: "Выполнено", rejected: "Отклонено" };
+  const plural = (n, one, few, many) => {
+    const a = n % 10, b = n % 100;
+    if (a === 1 && b !== 11) return one;
+    if (a >= 2 && a <= 4 && (b < 12 || b > 14)) return few;
+    return many;
+  };
+  const ISSUES = {
+    "0142": { title: "Лифт не работает", house: "17к2", place: "Подъезд 2", icon: "i-elevator", count: 12, status: "accepted",
+      deadline: "до 19 сентября", daysLeft: 2, overdueDays: 0, org: "УК «Ореховый квартал»",
+      timeline: [["17 сентября, 08:10", "Житель подъезда 2 сообщил о проблеме"], ["17 сентября, 09:30", "Присоединились ещё 11 соседей"], ["17 сентября, 11:05", "УК приняла заявку"]] },
+    "0138": { title: "Не горит свет на 5 этаже", house: "17к2", place: "Подъезд 1", icon: "i-bulb", count: 4, status: "progress",
+      deadline: "срок истёк 16 сентября", daysLeft: 0, overdueDays: 1, org: "УК «Ореховый квартал»",
+      timeline: [["9 сентября, 21:40", "Житель подъезда 1 сообщил о проблеме"], ["10 сентября, 10:15", "УК приняла заявку"], ["12 сентября, 14:00", "УК: заказали светильник, ждём поставку"], ["16 сентября, 18:00", "Срок ответа истёк"]] },
+    "0145": { title: "Протекает кровля над 9 этажом", house: "17к2", place: "Подъезд 3", icon: "i-drop", count: 7, status: "accepted",
+      deadline: "до 25 сентября", daysLeft: 8, overdueDays: 0, org: "УК «Ореховый квартал»",
+      timeline: [["15 сентября, 19:02", "Житель подъезда 3 сообщил о проблеме"], ["16 сентября, 09:40", "УК приняла заявку"]] },
+    "0147": { title: "Не закрывается дверь подъезда", house: "17к1", place: "Подъезд 4", icon: "i-door", count: 2, status: "sent",
+      deadline: "до 20 сентября", daysLeft: 3, overdueDays: 0, org: "УК «Ореховый квартал»",
+      timeline: [["17 сентября, 09:20", "Житель подъезда 4 сообщил о проблеме"]] }
+  };
+  const deadlineHtml = (d) => d.overdueDays > 0
+    ? `<span class="deadline deadline--overdue"><svg class="i i--sm" aria-hidden="true"><use href="#i-clock"/></svg>Просрочено на ${d.overdueDays} ${plural(d.overdueDays, "день", "дня", "дней")}</span>`
+    : `<span class="deadline"><svg class="i i--sm" aria-hidden="true"><use href="#i-clock"/></svg>${d.deadline}, ${d.daysLeft} ${plural(d.daysLeft, "день", "дня", "дней")}</span>`;
+
+  const rowHtml = (id, withHouse) => {
+    const d = ISSUES[id];
+    return `<li><button class="row" type="button" data-issue="${id}">
+      <span class="count"><b data-count="${id}">${d.count}</b><small>${plural(d.count, "сосед", "соседа", "соседей")}</small></span>
+      <span class="row__body"><span class="row__title">${d.title}</span>
+      <span class="row__sub">${withHouse ? d.house + ", " + d.place.toLowerCase() : d.place}</span>${deadlineHtml(d)}</span>
+      <svg class="i" aria-hidden="true"><use href="#i-caret-right"/></svg></button></li>`;
+  };
+
+  function cardHtml(id, opts) {
+    const d = ISSUES[id];
+    const second = d.overdueDays > 0
+      ? `<div class="figure figure--overdue"><b class="figure__num">${d.overdueDays}</b><span class="figure__label">${plural(d.overdueDays, "день", "дня", "дней")} просрочки</span></div>`
+      : `<div class="figure"><b class="figure__num">${d.daysLeft}</b><span class="figure__label">${plural(d.daysLeft, "день", "дня", "дней")} до срока ответа</span></div>`;
+    const escalate = d.overdueDays > 0 && !opts.uk ? `
+      <div class="escalate">
+        <p><strong>УК не уложилась в срок.</strong> Подготовим обращение в жилищную инспекцию: даты, комментарии УК и число сообщивших соседей уже внутри.</p>
+        <button class="btn btn--secondary" type="button"><svg class="i" aria-hidden="true"><use href="#i-file-pdf"/></svg>Подготовить PDF</button>
+      </div>` : "";
+    const actions = opts.uk ? "" : `
+      <div class="actionbar">
+        ${opts.joined
+          ? `<button class="btn btn--secondary" type="button" disabled><svg class="i" aria-hidden="true"><use href="#i-check"/></svg>Вы среди сообщивших</button>`
+          : `<button class="btn btn--primary" type="button" data-join="${id}">Это и у меня</button>`}
+        <button class="btn btn--secondary" type="button"><svg class="i" aria-hidden="true"><use href="#i-share"/></svg>Отправить в чат дома</button>
+      </div>`;
+    return `
+      <div class="issue-head">
+        <span class="plate plate--issue"><span class="plate__label">Заявка</span><span class="plate__num">№ ${id}</span></span>
+        <span class="stamp" data-status="${d.status}" data-stamp="${id}">${STATUS[d.status]}</span>
+      </div>
+      <h2 class="issue-title">${d.title}</h2>
+      <p class="issue-place">Ореховый бульвар, ${d.house}, ${d.place.toLowerCase()}</p>
+      <div class="figures">
+        <div class="figure"><b class="figure__num" data-count="${id}">${d.count}</b><span class="figure__label">${plural(d.count, "сосед сообщил", "соседа сообщили", "соседей сообщили")}</span></div>
+        ${second}
+      </div>
+      ${escalate}
+      <dl class="facts">
+        <div><dt>Отвечает</dt><dd>${d.org}</dd></div>
+        <div><dt>Срок ответа</dt><dd>${d.overdueDays > 0 ? d.deadline : d.deadline + ", по справочнику сроков"}</dd></div>
+      </dl>
+      <h3 class="section-title">Что происходило</h3>
+      <ol class="timeline" data-timeline="${id}">${d.timeline.map(([t, s]) => `<li><time>${t}</time><span>${s}</span></li>`).join("")}</ol>
+      ${actions}`;
+  }
+
+  /* ---------- общие механики ---------- */
+  function landStamp(stamp, status) {
+    stamp.dataset.status = status;
+    stamp.textContent = STATUS[status];
+    stamp.classList.remove("is-landing");
+    void stamp.offsetWidth;
+    stamp.classList.add("is-landing");
+    /* в MAX: window.WebApp?.HapticFeedback?.notificationOccurred("success") */
+  }
+  function bumpCounts(id) {
+    document.querySelectorAll(`[data-count="${id}"]`).forEach((el) => {
+      el.textContent = ISSUES[id].count;
+      el.classList.remove("count-bump");
+      void el.offsetWidth;
+      el.classList.add("count-bump");
+    });
+  }
+  function toast(phone, text) {
+    const t = phone.querySelector(".toast");
+    t.hidden = false;
+    t.innerHTML = `<svg class="i" aria-hidden="true"><use href="#i-check"/></svg><span>${text}</span>`;
+    clearTimeout(t._timer);
+    t._timer = setTimeout(() => { t.hidden = true; }, 3400);
+  }
+  function makeRouter(phone) {
+    const screens = [...phone.querySelectorAll("[data-screen]")];
+    const back = phone.querySelector("[data-back]");
+    const stack = [screens.find((s) => !s.hidden).dataset.screen];
+    const show = (name, focus) => {
+      screens.forEach((s) => { s.hidden = s.dataset.screen !== name; });
+      back.hidden = stack.length < 2;
+      const target = screens.find((s) => s.dataset.screen === name);
+      target.scrollTop = 0;
+      target.dispatchEvent(new CustomEvent("screen:show"));
+      if (focus) target.focus({ preventScroll: true });
+    };
+    back.addEventListener("click", () => { if (stack.length > 1) { stack.pop(); show(stack[stack.length - 1], true); } });
+    return {
+      go(name) { stack.push(name); show(name, true); },
+      reset(...names) { stack.length = 0; stack.push(...names); show(names[names.length - 1], true); },
+      current: () => stack[stack.length - 1]
+    };
+  }
+  function tabs(tablist) {
+    const buttons = [...tablist.querySelectorAll('[role="tab"]')];
+    buttons.forEach((b) => b.addEventListener("click", () => {
+      buttons.forEach((x) => {
+        const on = x === b;
+        x.setAttribute("aria-selected", String(on));
+        document.getElementById(x.getAttribute("aria-controls")).hidden = !on;
+      });
+    }));
+  }
+
+  /* ---------- житель ---------- */
+  const residentPhone = document.getElementById("phoneResident");
+  const residentRouter = makeRouter(residentPhone);
+  const hubList = document.getElementById("hubList");
+  const residentCard = document.getElementById("residentCard");
+  let openedIssue = "0142";
+  const joined = new Set();
+
+  const renderHub = () => { hubList.innerHTML = ["0142", "0138", "0145"].map((id) => rowHtml(id, false)).join(""); };
+  const renderResidentCard = () => { residentCard.innerHTML = cardHtml(openedIssue, { joined: joined.has(openedIssue) }); };
+  renderHub();
+
+  residentPhone.addEventListener("click", (e) => {
+    const go = e.target.closest("[data-go]");
+    if (go && !go.disabled) { residentRouter.go(go.dataset.go); return; }
+    if (e.target.closest("[data-home]")) { residentRouter.reset("hub"); return; }
+    const row = e.target.closest("[data-issue]");
+    if (row) { openedIssue = row.dataset.issue; renderResidentCard(); residentRouter.go("card"); return; }
+    const joinBtn = e.target.closest("[data-join]");
+    if (joinBtn) { join(joinBtn.dataset.join); return; }
+    const chip = e.target.closest(".chip");
+    if (chip) {
+      residentPhone.querySelectorAll(".chip").forEach((c) => c.setAttribute("aria-pressed", String(c === chip)));
+      updateStep1();
+    }
+  });
+
+  function join(id) {
+    if (!joined.has(id)) { joined.add(id); ISSUES[id].count += 1; }
+    openedIssue = id;
+    renderResidentCard();
+    renderHub();
+    renderUkLists();
+    bumpCounts(id);
+    syncBot();
+    toast(residentPhone, "Вы присоединились. Карточка со статусом придёт в чат с ботом.");
+  }
+  document.getElementById("joinBtn").addEventListener("click", () => {
+    openedIssue = "0142";
+    renderResidentCard();
+    residentRouter.reset("hub", "card");
+    join("0142");
+  });
+
+  const desc = document.getElementById("desc");
+  const step1Next = document.getElementById("step1Next");
+  function updateStep1() {
+    const hasChip = !!residentPhone.querySelector('.chip[aria-pressed="true"]');
+    step1Next.disabled = !(desc.value.trim() || hasChip);
+  }
+  desc.addEventListener("input", updateStep1);
+
+  const consent = document.getElementById("consent");
+  const sendBtn = document.getElementById("sendBtn");
+  consent.addEventListener("change", () => { sendBtn.disabled = !consent.checked; });
+  sendBtn.addEventListener("click", () => residentRouter.reset("hub", "sent"));
+  residentPhone.querySelector('[data-screen="sent"]').addEventListener("screen:show", () => {
+    landStamp(document.getElementById("sentStamp"), "sent");
+  });
+
+  /* ---------- просрочка (статичный экран) ---------- */
+  document.getElementById("overdueCard").innerHTML = cardHtml("0138", {});
+
+  /* ---------- состояния ---------- */
+  tabs(document.querySelector("#phoneStates .seg"));
+
+  /* ---------- УК ---------- */
+  const ukPhone = document.getElementById("phoneUk");
+  const ukRouter = makeRouter(ukPhone);
+  const ukCard = document.getElementById("ukCard");
+  let ukOpened = "0142";
+  tabs(ukPhone.querySelector(".seg"));
+
+  function renderUkLists() {
+    const groups = { overdue: ["0138"], soon: ["0142"], new: ["0147"] };
+    Object.entries(groups).forEach(([key, ids]) => {
+      ukPhone.querySelector(`[data-uk-list="${key}"]`).innerHTML = ids.map((id) => rowHtml(id, true)).join("");
+    });
+  }
+  renderUkLists();
+
+  ukPhone.addEventListener("click", (e) => {
+    const row = e.target.closest("[data-issue]");
+    if (row) { ukOpened = row.dataset.issue; ukCard.innerHTML = cardHtml(ukOpened, { uk: true }); ukRouter.go("ukcard"); return; }
+    if (e.target.closest("[data-close-sheet]")) closeSheet();
+  });
+
+  const sheet = document.getElementById("statusSheet");
+  const openSheetBtn = document.getElementById("openSheet");
+  const stComment = document.getElementById("stComment");
+  const stCommentLabel = document.getElementById("stCommentLabel");
+  const stCommentHelp = document.getElementById("stCommentHelp");
+  const saveStatus = document.getElementById("saveStatus");
+
+  function openSheet() {
+    sheet.hidden = false;
+    sheet.querySelector('input[name="st"]:checked').focus();
+  }
+  function closeSheet() {
+    sheet.hidden = true;
+    openSheetBtn.focus();
+  }
+  openSheetBtn.addEventListener("click", openSheet);
+  sheet.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") { e.preventDefault(); closeSheet(); }
+    if (e.key === "Tab") {
+      const focusables = [...sheet.querySelectorAll('input:checked, textarea, button:not([tabindex="-1"])')];
+      const first = focusables[0], last = focusables[focusables.length - 1];
+      if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+      else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+    }
+  });
+  sheet.querySelectorAll('input[name="st"]').forEach((r) => r.addEventListener("change", () => {
+    const rejected = r.value === "rejected" && r.checked;
+    stCommentLabel.textContent = rejected ? "Причина отказа" : "Комментарий для жителей";
+    stCommentHelp.textContent = rejected ? "Обязательно. Жители увидят причину в карточке." : "Его увидят все, кто сообщил о проблеме.";
+    if (rejected) stComment.value = "";
+    saveStatus.disabled = rejected && !stComment.value.trim();
+  }));
+  stComment.addEventListener("input", () => {
+    const rejected = sheet.querySelector('input[name="st"]:checked').value === "rejected";
+    saveStatus.disabled = rejected && !stComment.value.trim();
+  });
+
+  saveStatus.addEventListener("click", () => {
+    const status = sheet.querySelector('input[name="st"]:checked').value;
+    const comment = stComment.value.trim();
+    const d = ISSUES[ukOpened];
+    d.status = status;
+    const now = new Date();
+    const time = now.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+    d.timeline.push([`сегодня, ${time}`, `УК: ${STATUS[status].toLowerCase()}${comment ? ". " + comment : ""}`]);
+    closeSheet();
+
+    ukCard.innerHTML = cardHtml(ukOpened, { uk: true });
+    landStamp(ukCard.querySelector("[data-stamp]"), status);
+    toast(ukPhone, `Статус сохранён. ${d.count} ${plural(d.count, "житель увидит", "жителя увидят", "жителей увидят")} его в карточке.`);
+
+    if (openedIssue === ukOpened && residentRouter.current() === "card") {
+      renderResidentCard();
+      landStamp(residentCard.querySelector("[data-stamp]"), status);
+    }
+    if (ukOpened === "0138") {
+      document.getElementById("overdueCard").innerHTML = cardHtml("0138", {});
+      landStamp(document.querySelector("#overdueCard [data-stamp]"), status);
+    }
+    if (ukOpened === "0142") syncBot(comment);
+  });
+
+  /* ---------- бот ---------- */
+  function syncBot(comment) {
+    const d = ISSUES["0142"];
+    const words = { sent: "отправлена в УК", accepted: "принята УК «Ореховый квартал»", progress: "в работе", done: "выполнена", rejected: "отклонена" };
+    const statusEl = document.getElementById("botStatus");
+    statusEl.textContent = words[d.status];
+    statusEl.style.color = d.status === "rejected" ? "var(--surik)" : d.status === "done" ? "var(--stencil-green)" : d.status === "progress" ? "var(--amber-text)" : "";
+    document.getElementById("botCount").textContent = d.count;
+    const c = document.getElementById("botComment");
+    if (comment !== undefined) { c.hidden = !comment; c.textContent = comment ? `Комментарий УК: ${comment}` : ""; }
+    document.getElementById("botEdited").hidden = false;
+  }
+
+  /* ---------- QR на наклейке ---------- */
+  const qrEl = document.getElementById("qr");
+  if (window.qrcode) {
+    const qr = window.qrcode(0, "M");
+    qr.addData("https://max.ru/example_bot?startapp=o_17k2_e2_lift1");
+    qr.make();
+    const n = qr.getModuleCount();
+    let d = "";
+    for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (qr.isDark(r, c)) d += `M${c} ${r}h1v1h-1z`;
+    qrEl.innerHTML = `<svg viewBox="-2 -2 ${n + 4} ${n + 4}" shape-rendering="crispEdges" aria-hidden="true"><rect x="-2" y="-2" width="${n + 4}" height="${n + 4}" fill="#ffffff"/><path d="${d}" fill="#0a0b0d"/></svg>`;
+  } else {
+    qrEl.textContent = "Здесь будет QR-код";
+  }
+})();
+</script>

@@ -1,0 +1,131 @@
+/*
+ * «Адресная табличка» — токены фирменного слоя поверх MAX UI.
+ * Источник истины для hack-docs/design/DESIGN-SYSTEM.md и прототипа.
+ *
+ * Подключение в miniapp:
+ *   import '@maxhub/max-ui/dist/styles.css';
+ *   import './theme/tokens.css';
+ *   <MaxUI colorScheme={scheme}>
+ *     <div className="app-theme" data-scheme={scheme}> ...приложение... </div>
+ *   </MaxUI>
+ *
+ * MAX UI объявляет переменные на своём корне (хэшированный класс).
+ * CSS-переменные наследуются от ближайшего предка, поэтому обёртка .app-theme
+ * внутри <MaxUI> переопределяет их для всего приложения, не трогая классы библиотеки.
+ */
+
+/* Шрифты: в продакшене — self-host (OFL), файлы кладутся в miniapp/public/fonts/. */
+@font-face {
+  font-family: "Sofia Sans";
+  src: url("/fonts/SofiaSans[wght].woff2") format("woff2");
+  font-weight: 1 1000;
+  font-display: swap;
+}
+@font-face {
+  font-family: "Sofia Sans Extra Condensed";
+  src: url("/fonts/SofiaSansExtraCondensed[wght].woff2") format("woff2");
+  font-weight: 1 1000;
+  font-display: swap;
+}
+
+.app-theme {
+  /* Шрифты */
+  --font-ui: "Sofia Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-plate: "Sofia Sans Extra Condensed", "Sofia Sans", "Arial Narrow", system-ui, sans-serif;
+
+  /* Фирменная краска и состояния (светлая тема) */
+  --enamel: #1b3f94;            /* таблички, основная кнопка */
+  --enamel-pressed: #142f70;
+  --enamel-text: #1b3f94;       /* ссылки и иконки на светлом фоне */
+  --plate-ink: #ffffff;         /* текст и рамка таблички */
+  --surik: #c23a22;             /* просрочено, отклонено, удаление */
+  --stencil-green: #2c7548;     /* выполнено */
+  --amber-text: #8a5a00;        /* в работе: текст и штамп */
+
+  /* Нативные поверхности MAX UI (светлая тема), продублированы для прототипа */
+  --surface: #edeef2;
+  --surface-card: #ffffff;
+  --surface-secondary: #f5f7fa;
+  --control: #e9ebf1;
+  --text: #060708;
+  --text-2: rgb(6 7 8 / 0.68);
+  --text-3: rgb(6 7 8 / 0.6);
+  --separator: rgb(6 7 8 / 0.1);
+  --sheet-shadow: 0 -12px 32px rgb(20 30 60 / 0.16);
+
+  /* Форма */
+  --radius-plate: 6px;
+  --radius-plate-rule: 3px;
+  --radius-control: 12px;
+  --radius-button: 14px;
+  --radius-island: 12px;
+  --radius-sheet: 16px;
+
+  /* Отступы */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-6: 24px;
+  --space-8: 32px;
+
+  /* Шкала текста */
+  --type-description: 13px;
+  --type-detail: 15px;
+  --type-body: 17px;
+  --type-subheader: 20px;
+  --type-header: 26px;
+  --type-plate-house: 64px;
+  --type-plate-card: 44px;
+  --type-plate-row: 32px;
+  --leading-text: 1.35;
+  --leading-plate: 0.9;
+
+  /* Движение */
+  --stamp-duration: 380ms;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  /* Переопределение переменных MAX UI */
+  --font: var(--font-ui);
+  --button-primary: var(--enamel);
+  --states-button-primary-pressed: var(--enamel-pressed);
+  --text-themed: var(--enamel-text);
+  --icon-themed: var(--enamel-text);
+  --text-negative: var(--surik);
+  --button-negative: var(--surik);
+
+  font-family: var(--font-ui);
+  color: var(--text);
+  background: var(--surface);
+}
+
+.app-theme[data-scheme="dark"] {
+  --enamel: #3a5fc4;
+  --enamel-pressed: #2f50aa;
+  --enamel-text: #93aaf2;
+  --plate-ink: #f4f6fb;
+  --surik: #e2583f;
+  --stencil-green: #56a877;
+  --amber-text: #e0a83a;
+
+  --surface: #0f0f12;
+  --surface-card: #17181c;
+  --surface-secondary: #25262d;
+  --control: #2c2d35;
+  --text: #ffffff;
+  --text-2: rgb(255 255 255 / 0.8);
+  --text-3: rgb(255 255 255 / 0.62);
+  --separator: rgb(255 255 255 / 0.1);
+  --sheet-shadow: 0 -12px 32px rgb(0 0 0 / 0.5);
+}
+
+/* Штамп статуса: единственная автоматическая анимация */
+@keyframes stamp-land {
+  0%   { opacity: 0; transform: scale(1.35) rotate(-10deg); }
+  70%  { opacity: 0.92; transform: scale(0.97) rotate(-3deg); }
+  100% { opacity: 0.92; transform: scale(1) rotate(-4deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-theme { --stamp-duration: 0ms; }
+}
