@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "design-prototype",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "4173", "--bind", "127.0.0.1", "--directory", "hack-docs/design/prototype"],
+      "port": 4173
+    }
+  ]
+}

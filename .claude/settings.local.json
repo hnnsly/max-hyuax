@@ -1,0 +1,77 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "C:/Users/Yaroslafffchik/AppData/Roaming/npm/node_modules/lean-ctx-bin/bin/lean-ctx.exe hook observe",
+            "type": "command"
+          }
+        ],
+        "matcher": ".*"
+      },
+      {
+        "hooks": [
+          {
+            "command": "C:/Users/Yaroslafffchik/AppData/Roaming/npm/node_modules/lean-ctx-bin/bin/lean-ctx.exe hook read-dedup",
+            "type": "command"
+          }
+        ],
+        "matcher": "Read"
+      }
+    ],
+    "PreCompact": [
+      {
+        "hooks": [
+          {
+            "command": "C:/Users/Yaroslafffchik/AppData/Roaming/npm/node_modules/lean-ctx-bin/bin/lean-ctx.exe hook observe",
+            "type": "command"
+          }
+        ],
+        "matcher": ".*"
+      }
+    ],
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "command": "C:/Users/Yaroslafffchik/AppData/Roaming/npm/node_modules/lean-ctx-bin/bin/lean-ctx.exe hook rewrite",
+            "type": "command"
+          }
+        ],
+        "matcher": "Bash|bash|PowerShell|powershell"
+      },
+      {
+        "hooks": [
+          {
+            "command": "C:/Users/Yaroslafffchik/AppData/Roaming/npm/node_modules/lean-ctx-bin/bin/lean-ctx.exe hook redirect",
+            "type": "command"
+          }
+        ],
+        "matcher": "Read|read|ReadFile|read_file|View|view|Grep|grep|Search|search|ListFiles|list_files|ListDirectory|list_directory|Glob|glob"
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "command": "C:/Users/Yaroslafffchik/AppData/Roaming/npm/node_modules/lean-ctx-bin/bin/lean-ctx.exe hook observe",
+            "type": "command"
+          }
+        ],
+        "matcher": ".*"
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "command": "C:/Users/Yaroslafffchik/AppData/Roaming/npm/node_modules/lean-ctx-bin/bin/lean-ctx.exe hook observe",
+            "type": "command"
+          }
+        ],
+        "matcher": ".*"
+      }
+    ]
+  }
+}
