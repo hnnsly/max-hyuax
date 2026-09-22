@@ -4,6 +4,31 @@
 
 **Статус (17.09.2026):** этап 1 завершён (ресерч, интервью, SRS v1.0, ADR 001–008). Кода ещё нет — начинается Спайк 0. Онлайн-этап до 30.09.2026; точное время дедлайна не известно, поэтому code freeze 29.09 днём. **Токен бота ещё не выдан.**
 
+**Статус (23.09.2026)**: Выдали информацию по боту, получилось зафетчить:
+```shell
+PS C:\WINDOWS\system32> curl.exe -k -X GET https://platform-api2.max.ru/me -H "Authorization: f9LHodD0cOL2NmKbuATgdnneiJ5RFSQyh_YHIO6Tztr5VIn7MS536x4ixpeAAke_2GTrMtXrjl-lySJ-AbXl"
+```
+*пришлось добавить флаг -k, т.к. эта штука очень ругается на сертификаты, что прямо и указано в документации*
+
+Информация о боте:
+```JSON
+{
+  "user_id": 426323711,
+  "first_name": "Хакатон МАХ 105",
+  "is_bot": true,
+  "username": "t105_hakaton_max_bot",
+  "last_activity_time": 1790029657169,
+  "description": "Хакатон по разработке чат-ботов и мини-приложений для мессенджера МАХ",
+  "avatar_url": "https://i.oneme.ru/i?r=BTFjO43w8Yr1OSJ4tcurq5HiHtyVRGRH-tR23uFpfKjopoSuRMMRIayvt1jkELP5cm4",
+  "full_avatar_url": "https://i.oneme.ru/i?r=BTFjO43w8Yr1OSJ4tcurq5HiNumsXLY3PqE_FARjsJ6TmISuRMMRIayvt1jkELP5cm4",
+  "name": "Хакатон МАХ 105"
+}
+```
+Токен доступа:
+```
+f9LHodD0cOL2NmKbuATgdnneiJ5RFSQyh_YHIO6Tztr5VIn7MS536x4ixpeAAke_2GTrMtXrjl-lySJ-AbXl
+```
+Прямая ссылка в максе: https://max.ru/t105_hakaton_max_bot
 ## Начало каждой сессии
 1. Прочитать `hack-docs/INDEX.md` — индекс базы знаний и текущее состояние.
 2. Затем `hack-docs/research/MINDMAP.md` и заметку по задаче (`SRS.md`, `requirements/*`, `adr/*`).
