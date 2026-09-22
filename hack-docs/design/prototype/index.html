@@ -98,6 +98,8 @@
 }
 
 *, *::before, *::after { box-sizing: border-box; }
+/* атрибут hidden должен побеждать display у компонентов и встроенные стили */
+[hidden] { display: none !important; }
 body {
   background: var(--page);
   color: var(--text);

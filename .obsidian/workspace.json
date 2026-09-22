@@ -4,34 +4,25 @@
     "type": "split",
     "children": [
       {
-        "id": "abf167e6833579ec",
+        "id": "bfb7ad9ba442b980",
         "type": "tabs",
         "children": [
           {
-            "id": "c9e6456587913c99",
+            "id": "db6a6d2397df83fa",
             "type": "leaf",
             "state": {
-              "type": "markdown",
+              "type": "split-diff-view",
               "state": {
-                "file": "hack-docs/research/competitors.md",
-                "mode": "source",
-                "source": false
+                "aFile": "CLAUDE.md",
+                "bFile": "CLAUDE.md",
+                "aRef": "HEAD",
+                "bRef": ""
               },
-              "icon": "lucide-file",
-              "title": "competitors"
-            }
-          },
-          {
-            "id": "07bb8ee6cae4a42a",
-            "type": "leaf",
-            "state": {
-              "type": "beautitab-react-view",
-              "state": {},
-              "title": "New tab"
+              "icon": "diff",
+              "title": "Diff: CLAUDE  (Index)"
             }
           }
-        ],
-        "currentTab": 1
+        ]
       }
     ],
     "direction": "vertical"
@@ -220,13 +211,24 @@
       "obsidian-excalidraw-plugin:Создать новый чертеж": false
     }
   },
-  "active": "07bb8ee6cae4a42a",
+  "active": "a9e6f6ededf2c80e",
   "lastOpenFiles": [
+    "Без названия",
+    "CLAUDE.md",
+    "hack-docs/GENERAL_PLAN.md",
+    "hack-docs/research/competitors.md",
+    "hack-docs/requirements/data-model.md",
+    "hack-docs/interview/BLOCK-A.md",
+    "hack-docs/design/DESIGN-SYSTEM.md",
+    "CLAUDE.md.tmp.31256.dd4633738012",
+    "hack-docs/GENERAL_PLAN.md.tmp.31256.ed64beb45075",
+    "hack-docs/adr/009-visual-identity.md",
+    "hack-docs/design/DESIGN-SYSTEM.md.tmp.31256.c1542694cb4b",
+    "hack-docs/design/prototype/index.html",
+    "hack-docs/design/prototype",
     "hack-docs/design/tokens.css",
     "hack-docs/design",
-    "CLAUDE.md",
     "hack-docs/ROADMAP.md",
-    "hack-docs/requirements/data-model.md",
     "hack-docs/requirements/nfr.md",
     "hack-docs/requirements/ux-flows.md",
     "hack-docs/requirements/ux-flows.md.tmp.31256.aa3432e2c1ac",
@@ -243,21 +245,10 @@
     "hack-docs/interview/BLOCK-G.md",
     "hack-docs/interview/BLOCK-V.md",
     "hack-docs/interview/BLOCK-B.md",
-    "hack-docs/interview/BLOCK-A.md.tmp.31256.67fe1da40cd5",
-    "hack-docs/research/competitors.md",
-    "hack-docs/interview/BLOCK-A.md",
     "hack-docs/dev-max/index.md",
     "hack-docs/INDEX.md",
     "hack-docs/SRS.md",
     "hack-docs/adr/001-docs-separation.md",
-    "hack-docs/INDEX.md.tmp.31256.7f40659495cf",
-    "hack-docs/GENERAL_PLAN.md.tmp.31256.c5a0a6e53124",
-    "hack-docs/adr/README.md",
-    "hack-docs/adr/001-docs-separation.md.tmp.31256.0282b94573c2",
-    "hack-docs/interview",
-    "hack-docs/research/MINDMAP.md",
-    "hack-docs/adr/README.md.tmp.31256.9b70c483088b",
-    "hack-docs/GENERAL_PLAN.md",
     "Без названия.canvas"
   ]
 }
