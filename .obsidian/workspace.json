@@ -4,21 +4,21 @@
     "type": "split",
     "children": [
       {
-        "id": "3369bb4157214be4",
+        "id": "9bcba43d46ccba36",
         "type": "tabs",
         "children": [
           {
-            "id": "648dbfe1248d1db1",
+            "id": "cca2c4d14c34f37b",
             "type": "leaf",
             "state": {
-              "type": "markdown",
+              "type": "split-diff-view",
               "state": {
-                "file": "CLAUDE.md",
-                "mode": "source",
-                "source": false
+                "aFile": "tmp/plans/phased-implementation-plan.md",
+                "bFile": "tmp/plans/phased-implementation-plan.md",
+                "aRef": ""
               },
-              "icon": "lucide-file",
-              "title": "CLAUDE"
+              "icon": "diff",
+              "title": "Diff: phased-implementation-plan  (Working Tree)"
             }
           }
         ]
@@ -210,13 +210,13 @@
       "obsidian-excalidraw-plugin:Создать новый чертеж": false
     }
   },
-  "active": "648dbfe1248d1db1",
+  "active": "cca2c4d14c34f37b",
   "lastOpenFiles": [
+    "tmp/plans/phased-implementation-plan.md",
     "CLAUDE.md",
     "Без названия",
     "CLAUDE.md",
     "conflict-files-obsidian-git.md",
-    "tmp/plans/phased-implementation-plan.md",
     "tmp/plans",
     "tmp",
     "hack-docs/GENERAL_PLAN.md",
