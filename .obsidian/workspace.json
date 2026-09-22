@@ -4,11 +4,11 @@
     "type": "split",
     "children": [
       {
-        "id": "bfb7ad9ba442b980",
+        "id": "3369bb4157214be4",
         "type": "tabs",
         "children": [
           {
-            "id": "db6a6d2397df83fa",
+            "id": "648dbfe1248d1db1",
             "type": "leaf",
             "state": {
               "type": "split-diff-view",
@@ -211,10 +211,14 @@
       "obsidian-excalidraw-plugin:Создать новый чертеж": false
     }
   },
-  "active": "a9e6f6ededf2c80e",
+  "active": "648dbfe1248d1db1",
   "lastOpenFiles": [
-    "Без названия",
     "CLAUDE.md",
+    "conflict-files-obsidian-git.md",
+    "tmp/plans/phased-implementation-plan.md",
+    "tmp/plans",
+    "tmp",
+    "Без названия",
     "hack-docs/GENERAL_PLAN.md",
     "hack-docs/research/competitors.md",
     "hack-docs/requirements/data-model.md",
@@ -231,12 +235,9 @@
     "hack-docs/ROADMAP.md",
     "hack-docs/requirements/nfr.md",
     "hack-docs/requirements/ux-flows.md",
-    "hack-docs/requirements/ux-flows.md.tmp.31256.aa3432e2c1ac",
     "hack-docs/requirements/user-stories.md",
-    "hack-docs/requirements",
     "hack-docs/adr/008-llm-self-hosted.md",
     "hack-docs/adr/007-submission-packaging.md",
-    "hack-docs/adr/007-submission-packaging.md.tmp.31256.dcd0d87764d6",
     "hack-docs/adr/006-api-contract.md",
     "hack-docs/adr/005-hosting-https.md",
     "hack-docs/adr/004-auth-and-roles.md",
@@ -248,7 +249,6 @@
     "hack-docs/dev-max/index.md",
     "hack-docs/INDEX.md",
     "hack-docs/SRS.md",
-    "hack-docs/adr/001-docs-separation.md",
     "Без названия.canvas"
   ]
 }
