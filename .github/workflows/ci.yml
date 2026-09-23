@@ -1,0 +1,116 @@
+# Пайплайн: проверки на каждый push/PR + автодеплой на VPS при push в master.
+#
+# Что нужно настроить один раз (GitHub → Settings → Secrets and variables → Actions → New repository secret):
+#   VPS_HOST     — IP или домен сервера
+#   VPS_USER     — пользователь для SSH (с правом запускать docker)
+#   VPS_SSH_KEY  — приватный ключ (весь текст, включая BEGIN/END); публичная часть — в ~/.ssh/authorized_keys на VPS
+#   DEPLOY_PATH  — путь к клону репозитория на VPS, например /opt/dom-max
+# Пока секретов нет, job deploy просто пропускается (см. условие if ниже), проверки работают.
+
+name: ci
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  # Кнопка «Run workflow» во вкладке Actions: ручной передеплой без нового коммита.
+  workflow_dispatch:
+
+# Новый пуш в ту же ветку отменяет устаревший прогон проверок.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: backend (go test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      # Версия Go берётся из backend/go.mod (go 1.27, toolchain go1.27.1) — вручную не дублируем.
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: backend/go.mod
+          cache-dependency-path: backend/go.sum
+
+      # gofmt -l печатает неотформатированные файлы; непустой вывод = ошибка.
+      - name: gofmt
+        run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
+
+      - name: go vet
+        run: go vet ./...
+
+      # Live-тесты (тег live) ходят в настоящий MAX API и здесь не запускаются.
+      - name: go test
+        run: go test -race -count=1 ./...
+
+  miniapp:
+    name: miniapp (build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # Мини-приложения в репозитории пока нет: шаги ниже включатся сами, когда появится miniapp/package.json.
+      - name: check miniapp exists
+        id: exists
+        run: echo "found=$([ -f miniapp/package.json ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-node@v4
+        if: steps.exists.outputs.found == 'true'
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: miniapp/package-lock.json
+
+      - name: npm ci, typecheck, build
+        if: steps.exists.outputs.found == 'true'
+        working-directory: miniapp
+        run: |
+          npm ci
+          npm run typecheck
+          npm run build
+
+  deploy:
+    name: deploy to VPS
+    needs: [backend, miniapp]
+    # Только master (push или ручной запуск) и только если секреты заданы.
+    if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
+    # Два деплоя одновременно не пускаем; текущий не отменяем, чтобы не оборвать docker compose.
+    concurrency:
+      group: deploy
+      cancel-in-progress: false
+    steps:
+      - name: check secrets
+        id: secrets
+        env:
+          HOST: ${{ secrets.VPS_HOST }}
+        run: echo "ready=$([ -n "$HOST" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+
+      # Заходим на VPS по SSH и обновляем код до коммита, который сейчас проверили.
+      # Сборка образов идёт на сервере (docker compose --build): registry пока не заводим.
+      - name: ssh deploy
+        if: steps.secrets.outputs.ready == 'true'
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          command_timeout: 15m
+          script: |
+            set -eu
+            cd "${{ secrets.DEPLOY_PATH }}"
+            git fetch --depth 1 origin ${{ github.sha }}
+            git reset --hard ${{ github.sha }}
+            # deploy/.env на сервере не трогаем: DOMAIN и секреты живут там.
+            docker compose -f deploy/compose.yaml up -d --build --remove-orphans
+            docker image prune -f
+            docker compose -f deploy/compose.yaml ps
+
+      - name: deploy skipped
+        if: steps.secrets.outputs.ready != 'true'
+        run: echo "::notice::Секреты VPS_* не заданы, деплой пропущен. Инструкция — PRIVET_OT_CLAUDE_FOR_DEVOPS.md"

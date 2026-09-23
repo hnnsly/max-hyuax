@@ -26,7 +26,10 @@ tags: [handoff, status]
 - **Не проверено руками:** ответ бота на `/start` в самом MAX. Шелл агента не даёт держать процесс; проверка — команда ниже, затем `/start` в https://max.ru/t105_hakaton_max_bot.
 
 ## Следующий шаг
-1. **DevOps (люди):** этап А из [DEVOPS.md](DEVOPS.md) — заглушка по HTTPS и URL мини-приложения на модерацию.
+1. **DevOps (люди), СРОЧНО:** письмо в корне `PRIVET_OT_CLAUDE_FOR_DEVOPS.md`:
+   - заглушка по HTTPS и URL мини-приложения на модерацию (до 48 рабочих часов);
+   - секреты для автодеплоя (`.github/workflows/ci.yml`);
+   - по возможности `backend/Dockerfile` и сервис `api` в compose, бот в режиме polling.
 2. **Claude, 24.09:**
    - миграции goose + sqlc, репозитории;
    - сценарии Report / Join / ChangeStatus / Get / List / FindSimilar (слой `app`, порты в `app/ports.go`);
