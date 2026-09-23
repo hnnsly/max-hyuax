@@ -1,0 +1,482 @@
+openapi: 3.1.0
+info:
+  title: Дом в MAX — API коллективных заявок
+  version: 1.0.0
+  description: |
+    API мини-приложения и бота: жители сообщают о проблемах с общим имуществом дома,
+    присоединяются к существующим заявкам, УК меняет статусы.
+
+    Вход: POST /auth/max (initData мини-приложения) или POST /auth/demo (демо-роли для проверки).
+    Дальше заголовок `Authorization: Bearer <token>`, сессия живёт 12 часов.
+
+    Ошибки всегда в формате `{"error": {"code": "...", "message": "..."}}`.
+servers:
+  - url: /api/v1
+
+tags:
+  - name: auth
+  - name: me
+  - name: houses
+  - name: issues
+  - name: uk
+
+paths:
+  /health:
+    get:
+      summary: Состояние сервиса и базы данных
+      security: []
+      responses:
+        "200":
+          description: Сервис работает
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status: { type: string, example: ok }
+                  db: { type: string, example: ok }
+        "503":
+          description: База данных недоступна
+
+  /auth/max:
+    post:
+      tags: [auth]
+      summary: Вход по initData мини-приложения MAX
+      description: Сервер проверяет подпись HMAC-SHA256 и свежесть auth_date (не старше 1 часа). Новый пользователь MAX становится жителем.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [init_data]
+              properties:
+                init_data: { type: string, description: Строка window.WebApp.initData }
+      responses:
+        "200": { $ref: "#/components/responses/Session" }
+        "401": { $ref: "#/components/responses/Error" }
+
+  /auth/demo:
+    post:
+      tags: [auth]
+      summary: Демо-вход для проверки без клиента MAX
+      description: Работает только при DEMO_AUTH_ENABLED=true.
+      security: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role:
+                  type: string
+                  enum: [resident, resident_2, uk_operator]
+                  description: resident и resident_2 — два соседа из одного дома, uk_operator — сотрудник УК
+      responses:
+        "200": { $ref: "#/components/responses/Session" }
+        "403": { $ref: "#/components/responses/Error" }
+        "422": { $ref: "#/components/responses/Error" }
+
+  /categories:
+    get:
+      tags: [issues]
+      summary: Категории проблем со сроками и основаниями
+      security: []
+      responses:
+        "200":
+          description: Список категорий
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Category" }
+
+  /me:
+    get:
+      tags: [me]
+      summary: Текущий пользователь
+      responses:
+        "200": { $ref: "#/components/responses/User" }
+        "401": { $ref: "#/components/responses/Error" }
+    delete:
+      tags: [me]
+      summary: Удалить аккаунт
+      description: Имя, телефон и согласие стираются; заявки остаются без данных автора.
+      responses:
+        "204": { description: Аккаунт удалён }
+        "401": { $ref: "#/components/responses/Error" }
+
+  /me/consent:
+    post:
+      tags: [me]
+      summary: Дать согласие на обработку персональных данных
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [version]
+              properties:
+                version: { type: string, example: v1 }
+      responses:
+        "200": { $ref: "#/components/responses/User" }
+        "422": { $ref: "#/components/responses/Error" }
+
+  /me/house:
+    post:
+      tags: [me]
+      summary: Привязать жителя к дому
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [house_id]
+              properties:
+                house_id: { type: string, example: h-17k2 }
+      responses:
+        "200": { $ref: "#/components/responses/User" }
+        "404": { $ref: "#/components/responses/Error" }
+
+  /houses:
+    get:
+      tags: [houses]
+      summary: Поиск дома по адресу
+      parameters:
+        - { name: query, in: query, required: true, schema: { type: string, minLength: 2 }, example: 17к2 }
+      responses:
+        "200":
+          description: До 20 домов
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/House" }
+        "422": { $ref: "#/components/responses/Error" }
+
+  /houses/nearest:
+    get:
+      tags: [houses]
+      summary: Ближайшие дома по координатам
+      parameters:
+        - { name: lat, in: query, required: true, schema: { type: number }, example: 55.6124 }
+        - { name: lon, in: query, required: true, schema: { type: number }, example: 37.7462 }
+      responses:
+        "200":
+          description: До 5 домов, ближайший первым
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/House" }
+        "422": { $ref: "#/components/responses/Error" }
+
+  /houses/{id}:
+    get:
+      tags: [houses]
+      summary: Карточка дома с УК, подъездами и объектами
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, example: h-17k2 }
+      responses:
+        "200":
+          description: Дом
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/HouseDetails" }
+        "404": { $ref: "#/components/responses/Error" }
+
+  /houses/{id}/issues:
+    get:
+      tags: [issues]
+      summary: Заявки дома, новые первыми
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses:
+        "200": { $ref: "#/components/responses/IssueList" }
+
+  /objects/{code}:
+    get:
+      tags: [houses]
+      summary: Вход по QR-коду на объекте
+      parameters:
+        - { name: code, in: path, required: true, schema: { type: string }, example: h-17k2-e2-lift }
+      responses:
+        "200":
+          description: Объект и его дом
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  object: { $ref: "#/components/schemas/AssetObject" }
+                  house: { $ref: "#/components/schemas/House" }
+        "404": { $ref: "#/components/responses/Error" }
+
+  /issues/similar:
+    get:
+      tags: [issues]
+      summary: Открытые похожие заявки за 14 дней (защита от дублей)
+      parameters:
+        - { name: house_id, in: query, required: true, schema: { type: string } }
+        - { name: category, in: query, required: true, schema: { type: string } }
+        - { name: object_id, in: query, required: false, schema: { type: string } }
+      responses:
+        "200": { $ref: "#/components/responses/IssueList" }
+        "422": { $ref: "#/components/responses/Error" }
+
+  /issues:
+    post:
+      tags: [issues]
+      summary: Сообщить о проблеме
+      description: |
+        Ответственный — УК дома, срок — из справочника категорий в рабочих днях (по Москве).
+        Если указан object_id, категория и заголовок по умолчанию берутся из объекта.
+        Нужно согласие на обработку ПДн.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [house_id]
+              properties:
+                house_id: { type: string, example: h-17k2 }
+                object_id: { type: string, example: h-17k2-e2-lift }
+                category: { type: string, example: lift }
+                title: { type: string }
+                description: { type: string, example: Кабина не приходит на вызов }
+      responses:
+        "201":
+          description: Заявка создана
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Issue" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "422": { $ref: "#/components/responses/Error" }
+
+  /issues/{id}:
+    get:
+      tags: [issues]
+      summary: Карточка заявки с адресом, ответственным и основанием срока
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Заявка
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Issue" }
+        "404": { $ref: "#/components/responses/Error" }
+
+  /issues/{id}/join:
+    post:
+      tags: [issues]
+      summary: «Это и у меня» — присоединиться к заявке
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Заявка с обновлённым числом участников
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Issue" }
+        "403": { $ref: "#/components/responses/Error" }
+        "409":
+          description: already_joined или issue_closed
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Error" }
+
+  /issues/{id}/status:
+    post:
+      tags: [uk]
+      summary: Сменить статус (оператор ответственной УК)
+      description: |
+        Переходы: sent → accepted | in_progress | rejected; accepted → in_progress | done | rejected;
+        in_progress → done | rejected. Для rejected комментарий обязателен.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { $ref: "#/components/schemas/Status" }
+                comment: { type: string, example: Мастер приедет завтра до 12:00 }
+      responses:
+        "200":
+          description: Заявка с новым статусом
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Issue" }
+        "403": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+        "422": { $ref: "#/components/responses/Error" }
+
+  /uk/issues:
+    get:
+      tags: [uk]
+      summary: Очередь заявок УК
+      description: Открытые по сроку (просроченные первыми), затем закрытые. Только для uk_operator.
+      responses:
+        "200": { $ref: "#/components/responses/IssueList" }
+        "403": { $ref: "#/components/responses/Error" }
+
+security:
+  - bearer: []
+
+components:
+  securitySchemes:
+    bearer:
+      type: http
+      scheme: bearer
+
+  responses:
+    Session:
+      description: Сессия
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              token: { type: string }
+              expires_at: { type: string, format: date-time }
+              user: { $ref: "#/components/schemas/User" }
+              start_param: { type: string, description: Параметр запуска мини-приложения, например o_<qr_code> }
+    User:
+      description: Пользователь
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/User" }
+    IssueList:
+      description: Список заявок
+      content:
+        application/json:
+          schema:
+            type: array
+            items: { $ref: "#/components/schemas/Issue" }
+    Error:
+      description: Ошибка
+      content:
+        application/json:
+          schema: { $ref: "#/components/schemas/Error" }
+
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              enum: [unauthorized, consent_required, forbidden, not_found, already_joined, issue_closed,
+                     invalid_transition, reason_required, invalid_input, http_error, internal]
+            message: { type: string, description: Текст для показа жителю }
+
+    User:
+      type: object
+      properties:
+        id: { type: integer, format: int64 }
+        first_name: { type: string }
+        role: { type: string, enum: [resident, uk_operator] }
+        house_id: { type: string }
+        organization_id: { type: string }
+        has_consent: { type: boolean }
+        consent_version: { type: string, description: Версия согласия, которая требуется сейчас }
+
+    Category:
+      type: object
+      properties:
+        code: { type: string, example: lift }
+        title: { type: string, example: Лифт }
+        responsible: { type: string, example: management_company }
+        basis: { type: string }
+        business_days: { type: integer, example: 1 }
+
+    Organization:
+      type: object
+      properties:
+        id: { type: string }
+        type: { type: string, enum: [uk, tsj, rso, regoperator, capital_repair_fund, gji] }
+        name: { type: string }
+        phone_office: { type: string }
+        phone_dispatcher: { type: string }
+        phone_emergency: { type: string }
+        schedule: { type: string }
+
+    House:
+      type: object
+      properties:
+        id: { type: string }
+        address: { type: string }
+        district: { type: string }
+        year_built: { type: integer }
+        floors: { type: integer }
+        entrances_count: { type: integer }
+        organization_id: { type: string }
+        source: { type: string, description: "model — модельная запись, в интерфейсе помечается" }
+
+    AssetObject:
+      type: object
+      properties:
+        id: { type: string }
+        house_id: { type: string }
+        entrance_id: { type: string }
+        category: { type: string }
+        label: { type: string, example: "подъезд 2, пассажирский лифт" }
+        qr_code: { type: string }
+
+    HouseDetails:
+      allOf:
+        - $ref: "#/components/schemas/House"
+        - type: object
+          properties:
+            organization: { $ref: "#/components/schemas/Organization" }
+            entrances:
+              type: array
+              items:
+                type: object
+                properties:
+                  id: { type: string }
+                  number: { type: integer }
+            objects:
+              type: array
+              items: { $ref: "#/components/schemas/AssetObject" }
+
+    Status:
+      type: string
+      enum: [sent, accepted, in_progress, done, rejected]
+
+    Issue:
+      type: object
+      description: Участники не раскрываются, только их число.
+      properties:
+        id: { type: string, format: uuid }
+        number: { type: integer, format: int64, example: 142 }
+        house_id: { type: string }
+        address: { type: string, description: В карточке и очереди УК }
+        object_id: { type: string }
+        category: { type: string }
+        category_title: { type: string }
+        title: { type: string }
+        description: { type: string }
+        status: { $ref: "#/components/schemas/Status" }
+        status_at: { type: string, format: date-time }
+        status_comment: { type: string }
+        created_at: { type: string, format: date-time }
+        deadline: { type: string, format: date-time }
+        overdue: { type: boolean }
+        participant_count: { type: integer }
+        joined: { type: boolean, description: Текущий пользователь среди участников }
+        responsible: { $ref: "#/components/schemas/Organization" }
+        basis: { type: string, description: Основание срока (только в карточке) }

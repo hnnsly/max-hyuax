@@ -15,7 +15,7 @@ tags: [index, hub]
 > `hack-docs/` — внутренняя рабочая база, **в сдачу не входит**. Документация продукта для жюри живёт в `docs/` и `README.md` в корне ([ADR-001](adr/001-docs-separation.md)).
 
 ## Текущее состояние (17.09.2026)
-- **Этап (23.09):** разработка MVP. Дизайн v2 утверждён, бот выдан, ADR-010/011 приняты. В `backend/` готовы домен (`issue`, `rules`), клиент MAX и бот в режиме polling; тесты зелёные. План на 23–30.09 — в [GENERAL_PLAN](GENERAL_PLAN.md), текущий шаг — в [HANDOFF](HANDOFF.md).
+- **Этап (24.09):** разработка MVP. Бэкенд готов к деплою: Postgres + миграции с демо-данными, сценарии заявок, вход по initData и демо-ролям, HTTP API (`api/openapi.yaml` v1), webhook бота, Dockerfile. Команды — `task` (Taskfile.yml в корне). Документация продукта начата в `docs/`. Мини-приложения ещё нет (25.09). План на 23–30.09 — в [GENERAL_PLAN](GENERAL_PLAN.md), текущий шаг — в [HANDOFF](HANDOFF.md).
 - **Фокус (принят):** ядро H1 + H2 + шеринг из H5; пилот Москва; B2G → SaaS ([ADR-002](adr/002-product-scope.md)).
 - **Блокеры:** токен бота не выдан ([R2](research/risks.md)); точный дедлайн неизвестен ([R25](research/risks.md)).
 - **Ближайшие вехи:** M0 Спайк 0 — 18.09 (без токена); M1 ядро e2e и ворота экосистемы — 22.09 ([ROADMAP](ROADMAP.md)).
@@ -92,6 +92,7 @@ tags: [index, hub]
 | [adr/009-visual-identity.md](adr/009-visual-identity.md) | «Адресная табличка»: нативная база + фирменный слой | accepted | 2026-09-17 |
 | [adr/010-backend-layers.md](adr/010-backend-layers.md) | бэкенд: три слоя (транспорт, приложение, хранилище) + DDD-lite, список YAGNI | accepted | 2026-09-23 |
 | [adr/011-miniapp-typescript.md](adr/011-miniapp-typescript.md) | мини-приложение на TypeScript вместо JS | accepted | 2026-09-23 |
+| [adr/012-taskfile.md](adr/012-taskfile.md) | Taskfile.yml — единая точка команд, `.env` в корне для локального запуска | accepted | 2026-09-24 |
 | [HANDOFF.md](HANDOFF.md) | заметка передачи: кто в работе, что сделано, следующий шаг | active | 2026-09-23 |
 | [design/canvas-v2/project/](design/canvas-v2/project/canvas.json) | утверждённый дизайн v2: 12 артбордов (житель, УК, бот, наклейка, тёмная тема, разбор системы) | accepted | 2026-09-23 |
 

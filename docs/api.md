@@ -1,0 +1,50 @@
+# API
+
+Полный контракт: [`api/openapi.yaml`](../api/openapi.yaml) (OpenAPI 3.1). Базовый путь `/api/v1`.
+
+## Вход
+
+Для проверки без клиента MAX есть демо-роли:
+
+| Роль | Кто это |
+|---|---|
+| `resident` | житель дома «Ореховый бульвар, 17к2» |
+| `resident_2` | его сосед из того же дома |
+| `uk_operator` | сотрудник УК «Ореховый квартал» |
+
+```bash
+curl -X POST https://<домен>/api/v1/auth/demo -H "Content-Type: application/json" -d '{"role":"resident"}'
+```
+
+В ответе приходит `token`. Его нужно передавать в заголовке `Authorization: Bearer <token>`.
+
+## Основной сценарий
+
+1. **Найти дом:** `GET /houses?query=17к2` или `GET /houses/nearest?lat=55.6124&lon=37.7462`.
+2. **Или открыть объект по QR:** `GET /objects/h-17k2-e2-lift`.
+3. **Проверить дубли:** `GET /issues/similar?house_id=h-17k2&category=lift&object_id=h-17k2-e2-lift`.
+4. **Сообщить о проблеме:** `POST /issues` с телом `{"house_id":"h-17k2","object_id":"h-17k2-e2-lift","description":"Кабина не приходит"}`. Категория, заголовок, ответственный и срок заполнятся сами.
+5. **Присоединиться соседу:** `POST /issues/{id}/join` с токеном `resident_2`.
+6. **Сменить статус сотруднику УК:** `POST /issues/{id}/status` с телом `{"status":"in_progress","comment":"Мастер приедет до 18:00"}` и токеном `uk_operator`.
+7. **Очередь УК:** `GET /uk/issues`.
+
+## Ошибки
+
+Формат ошибки: `{"error":{"code":"...","message":"..."}}`. Поле `message` можно показывать жителю как есть.
+
+| HTTP | code | Когда |
+|---|---|---|
+| 401 | `unauthorized` | нет токена или он истёк |
+| 403 | `consent_required` | нет согласия на обработку персональных данных |
+| 403 | `forbidden` | действие недоступно роли |
+| 404 | `not_found` | объект не найден |
+| 409 | `already_joined` | житель уже участвует в заявке |
+| 409 | `issue_closed` | заявка закрыта |
+| 409 | `invalid_transition` | недопустимый переход статуса |
+| 422 | `reason_required` | отказ без причины |
+| 422 | `invalid_input` | некорректные данные запроса |
+
+## Служебное
+
+- `GET /api/v1/health` — состояние сервиса и базы данных.
+- `POST /webhook/max` — приём событий бота от MAX; проверяет заголовок `X-Max-Bot-Api-Secret`.

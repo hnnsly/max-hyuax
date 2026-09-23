@@ -2,7 +2,7 @@
 
 Чат-бот + мини-приложение в мессенджере MAX (хакатон MAX, трек «Умный город»): жители превращают хаос сообщений в домовом чате в одну доказательную заявку с ответственным, нормативным сроком и живым статусом.
 
-**Статус (23.09.2026):** исследование, SRS, ADR 001–011 и дизайн v2 готовы. Идёт разработка MVP: сдача 30.09, заморозка кода 29.09 днём. **Текущее состояние и следующий шаг — в `hack-docs/HANDOFF.md`.**
+**Статус (24.09.2026):** исследование, SRS, ADR 001–012 и дизайн v2 готовы; бэкенд (БД, сценарии, API, вход, webhook, Docker) готов к деплою. Идёт разработка MVP: сдача 30.09, заморозка кода 29.09 днём. **Текущее состояние и следующий шаг — в `hack-docs/HANDOFF.md`.**
 
 **Статус (23.09.2026)**: Выдали информацию по боту, получилось зафетчить:
 ```shell
@@ -72,8 +72,9 @@ backend/                Go 1.27.1 · Fiber v3 · pgx + sqlc · PostgreSQL · goo
   cmd/api/              точка сборки: конфиг, зависимости, HTTP, бот, фоновые задачи
   internal/domain/      ядро DDD-lite без внешних зависимостей: issue (агрегат), house, user, rules
   internal/app/         сценарии + порты (интерфейсы); зависит только от domain
-  internal/transport/   входящие: http (Fiber), bot (обновления MAX), jobs (outbox, просрочки)
-  internal/storage/     исходящие: postgres (репозитории, миграции), maxapi (тонкий клиент Bot API)
+  internal/app/apptest/ хранилище в памяти для юнит-тестов сценариев
+  internal/transport/   входящие: httpapi (Fiber), bot (события MAX, webhook, polling), jobs (outbox, просрочки)
+  internal/storage/     исходящие: postgres (репозитории, migrations, queries → sqlcdb), maxapi (клиент Bot API)
 miniapp/                Vite · React · TypeScript (strict) · @maxhub/max-ui · MAX Bridge
   src/app, src/pages, src/shared/{api,bridge,ui,theme}
 deploy/                 compose.yaml, Caddyfile, seed/
@@ -96,16 +97,20 @@ docs/                   документация продукта (ведётс�
 ## Команды
 **Добавляйте сюда реальные команды сразу, как только они заработают.** Не вписывайте непроверенные команды.
 
-Бэкенд (из `backend/`, Git Bash):
-- `go test ./...` — все тесты;
-- `go vet ./...` и `gofmt -l .` — проверки;
-- `go build -o bin/api.exe ./cmd/api` — сборка;
-- `MAX_BOT_TOKEN=<токен> MAX_API_INSECURE_TLS=true go test -tags live -count=1 ./internal/storage/maxapi` — проверка на живом Bot API;
-- `MAX_BOT_TOKEN=<токен> MAX_API_INSECURE_TLS=true go run ./cmd/api` — бот в режиме polling (`BOT_MODE=polling` по умолчанию).
+Единая точка — `Taskfile.yml` в корне (Task v3; `task` показывает список). Переменные для локального запуска лежат в `.env` в корне. Новые команды добавляются в Taskfile.
+- `task db` — поднять Postgres 18.6 в Docker (Docker Desktop должен быть запущен);
+- `task test` — юнит-тесты; `task test:integration` — тесты на Postgres (временная база на каждый прогон);
+- `task lint` — `gofmt` и `go vet`;
+- `task run` — api на `:8080`, миграции при старте; бот по `BOT_MODE` из `.env` (локально `off`);
+- `task test:live` — проверка на живом MAX Bot API;
+- `task sqlc` — перегенерировать код запросов после правки `queries/*.sql` или миграций;
+- `task up` / `task down` / `task logs -- api` — весь стек в compose;
+- превью сервера для агента: `.claude/launch.json`, конфигурация `api`.
 
 ## Ловушки платформы MAX
 - Bot API — только `https://platform-api2.max.ru` с заголовком `Authorization: <token>`; в образе `api` нужен корневой сертификат Минцифры.
 - Webhook — только HTTPS:443 с доверенным CA; ответ 200 ≤ 30 с (у нас ≤ 1 с, обработка асинхронная); события дублируются → дедупликация `processed_updates`; секрет в `X-Max-Bot-Api-Secret`.
+- **При активной подписке webhook long polling не работает** (dev-max `POST /subscriptions`) → после деплоя с `BOT_MODE=webhook` локально только `BOT_MODE=off`.
 - **Любая правка настроек бота (URL мини-приложения, группы) модерируется до 48 рабочих часов** — URL стабильный, меняется только код за ним.
 - Лимиты: 30 rps глобально, 2 rps на чат для send/edit/delete/answers → все отправки только через outbox.
 - `initDataUnsafe` не доверять; телефон — только `requestContact` с проверкой hash.
@@ -133,10 +138,11 @@ docs/                   документация продукта (ведётс�
 - Модельные и синтетические данные помечаются в интерфейсе и в `docs/data.md`.
 
 ## Ключевые файлы
+- `Taskfile.yml` — все команды проекта (ADR-012); `api/openapi.yaml` — контракт API v1
 - `hack-docs/HANDOFF.md` — текущее состояние работы и следующий шаг
 - `hack-docs/INDEX.md` — вход в базу знаний
 - `hack-docs/SRS.md` + `hack-docs/requirements/` — требования (user-stories, ux-flows, nfr, data-model)
-- `hack-docs/adr/` — решения 001–011
+- `hack-docs/adr/` — решения 001–012
 - `hack-docs/design/canvas-v2/project/` — утверждённый дизайн v2 (эталон экранов), `hack-docs/design/DESIGN-SYSTEM.md`
 - `hack-docs/GENERAL_PLAN.md`, `hack-docs/ROADMAP.md` — план и вехи M0–M5
 - `hack-docs/research/max-platform-capabilities.md` — справка по Bot API, Bridge, MAX UI
