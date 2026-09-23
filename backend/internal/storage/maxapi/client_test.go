@@ -189,8 +189,11 @@ func TestAPIErrorCarriesStatusAndMessage(t *testing.T) {
 	if !ok {
 		t.Fatalf("err = %v, want *maxapi.Error", err)
 	}
-	if apiErr.Status != http.StatusUnauthorized || apiErr.Message != "Invalid access_token" {
+	if apiErr.Status != http.StatusUnauthorized || apiErr.Message != "Invalid access_token" || apiErr.RateLimited() {
 		t.Fatalf("apiErr = %+v", apiErr)
+	}
+	if !(&maxapi.Error{Status: http.StatusTooManyRequests}).RateLimited() {
+		t.Fatal("429 must be reported as rate limited")
 	}
 }
 

@@ -40,6 +40,9 @@ func (e *Error) Error() string {
 	return fmt.Sprintf("maxapi: %d %s: %s", e.Status, e.Code, e.Message)
 }
 
+// RateLimited — MAX ответил «слишком много запросов», отправку нужно притормозить.
+func (e *Error) RateLimited() bool { return e.Status == http.StatusTooManyRequests }
+
 // HTTPClient доверяет корневому сертификату Минцифры, которым подписан platform-api2.
 // caFile добавляет PEM к системному пулу; insecure отключает проверку и нужен только
 // на машине разработчика без сертификата.

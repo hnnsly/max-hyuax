@@ -3,6 +3,7 @@ package issues_test
 import (
 	"errors"
 	"fmt"
+	"slices"
 	"testing"
 	"time"
 
@@ -180,6 +181,34 @@ func TestMineAndTimeline(t *testing.T) {
 	}
 	if _, err := f.svc.Timeline(t.Context(), "nope"); !errors.Is(err, app.ErrNotFound) {
 		t.Fatalf("unknown issue timeline err = %v", err)
+	}
+}
+
+func TestChangesEnqueueLiveCardNotifications(t *testing.T) {
+	f := setup(t)
+	pending := func() []app.Notification { return f.store.Outbox().(*apptest.MemOutbox).Pending }
+	is := report(t, f, f.anna)
+	if want := []app.Notification{{Kind: app.NotifyCard, IssueID: is.ID(), UserID: f.anna.ID}}; !slices.Equal(pending(), want) {
+		t.Fatalf("after report = %+v", pending())
+	}
+	if _, err := f.svc.Join(t.Context(), f.sergey, is.ID()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.svc.ChangeStatus(t.Context(), f.oper, is.ID(), issue.StatusInProgress, ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.svc.ChangeStatus(t.Context(), f.oper, is.ID(), issue.StatusDone, "Починили"); err != nil {
+		t.Fatal(err)
+	}
+	var finals int
+	for _, n := range pending() {
+		if n.Kind == app.NotifyFinal {
+			finals++
+		}
+	}
+	// Карточки Анны и Сергея схлопываются в очереди, итоговых сообщений два.
+	if len(pending()) != 4 || finals != 2 {
+		t.Fatalf("pending = %+v", pending())
 	}
 }
 

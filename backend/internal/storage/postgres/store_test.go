@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"slices"
 	"testing"
 	"time"
 	"uuid"
@@ -213,6 +214,64 @@ func TestUserCreateConsentAndDelete(t *testing.T) {
 	got, _ = store.Users().Get(t.Context(), u.ID)
 	if !got.Deleted() || got.FirstName != "" {
 		t.Fatalf("deleted user = %+v", got)
+	}
+}
+
+func TestOutboxCollapsesPendingAndKeepsChangesDuringSend(t *testing.T) {
+	anna := demoUser(t, "resident_demo_1")
+	is := newIssue(t, anna.ID)
+	if err := store.Issues().Create(t.Context(), is); err != nil {
+		t.Fatal(err)
+	}
+	ob := store.Outbox()
+	n := app.Notification{Kind: app.NotifyCard, IssueID: is.ID(), UserID: anna.ID}
+	// Две правки до отправки схлопываются.
+	if err := ob.Enqueue(t.Context(), []app.Notification{n, n}); err != nil {
+		t.Fatal(err)
+	}
+	items, err := ob.Claim(t.Context(), 100)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mine := slices.DeleteFunc(items, func(it app.OutboxItem) bool { return it.IssueID != is.ID() })
+	if len(mine) != 1 || mine[0].Attempts != 1 {
+		t.Fatalf("claimed = %+v", mine)
+	}
+	// Правка во время отправки ставится отдельной строкой.
+	if err := ob.Enqueue(t.Context(), []app.Notification{n}); err != nil {
+		t.Fatal(err)
+	}
+	// Неудача первой отправки не плодит дубль: новая строка её заменяет.
+	if err := ob.Retry(t.Context(), mine[0].ID, time.Now(), "boom", false); err != nil {
+		t.Fatal(err)
+	}
+	again, _ := ob.Claim(t.Context(), 100)
+	again = slices.DeleteFunc(again, func(it app.OutboxItem) bool { return it.IssueID != is.ID() })
+	if len(again) != 1 || again[0].ID == mine[0].ID {
+		t.Fatalf("second claim = %+v", again)
+	}
+	if err := ob.Done(t.Context(), again[0].ID); err != nil {
+		t.Fatal(err)
+	}
+	if left, _ := ob.Claim(t.Context(), 100); slices.ContainsFunc(left, func(it app.OutboxItem) bool { return it.IssueID == is.ID() }) {
+		t.Fatalf("nothing must be left, got %+v", left)
+	}
+}
+
+func TestCardMIDRoundTrip(t *testing.T) {
+	anna := demoUser(t, "resident_demo_1")
+	is := newIssue(t, anna.ID)
+	if err := store.Issues().Create(t.Context(), is); err != nil {
+		t.Fatal(err)
+	}
+	ob := store.Outbox()
+	if _, err := ob.CardMID(t.Context(), is.ID(), anna.ID); !errors.Is(err, app.ErrNotFound) {
+		t.Fatalf("err = %v, want ErrNotFound", err)
+	}
+	_ = ob.SaveCardMID(t.Context(), is.ID(), anna.ID, "m1")
+	_ = ob.SaveCardMID(t.Context(), is.ID(), anna.ID, "m2")
+	if mid, err := ob.CardMID(t.Context(), is.ID(), anna.ID); err != nil || mid != "m2" {
+		t.Fatalf("mid = %q, err = %v", mid, err)
 	}
 }
 

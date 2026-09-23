@@ -136,6 +136,16 @@ func TestChangeStatusRecordsEventWithComment(t *testing.T) {
 	}
 }
 
+func TestPendingEventsDoesNotClear(t *testing.T) {
+	is := newIssue(t)
+	if got := is.PendingEvents(); len(got) != 1 || got[0].Kind != issue.EventCreated {
+		t.Fatalf("pending = %+v", got)
+	}
+	if len(is.PullEvents()) != 1 {
+		t.Fatal("PendingEvents must not clear events")
+	}
+}
+
 func TestRestoreKeepsStateWithoutEvents(t *testing.T) {
 	at := created.Add(time.Hour)
 	is := issue.Restore(issue.NewParams{ID: "u-1", HouseID: "h", Category: "lift", Title: "Лифт", ResponsibleOrgID: "org-1", CreatedAt: created, Deadline: deadline},

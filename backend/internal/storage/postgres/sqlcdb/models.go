@@ -19,6 +19,13 @@ type AssetObject struct {
 	QrCode     string
 }
 
+type BotCard struct {
+	IssueID   string
+	UserID    int64
+	Mid       string
+	UpdatedAt time.Time
+}
+
 type Entrance struct {
 	ID      string
 	HouseID string
@@ -80,6 +87,18 @@ type Organization struct {
 	PhoneEmergency  string
 	Schedule        string
 	Source          string
+}
+
+type Outbox struct {
+	ID            int64
+	Kind          string
+	IssueID       string
+	UserID        int64
+	Status        string
+	Attempts      int32
+	NextAttemptAt time.Time
+	LastError     string
+	CreatedAt     time.Time
 }
 
 type ProcessedUpdate struct {

@@ -14,12 +14,14 @@ import (
 	"github.com/gofiber/fiber/v3"
 
 	"dommax/internal/app/auth"
+	"dommax/internal/app/cards"
 	"dommax/internal/app/houses"
 	"dommax/internal/app/issues"
 	"dommax/internal/storage/maxapi"
 	"dommax/internal/storage/postgres"
 	"dommax/internal/transport/bot"
 	"dommax/internal/transport/httpapi"
+	"dommax/internal/transport/jobs"
 )
 
 const (
@@ -115,6 +117,15 @@ func startBot(ctx context.Context, cfg config, store *postgres.Store, deps *http
 	}
 	log.Info("bot authorized", "username", me.Username)
 	h := bot.NewHandler(client, me.Username, log)
+
+	// Живые карточки: очередь outbox отправляется в фоне с лимитами Bot API.
+	cardSvc := cards.NewService(store, bot.NewCardSender(client, me.Username), time.Now)
+	limiter := jobs.NewLimiter(jobs.GlobalInterval, jobs.PerChatInterval, time.Now, jobs.SleepCtx)
+	go func() {
+		if err := jobs.NewOutboxWorker(store.Outbox(), cardSvc.Deliver, limiter, log).Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
+			log.Error("outbox worker stopped", "err", err)
+		}
+	}()
 
 	if cfg.BotMode == "webhook" {
 		deps.Webhook = bot.NewWebhook(cfg.WebhookSecret, h, store, log)

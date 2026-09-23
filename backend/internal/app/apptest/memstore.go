@@ -5,6 +5,7 @@ import (
 	"cmp"
 	"context"
 	"slices"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -25,6 +26,60 @@ type MemStore struct {
 	Events   []issue.Event
 	nextNum  int64
 	nextUID  int64
+	outbox   MemOutbox
+}
+
+// MemOutbox — очередь уведомлений в памяти: Pending виден тестам напрямую.
+type MemOutbox struct {
+	mu      sync.Mutex
+	Pending []app.Notification
+	cards   map[[2]string]string
+}
+
+func (o *MemOutbox) Enqueue(_ context.Context, notes []app.Notification) error {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	for _, n := range notes {
+		if !slices.Contains(o.Pending, n) {
+			o.Pending = append(o.Pending, n)
+		}
+	}
+	return nil
+}
+
+func (o *MemOutbox) Claim(_ context.Context, n int) ([]app.OutboxItem, error) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	var out []app.OutboxItem
+	for i, p := range o.Pending[:min(n, len(o.Pending))] {
+		out = append(out, app.OutboxItem{ID: int64(i + 1), Notification: p, Attempts: 1})
+	}
+	o.Pending = o.Pending[len(out):]
+	return out, nil
+}
+
+func (o *MemOutbox) Done(context.Context, int64) error                           { return nil }
+func (o *MemOutbox) Retry(context.Context, int64, time.Time, string, bool) error { return nil }
+func (o *MemOutbox) Release(context.Context) error                               { return nil }
+
+func (o *MemOutbox) CardMID(_ context.Context, issueID string, userID int64) (string, error) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	mid, ok := o.cards[[2]string{issueID, strconv.FormatInt(userID, 10)}]
+	if !ok {
+		return "", app.ErrNotFound
+	}
+	return mid, nil
+}
+
+func (o *MemOutbox) SaveCardMID(_ context.Context, issueID string, userID int64, mid string) error {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	if o.cards == nil {
+		o.cards = map[[2]string]string{}
+	}
+	o.cards[[2]string{issueID, strconv.FormatInt(userID, 10)}] = mid
+	return nil
 }
 
 func New() *MemStore {
@@ -38,9 +93,10 @@ func New() *MemStore {
 	}
 }
 
-func (s *MemStore) Issues() app.IssueRepo { return issueRepo{s} }
-func (s *MemStore) Houses() app.HouseRepo { return houseRepo{s} }
-func (s *MemStore) Users() app.UserRepo   { return userRepo{s} }
+func (s *MemStore) Issues() app.IssueRepo  { return issueRepo{s} }
+func (s *MemStore) Houses() app.HouseRepo  { return houseRepo{s} }
+func (s *MemStore) Users() app.UserRepo    { return userRepo{s} }
+func (s *MemStore) Outbox() app.OutboxRepo { return &s.outbox }
 
 // InTx в памяти просто вызывает fn: откат в юнит-тестах не проверяется.
 func (s *MemStore) InTx(_ context.Context, fn func(app.Store) error) error { return fn(s) }

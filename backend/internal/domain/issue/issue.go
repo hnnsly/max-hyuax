@@ -173,6 +173,10 @@ func (is *Issue) PullEvents() []Event {
 	return events
 }
 
+// PendingEvents возвращает копию накопленных событий, не очищая их: по ним сценарий
+// планирует уведомления до того, как хранилище запишет события в журнал.
+func (is *Issue) PendingEvents() []Event { return slices.Clone(is.events) }
+
 func (is *Issue) record(e Event) {
 	e.IssueID = is.id
 	is.events = append(is.events, e)

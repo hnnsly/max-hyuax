@@ -55,10 +55,50 @@ type UserRepo interface {
 	Save(ctx context.Context, u user.User) error
 }
 
+type NotificationKind string
+
+const (
+	// NotifyCard — отправить или обновить живую карточку заявки у участника.
+	NotifyCard NotificationKind = "card"
+	// NotifyFinal — отдельное сообщение участнику, когда заявка закрыта.
+	NotifyFinal NotificationKind = "final"
+)
+
+// Notification — намерение уведомить участника. Текст собирается при отправке
+// из актуального состояния заявки, поэтому в очереди хранится только адресат.
+type Notification struct {
+	Kind    NotificationKind
+	IssueID string
+	UserID  int64
+}
+
+type OutboxItem struct {
+	ID int64
+	Notification
+	Attempts int
+}
+
+// OutboxRepo — очередь исходящих сообщений бота и ссылки на отправленные карточки.
+type OutboxRepo interface {
+	// Enqueue ставит уведомления в очередь; одинаковые ещё не отправленные схлопываются.
+	Enqueue(ctx context.Context, notes []Notification) error
+	// Claim забирает до n готовых к отправке уведомлений.
+	Claim(ctx context.Context, n int) ([]OutboxItem, error)
+	Done(ctx context.Context, id int64) error
+	// Retry возвращает уведомление в очередь на время at; failed — больше не пытаться.
+	Retry(ctx context.Context, id int64, at time.Time, reason string, failed bool) error
+	// Release возвращает в очередь уведомления, взятые до перезапуска сервиса.
+	Release(ctx context.Context) error
+	// CardMID — id сообщения с карточкой заявки у пользователя; ErrNotFound, если ещё не отправляли.
+	CardMID(ctx context.Context, issueID string, userID int64) (string, error)
+	SaveCardMID(ctx context.Context, issueID string, userID int64, mid string) error
+}
+
 // Store — доступ к репозиториям; InTx выполняет fn в одной транзакции.
 type Store interface {
 	Issues() IssueRepo
 	Houses() HouseRepo
 	Users() UserRepo
+	Outbox() OutboxRepo
 	InTx(ctx context.Context, fn func(tx Store) error) error
 }

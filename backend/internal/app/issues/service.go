@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"dommax/internal/app"
+	"dommax/internal/app/cards"
 	"dommax/internal/domain/house"
 	"dommax/internal/domain/issue"
 	"dommax/internal/domain/rules"
@@ -83,7 +84,14 @@ func (s *Service) Report(ctx context.Context, u user.User, in ReportInput) (*iss
 	if err != nil {
 		return nil, fmt.Errorf("%w: %w", app.ErrInvalidInput, err)
 	}
-	if err := s.store.Issues().Create(ctx, is); err != nil {
+	err = s.store.InTx(ctx, func(tx app.Store) error {
+		notes := cards.Plan(is.PendingEvents(), is.Participants())
+		if err := tx.Issues().Create(ctx, is); err != nil {
+			return err
+		}
+		return tx.Outbox().Enqueue(ctx, notes)
+	})
+	if err != nil {
 		return nil, err
 	}
 	return is, nil
@@ -122,7 +130,8 @@ func (s *Service) ChangeStatus(ctx context.Context, u user.User, issueID string,
 	})
 }
 
-// update загружает заявку с блокировкой, применяет изменение и сохраняет в одной транзакции.
+// update загружает заявку с блокировкой, применяет изменение и в одной транзакции
+// сохраняет её вместе с уведомлениями участникам (outbox).
 func (s *Service) update(ctx context.Context, issueID string, change func(*issue.Issue) error) (*issue.Issue, error) {
 	var out *issue.Issue
 	err := s.store.InTx(ctx, func(tx app.Store) error {
@@ -133,8 +142,12 @@ func (s *Service) update(ctx context.Context, issueID string, change func(*issue
 		if err := change(is); err != nil {
 			return err
 		}
+		notes := cards.Plan(is.PendingEvents(), is.Participants())
+		if err := tx.Issues().Save(ctx, is); err != nil {
+			return err
+		}
 		out = is
-		return tx.Issues().Save(ctx, is)
+		return tx.Outbox().Enqueue(ctx, notes)
 	})
 	return out, err
 }
