@@ -27,6 +27,8 @@ curl -X POST https://<домен>/api/v1/auth/demo -H "Content-Type: application
 5. **Присоединиться соседу:** `POST /issues/{id}/join` с токеном `resident_2`.
 6. **Сменить статус сотруднику УК:** `POST /issues/{id}/status` с телом `{"status":"in_progress","comment":"Мастер приедет до 18:00"}` и токеном `uk_operator`.
 7. **Очередь УК:** `GET /uk/issues`.
+8. **Хронология заявки:** `GET /issues/{id}/timeline`. Кто именно действовал, не раскрывается.
+9. **Мои заявки:** `GET /me/issues`.
 
 ## Ошибки
 

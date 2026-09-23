@@ -2,7 +2,7 @@
 
 Чат-бот + мини-приложение в мессенджере MAX (хакатон MAX, трек «Умный город»): жители превращают хаос сообщений в домовом чате в одну доказательную заявку с ответственным, нормативным сроком и живым статусом.
 
-**Статус (24.09.2026):** исследование, SRS, ADR 001–012 и дизайн v2 готовы; бэкенд (БД, сценарии, API, вход, webhook, Docker) готов к деплою. Идёт разработка MVP: сдача 30.09, заморозка кода 29.09 днём. **Текущее состояние и следующий шаг — в `hack-docs/HANDOFF.md`.**
+**Статус (25.09.2026):** бэкенд, мини-приложение (дом, заявка, форма в 3 шага, дубль, очередь УК со сменой статуса), живая карточка через outbox и диалог бота готовы; нужен деплой и проверка в MAX. Идёт разработка MVP: сдача 30.09, заморозка кода 29.09 днём. **Текущее состояние и следующий шаг — в `hack-docs/HANDOFF.md`.**
 
 **Статус (23.09.2026)**: Выдали информацию по боту, получилось зафетчить:
 ```shell
@@ -75,8 +75,8 @@ backend/                Go 1.27.1 · Fiber v3 · pgx + sqlc · PostgreSQL · goo
   internal/app/apptest/ хранилище в памяти для юнит-тестов сценариев
   internal/transport/   входящие: httpapi (Fiber), bot (события MAX, webhook, polling), jobs (outbox, просрочки)
   internal/storage/     исходящие: postgres (репозитории, migrations, queries → sqlcdb), maxapi (клиент Bot API)
-miniapp/                Vite · React · TypeScript (strict) · @maxhub/max-ui · MAX Bridge
-  src/app, src/pages, src/shared/{api,bridge,ui,theme}
+miniapp/                Vite · React 19 · TypeScript (strict) · @maxhub/max-ui · MAX Bridge · Vitest
+  src/app (сессия, стек экранов), src/pages, src/shared/{api,bridge,lib,ui,theme}
 deploy/                 compose.yaml, Caddyfile, seed/
 api/openapi.yaml        контракт OpenAPI 3.1, пишется руками (ADR-006)
 DATA-API.yaml           обязательные проверки собственного API
@@ -105,7 +105,10 @@ docs/                   документация продукта (ведётс�
 - `task test:live` — проверка на живом MAX Bot API;
 - `task sqlc` — перегенерировать код запросов после правки `queries/*.sql` или миграций;
 - `task up` / `task down` / `task logs -- api` — весь стек в compose;
-- превью сервера для агента: `.claude/launch.json`, конфигурация `api`.
+- `task miniapp:install` — зависимости мини-приложения (`npm ci`);
+- `task miniapp:dev` — мини-приложение на `:5173`, `/api` проксируется на `task run`; открыть `http://localhost:5173/?demo=resident` (`resident_2`, `uk`), тема `&theme=dark`;
+- `task miniapp:test` / `task miniapp:typecheck` / `task miniapp:build` — Vitest, TypeScript, сборка в `miniapp/dist`;
+- превью для агента: `.claude/launch.json`, конфигурации `api` и `miniapp`.
 
 ## Ловушки платформы MAX
 - Bot API — только `https://platform-api2.max.ru` с заголовком `Authorization: <token>`; в образе `api` нужен корневой сертификат Минцифры.
@@ -115,7 +118,9 @@ docs/                   документация продукта (ведётс�
 - Лимиты: 30 rps глобально, 2 rps на чат для send/edit/delete/answers → все отправки только через outbox.
 - `initDataUnsafe` не доверять; телефон — только `requestContact` с проверкой hash.
 - На web не работают `DeviceStorage`, `SecureStorage`, `HapticFeedback`, `shareContent` → у каждой функции Bridge должен быть запасной путь.
-- В MAX UI нет модалок, табов, select, toast, checkbox, stepper и загрузки файлов → свои компоненты в `miniapp/src/components/`.
+- В MAX UI нет модалок, табов, select, toast, checkbox, stepper и загрузки файлов → свои компоненты в `miniapp/src/shared/ui/` (лист — нативный `<dialog>`, тост — `popover`).
+- `@maxhub/max-ui` 0.5.0 расходится с документацией: пропс `variant` вместо `mode`, нет Panel/Container/Flex/Grid/SearchInput, есть Radio; peer — ровно React 19.2.8. Смотреть типы в `node_modules/@maxhub/max-ui/dist/components`.
+- Вне MAX скрипт Bridge не имеет транспорта: вызовы `BackButton` и т.п. делать только при `bridge.inMax()`.
 - Диплинки: `?start=` ≤ 128 символов, `?startapp=` ≤ 512 символов `[A-Za-z0-9_-]`; в payload только непрозрачные id.
 - `GET /chats` удалён, `POST /chats/{id}/members` удаляется 30.09.2026 — не использовать.
 - Требования MAX §1.5: без массовых и сервисных рассылок → уведомляем только участников их заявок.
