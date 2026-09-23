@@ -1,0 +1,28 @@
+version: "2"
+sql:
+  - engine: postgresql
+    # Схема берётся прямо из миграций goose: sqlc понимает их разметку Up/Down.
+    schema: internal/storage/postgres/migrations
+    queries: internal/storage/postgres/queries
+    gen:
+      go:
+        package: sqlcdb
+        out: internal/storage/postgres/sqlcdb
+        sql_package: pgx/v5
+        overrides:
+          # В домене идентификаторы — строки; pgx сам переводит uuid <-> string.
+          - db_type: uuid
+            go_type: string
+          - db_type: uuid
+            nullable: true
+            go_type:
+              type: string
+              pointer: true
+          - db_type: timestamptz
+            go_type: time.Time
+          - db_type: timestamptz
+            nullable: true
+            go_type:
+              import: time
+              type: Time
+              pointer: true

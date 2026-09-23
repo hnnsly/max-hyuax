@@ -61,29 +61,43 @@ type Participant struct {
 }
 
 type Issue struct {
-	id           string
-	houseID      string
-	objectID     string
-	category     string
-	title        string
-	description  string
-	status       Status
-	createdAt    time.Time
-	deadline     time.Time
-	participants []Participant
-	events       []Event
+	id               string
+	number           int64
+	houseID          string
+	objectID         string
+	category         string
+	title            string
+	description      string
+	responsibleOrgID string
+	status           Status
+	statusAt         time.Time
+	statusComment    string
+	createdAt        time.Time
+	deadline         time.Time
+	participants     []Participant
+	events           []Event
 }
 
 type NewParams struct {
-	ID          string
-	HouseID     string
-	ObjectID    string
-	Category    string
-	Title       string
-	Description string
-	ReporterID  int64
-	CreatedAt   time.Time
-	Deadline    time.Time
+	ID               string
+	HouseID          string
+	ObjectID         string
+	Category         string
+	Title            string
+	Description      string
+	ResponsibleOrgID string
+	ReporterID       int64
+	CreatedAt        time.Time
+	Deadline         time.Time
+}
+
+// State — изменяемая часть агрегата, которую хранилище передаёт в Restore.
+type State struct {
+	Number        int64 // сквозной номер заявки; выдаёт хранилище при первом сохранении
+	Status        Status
+	StatusAt      time.Time
+	StatusComment string
+	Participants  []Participant
 }
 
 // New создаёт заявку; автор становится её первым участником.
@@ -97,16 +111,18 @@ func New(p NewParams) (*Issue, error) {
 		return nil, fmt.Errorf("%w: deadline must be after creation", ErrInvalid)
 	}
 	is := &Issue{
-		id:           p.ID,
-		houseID:      p.HouseID,
-		objectID:     p.ObjectID,
-		category:     p.Category,
-		title:        strings.TrimSpace(p.Title),
-		description:  strings.TrimSpace(p.Description),
-		status:       StatusSent,
-		createdAt:    p.CreatedAt,
-		deadline:     p.Deadline,
-		participants: []Participant{{UserID: p.ReporterID, JoinedAt: p.CreatedAt}},
+		id:               p.ID,
+		houseID:          p.HouseID,
+		objectID:         p.ObjectID,
+		category:         p.Category,
+		title:            strings.TrimSpace(p.Title),
+		description:      strings.TrimSpace(p.Description),
+		responsibleOrgID: p.ResponsibleOrgID,
+		status:           StatusSent,
+		statusAt:         p.CreatedAt,
+		createdAt:        p.CreatedAt,
+		deadline:         p.Deadline,
+		participants:     []Participant{{UserID: p.ReporterID, JoinedAt: p.CreatedAt}},
 	}
 	is.record(Event{Kind: EventCreated, UserID: p.ReporterID, Status: StatusSent, At: p.CreatedAt})
 	return is, nil
@@ -134,7 +150,7 @@ func (is *Issue) ChangeStatus(to Status, comment string, at time.Time) error {
 	if to == StatusRejected && comment == "" {
 		return ErrReasonRequired
 	}
-	is.status = to
+	is.status, is.statusAt, is.statusComment = to, at, comment
 	is.record(Event{Kind: EventStatusChanged, Status: to, Comment: comment, At: at})
 	return nil
 }
@@ -163,28 +179,47 @@ func (is *Issue) record(e Event) {
 }
 
 func (is *Issue) ID() string                  { return is.id }
+func (is *Issue) Number() int64               { return is.number }
 func (is *Issue) HouseID() string             { return is.houseID }
 func (is *Issue) ObjectID() string            { return is.objectID }
 func (is *Issue) Category() string            { return is.category }
 func (is *Issue) Title() string               { return is.title }
 func (is *Issue) Description() string         { return is.description }
+func (is *Issue) ResponsibleOrgID() string    { return is.responsibleOrgID }
 func (is *Issue) Status() Status              { return is.status }
+func (is *Issue) StatusAt() time.Time         { return is.statusAt }
+func (is *Issue) StatusComment() string       { return is.statusComment }
 func (is *Issue) CreatedAt() time.Time        { return is.createdAt }
 func (is *Issue) Deadline() time.Time         { return is.deadline }
 func (is *Issue) Participants() []Participant { return slices.Clone(is.participants) }
 
+// ReporterID — автор заявки: первый участник.
+func (is *Issue) ReporterID() int64 {
+	if len(is.participants) == 0 {
+		return 0
+	}
+	return is.participants[0].UserID
+}
+
+// SetNumber вызывает хранилище, когда база выдала номер новой заявке.
+func (is *Issue) SetNumber(n int64) { is.number = n }
+
 // Restore восстанавливает агрегат из хранилища без записи событий.
-func Restore(p NewParams, status Status, participants []Participant) *Issue {
+func Restore(p NewParams, s State) *Issue {
 	return &Issue{
-		id:           p.ID,
-		houseID:      p.HouseID,
-		objectID:     p.ObjectID,
-		category:     p.Category,
-		title:        p.Title,
-		description:  p.Description,
-		status:       status,
-		createdAt:    p.CreatedAt,
-		deadline:     p.Deadline,
-		participants: slices.Clone(participants),
+		id:               p.ID,
+		number:           s.Number,
+		houseID:          p.HouseID,
+		objectID:         p.ObjectID,
+		category:         p.Category,
+		title:            p.Title,
+		description:      p.Description,
+		responsibleOrgID: p.ResponsibleOrgID,
+		status:           s.Status,
+		statusAt:         s.StatusAt,
+		statusComment:    s.StatusComment,
+		createdAt:        p.CreatedAt,
+		deadline:         p.Deadline,
+		participants:     slices.Clone(s.Participants),
 	}
 }

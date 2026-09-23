@@ -1,0 +1,252 @@
+// Пакет apptest — хранилище в памяти для юнит-тестов сценариев.
+package apptest
+
+import (
+	"cmp"
+	"context"
+	"slices"
+	"strings"
+	"sync"
+	"time"
+
+	"dommax/internal/app"
+	"dommax/internal/domain/house"
+	"dommax/internal/domain/issue"
+	"dommax/internal/domain/user"
+)
+
+type MemStore struct {
+	mu       sync.Mutex
+	HouseMap map[string]house.House
+	Orgs     map[string]house.Organization
+	Objects  []house.AssetObject
+	UserMap  map[int64]user.User
+	issues   map[string]*issue.Issue
+	Events   []issue.Event
+	nextNum  int64
+	nextUID  int64
+}
+
+func New() *MemStore {
+	return &MemStore{
+		HouseMap: map[string]house.House{},
+		Orgs:     map[string]house.Organization{},
+		UserMap:  map[int64]user.User{},
+		issues:   map[string]*issue.Issue{},
+		nextNum:  100,
+		nextUID:  1000,
+	}
+}
+
+func (s *MemStore) Issues() app.IssueRepo { return issueRepo{s} }
+func (s *MemStore) Houses() app.HouseRepo { return houseRepo{s} }
+func (s *MemStore) Users() app.UserRepo   { return userRepo{s} }
+
+// InTx в памяти просто вызывает fn: откат в юнит-тестах не проверяется.
+func (s *MemStore) InTx(_ context.Context, fn func(app.Store) error) error { return fn(s) }
+
+// AddUser кладёт пользователя с заданным ID.
+func (s *MemStore) AddUser(u user.User) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.UserMap[u.ID] = u
+}
+
+// snapshot копирует агрегат, чтобы тест не мог изменить «сохранённое» состояние в обход Save.
+func snapshot(is *issue.Issue) *issue.Issue {
+	return issue.Restore(issue.NewParams{
+		ID: is.ID(), HouseID: is.HouseID(), ObjectID: is.ObjectID(), Category: is.Category(),
+		Title: is.Title(), Description: is.Description(), ResponsibleOrgID: is.ResponsibleOrgID(),
+		CreatedAt: is.CreatedAt(), Deadline: is.Deadline(),
+	}, issue.State{
+		Number: is.Number(), Status: is.Status(), StatusAt: is.StatusAt(),
+		StatusComment: is.StatusComment(), Participants: is.Participants(),
+	})
+}
+
+type issueRepo struct{ s *MemStore }
+
+func (r issueRepo) Create(_ context.Context, is *issue.Issue) error {
+	r.s.mu.Lock()
+	defer r.s.mu.Unlock()
+	r.s.nextNum++
+	is.SetNumber(r.s.nextNum)
+	r.s.Events = append(r.s.Events, is.PullEvents()...)
+	r.s.issues[is.ID()] = snapshot(is)
+	return nil
+}
+
+func (r issueRepo) Save(_ context.Context, is *issue.Issue) error {
+	r.s.mu.Lock()
+	defer r.s.mu.Unlock()
+	if _, ok := r.s.issues[is.ID()]; !ok {
+		return app.ErrNotFound
+	}
+	r.s.Events = append(r.s.Events, is.PullEvents()...)
+	r.s.issues[is.ID()] = snapshot(is)
+	return nil
+}
+
+func (r issueRepo) Get(_ context.Context, id string) (*issue.Issue, error) {
+	r.s.mu.Lock()
+	defer r.s.mu.Unlock()
+	is, ok := r.s.issues[id]
+	if !ok {
+		return nil, app.ErrNotFound
+	}
+	return snapshot(is), nil
+}
+
+func (r issueRepo) GetForUpdate(ctx context.Context, id string) (*issue.Issue, error) {
+	return r.Get(ctx, id)
+}
+
+func (r issueRepo) filter(keep func(*issue.Issue) bool, order func(a, b *issue.Issue) int, limit int) []*issue.Issue {
+	r.s.mu.Lock()
+	defer r.s.mu.Unlock()
+	var out []*issue.Issue
+	for _, is := range r.s.issues {
+		if keep(is) {
+			out = append(out, snapshot(is))
+		}
+	}
+	slices.SortFunc(out, order)
+	return out[:min(len(out), limit)]
+}
+
+func newestFirst(a, b *issue.Issue) int { return b.CreatedAt().Compare(a.CreatedAt()) }
+
+func (r issueRepo) ListByHouse(_ context.Context, houseID string, limit int) ([]*issue.Issue, error) {
+	return r.filter(func(is *issue.Issue) bool { return is.HouseID() == houseID }, newestFirst, limit), nil
+}
+
+func (r issueRepo) FindSimilar(_ context.Context, houseID, category, objectID string, since time.Time) ([]*issue.Issue, error) {
+	return r.filter(func(is *issue.Issue) bool {
+		return is.HouseID() == houseID && is.Category() == category && !is.Status().Closed() &&
+			!is.CreatedAt().Before(since) && (objectID == "" || is.ObjectID() == "" || is.ObjectID() == objectID)
+	}, newestFirst, 5), nil
+}
+
+func (r issueRepo) Queue(_ context.Context, orgID string, limit int) ([]*issue.Issue, error) {
+	return r.filter(func(is *issue.Issue) bool { return is.ResponsibleOrgID() == orgID }, func(a, b *issue.Issue) int {
+		return cmp.Or(cmpBool(a.Status().Closed(), b.Status().Closed()), a.Deadline().Compare(b.Deadline()))
+	}, limit), nil
+}
+
+func cmpBool(a, b bool) int {
+	switch {
+	case a == b:
+		return 0
+	case a:
+		return 1
+	}
+	return -1
+}
+
+type houseRepo struct{ s *MemStore }
+
+func (r houseRepo) Search(_ context.Context, query string) ([]house.House, error) {
+	var out []house.House
+	for _, h := range r.s.HouseMap {
+		if strings.Contains(strings.ToLower(h.Address), strings.ToLower(query)) {
+			out = append(out, h)
+		}
+	}
+	slices.SortFunc(out, func(a, b house.House) int { return strings.Compare(a.Address, b.Address) })
+	return out, nil
+}
+
+func (r houseRepo) Nearest(ctx context.Context, _, _ float64, limit int) ([]house.House, error) {
+	all, _ := r.Search(ctx, "")
+	return all[:min(len(all), limit)], nil
+}
+
+func (r houseRepo) Get(_ context.Context, id string) (house.House, error) {
+	h, ok := r.s.HouseMap[id]
+	if !ok {
+		return house.House{}, app.ErrNotFound
+	}
+	return h, nil
+}
+
+func (r houseRepo) Organization(_ context.Context, id string) (house.Organization, error) {
+	o, ok := r.s.Orgs[id]
+	if !ok {
+		return house.Organization{}, app.ErrNotFound
+	}
+	return o, nil
+}
+
+func (r houseRepo) Entrances(context.Context, string) ([]house.Entrance, error) { return nil, nil }
+
+func (r houseRepo) Objects(_ context.Context, houseID string) ([]house.AssetObject, error) {
+	var out []house.AssetObject
+	for _, o := range r.s.Objects {
+		if o.HouseID == houseID {
+			out = append(out, o)
+		}
+	}
+	return out, nil
+}
+
+func (r houseRepo) ObjectByCode(_ context.Context, code string) (house.AssetObject, error) {
+	i := slices.IndexFunc(r.s.Objects, func(o house.AssetObject) bool { return o.QRCode == code })
+	if i < 0 {
+		return house.AssetObject{}, app.ErrNotFound
+	}
+	return r.s.Objects[i], nil
+}
+
+type userRepo struct{ s *MemStore }
+
+func (r userRepo) Get(_ context.Context, id int64) (user.User, error) {
+	r.s.mu.Lock()
+	defer r.s.mu.Unlock()
+	u, ok := r.s.UserMap[id]
+	if !ok {
+		return user.User{}, app.ErrNotFound
+	}
+	return u, nil
+}
+
+func (r userRepo) ByMaxID(_ context.Context, maxUserID int64) (user.User, error) {
+	r.s.mu.Lock()
+	defer r.s.mu.Unlock()
+	for _, u := range r.s.UserMap {
+		if u.MaxUserID == maxUserID {
+			return u, nil
+		}
+	}
+	return user.User{}, app.ErrNotFound
+}
+
+// ByDemoKey в памяти ищет по имени: в тестах demo-ключ кладётся в FirstName.
+func (r userRepo) ByDemoKey(_ context.Context, key string) (user.User, error) {
+	r.s.mu.Lock()
+	defer r.s.mu.Unlock()
+	for _, u := range r.s.UserMap {
+		if u.FirstName == key {
+			return u, nil
+		}
+	}
+	return user.User{}, app.ErrNotFound
+}
+
+func (r userRepo) Create(_ context.Context, u user.User) (user.User, error) {
+	r.s.mu.Lock()
+	defer r.s.mu.Unlock()
+	r.s.nextUID++
+	u.ID = r.s.nextUID
+	r.s.UserMap[u.ID] = u
+	return u, nil
+}
+
+func (r userRepo) Save(_ context.Context, u user.User) error {
+	r.s.mu.Lock()
+	defer r.s.mu.Unlock()
+	if _, ok := r.s.UserMap[u.ID]; !ok {
+		return app.ErrNotFound
+	}
+	r.s.UserMap[u.ID] = u
+	return nil
+}

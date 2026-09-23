@@ -1,0 +1,182 @@
+// Пакет issues — сценарии работы с заявками: сообщить, присоединиться, сменить статус,
+// найти похожие, очередь УК.
+package issues
+
+import (
+	"cmp"
+	"context"
+	"errors"
+	"fmt"
+	"strings"
+	"time"
+
+	"dommax/internal/app"
+	"dommax/internal/domain/house"
+	"dommax/internal/domain/issue"
+	"dommax/internal/domain/rules"
+	"dommax/internal/domain/user"
+)
+
+// Moscow — часовой пояс пилота: сроки считаются по московским рабочим дням.
+var Moscow = time.FixedZone("MSK", 3*60*60)
+
+const (
+	similarWindow = 14 * 24 * time.Hour
+	listLimit     = 50
+	queueLimit    = 200
+)
+
+type Config struct {
+	Now            func() time.Time
+	NewID          func() string
+	ConsentVersion string // текущая версия согласия на обработку ПДн
+}
+
+type Service struct {
+	store app.Store
+	cfg   Config
+}
+
+func NewService(store app.Store, cfg Config) *Service {
+	return &Service{store: store, cfg: cfg}
+}
+
+type ReportInput struct {
+	HouseID     string
+	ObjectID    string // пусто, если проблема не привязана к объекту с QR
+	Category    string // пусто — берётся из объекта
+	Title       string // пусто — формируется из категории и объекта
+	Description string
+}
+
+// Report создаёт заявку: ответственный — УК дома, срок — из справочника правил.
+func (s *Service) Report(ctx context.Context, u user.User, in ReportInput) (*issue.Issue, error) {
+	if !u.HasConsent(s.cfg.ConsentVersion) {
+		return nil, app.ErrConsentRequired
+	}
+	h, err := s.store.Houses().Get(ctx, in.HouseID)
+	if err != nil {
+		return nil, err
+	}
+	var obj house.AssetObject
+	if in.ObjectID != "" {
+		if obj, err = s.object(ctx, h.ID, in.ObjectID); err != nil {
+			return nil, err
+		}
+	}
+	rule, err := rules.Lookup(cmp.Or(in.Category, obj.Category))
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", app.ErrInvalidInput, err)
+	}
+	now := s.cfg.Now().In(Moscow)
+	is, err := issue.New(issue.NewParams{
+		ID:               s.cfg.NewID(),
+		HouseID:          h.ID,
+		ObjectID:         obj.ID,
+		Category:         rule.Code,
+		Title:            cmp.Or(strings.TrimSpace(in.Title), defaultTitle(rule, obj)),
+		Description:      in.Description,
+		ResponsibleOrgID: h.OrganizationID,
+		ReporterID:       u.ID,
+		CreatedAt:        now,
+		Deadline:         rule.Deadline(now),
+	})
+	if err != nil {
+		return nil, fmt.Errorf("%w: %w", app.ErrInvalidInput, err)
+	}
+	if err := s.store.Issues().Create(ctx, is); err != nil {
+		return nil, err
+	}
+	return is, nil
+}
+
+func (s *Service) object(ctx context.Context, houseID, objectID string) (house.AssetObject, error) {
+	objs, err := s.store.Houses().Objects(ctx, houseID)
+	if err != nil {
+		return house.AssetObject{}, err
+	}
+	for _, o := range objs {
+		if o.ID == objectID {
+			return o, nil
+		}
+	}
+	return house.AssetObject{}, fmt.Errorf("%w: object %q is not in house %q", app.ErrInvalidInput, objectID, houseID)
+}
+
+func defaultTitle(r rules.Rule, obj house.AssetObject) string {
+	if obj.Label == "" {
+		return r.Title
+	}
+	return r.Title + ": " + obj.Label
+}
+
+// Join добавляет жителя к существующей заявке вместо создания дубля.
+func (s *Service) Join(ctx context.Context, u user.User, issueID string) (*issue.Issue, error) {
+	if !u.HasConsent(s.cfg.ConsentVersion) {
+		return nil, app.ErrConsentRequired
+	}
+	return s.update(ctx, issueID, func(is *issue.Issue) error {
+		return is.Join(u.ID, s.cfg.Now())
+	})
+}
+
+// ChangeStatus доступен только оператору УК, ответственной за заявку.
+func (s *Service) ChangeStatus(ctx context.Context, u user.User, issueID string, to issue.Status, comment string) (*issue.Issue, error) {
+	return s.update(ctx, issueID, func(is *issue.Issue) error {
+		if !u.CanManageIssues(is.ResponsibleOrgID()) {
+			return app.ErrForbidden
+		}
+		return is.ChangeStatus(to, comment, s.cfg.Now())
+	})
+}
+
+// update загружает заявку с блокировкой, применяет изменение и сохраняет в одной транзакции.
+func (s *Service) update(ctx context.Context, issueID string, change func(*issue.Issue) error) (*issue.Issue, error) {
+	var out *issue.Issue
+	err := s.store.InTx(ctx, func(tx app.Store) error {
+		is, err := tx.Issues().GetForUpdate(ctx, issueID)
+		if err != nil {
+			return err
+		}
+		if err := change(is); err != nil {
+			return err
+		}
+		out = is
+		return tx.Issues().Save(ctx, is)
+	})
+	return out, err
+}
+
+func (s *Service) Get(ctx context.Context, issueID string) (*issue.Issue, error) {
+	return s.store.Issues().Get(ctx, issueID)
+}
+
+func (s *Service) ListByHouse(ctx context.Context, houseID string) ([]*issue.Issue, error) {
+	return s.store.Issues().ListByHouse(ctx, houseID, listLimit)
+}
+
+// FindSimilar ищет открытые заявки того же дома и категории за последние две недели.
+func (s *Service) FindSimilar(ctx context.Context, houseID, category, objectID string) ([]*issue.Issue, error) {
+	if houseID == "" || category == "" {
+		return nil, fmt.Errorf("%w: house and category are required", app.ErrInvalidInput)
+	}
+	return s.store.Issues().FindSimilar(ctx, houseID, category, objectID, s.cfg.Now().Add(-similarWindow))
+}
+
+// Queue — заявки УК оператора: сначала открытые по сроку (просроченные первыми), затем закрытые.
+func (s *Service) Queue(ctx context.Context, u user.User) ([]*issue.Issue, error) {
+	if u.Role != user.RoleOperator || u.OrganizationID == "" {
+		return nil, app.ErrForbidden
+	}
+	return s.store.Issues().Queue(ctx, u.OrganizationID, queueLimit)
+}
+
+// IsDomainError сообщает, что ошибка — нарушение правил заявки, а не сбой.
+func IsDomainError(err error) bool {
+	for _, target := range []error{issue.ErrInvalid, issue.ErrAlreadyJoined, issue.ErrClosed, issue.ErrTransition, issue.ErrReasonRequired} {
+		if errors.Is(err, target) {
+			return true
+		}
+	}
+	return false
+}

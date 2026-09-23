@@ -137,14 +137,32 @@ func TestChangeStatusRecordsEventWithComment(t *testing.T) {
 }
 
 func TestRestoreKeepsStateWithoutEvents(t *testing.T) {
-	is := issue.Restore(issue.NewParams{ID: "0142", HouseID: "h", Category: "lift", Title: "Лифт", CreatedAt: created, Deadline: deadline},
-		issue.StatusAccepted, []issue.Participant{{UserID: 1}, {UserID: 2}})
+	at := created.Add(time.Hour)
+	is := issue.Restore(issue.NewParams{ID: "u-1", HouseID: "h", Category: "lift", Title: "Лифт", ResponsibleOrgID: "org-1", CreatedAt: created, Deadline: deadline},
+		issue.State{Number: 142, Status: issue.StatusAccepted, StatusAt: at, StatusComment: "Мастер завтра", Participants: []issue.Participant{{UserID: 1}, {UserID: 2}}})
 
-	if is.Status() != issue.StatusAccepted || is.ParticipantCount() != 2 {
-		t.Fatalf("status = %q, participants = %d", is.Status(), is.ParticipantCount())
+	if is.Status() != issue.StatusAccepted || is.ParticipantCount() != 2 || is.Number() != 142 {
+		t.Fatalf("status = %q, participants = %d, number = %d", is.Status(), is.ParticipantCount(), is.Number())
+	}
+	if !is.StatusAt().Equal(at) || is.StatusComment() != "Мастер завтра" || is.ResponsibleOrgID() != "org-1" {
+		t.Fatalf("status at = %v, comment = %q, org = %q", is.StatusAt(), is.StatusComment(), is.ResponsibleOrgID())
 	}
 	if len(is.PullEvents()) != 0 {
 		t.Fatal("restored issue must not carry events")
+	}
+}
+
+func TestChangeStatusUpdatesStatusTimeAndComment(t *testing.T) {
+	is := newIssue(t)
+	if !is.StatusAt().Equal(created) {
+		t.Fatalf("new issue status at = %v, want creation time", is.StatusAt())
+	}
+	at := created.Add(2 * time.Hour)
+	if err := is.ChangeStatus(issue.StatusInProgress, "Мастер на месте", at); err != nil {
+		t.Fatal(err)
+	}
+	if !is.StatusAt().Equal(at) || is.StatusComment() != "Мастер на месте" {
+		t.Fatalf("status at = %v, comment = %q", is.StatusAt(), is.StatusComment())
 	}
 }
 
