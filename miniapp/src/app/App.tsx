@@ -5,7 +5,9 @@ import { parseStartParam } from '../shared/lib/model';
 import { EmptyState, Screen } from '../shared/ui/Layout';
 import { Home } from '../pages/Home';
 import { IssueCard } from '../pages/IssueCard';
-import { Consent, DemoGate, HouseSearch, MyIssues, ReportPlaceholder, UkQueue } from '../pages/Other';
+import { Consent, DemoGate, HouseSearch, MyIssues, UkQueue } from '../pages/Other';
+import { Report } from '../pages/Report';
+import { ErrorBoundary } from './ErrorBoundary';
 import { RouterProvider, useRouter } from './router';
 import { SessionProvider, useSession } from './session';
 import type { Route } from './stack';
@@ -52,9 +54,9 @@ function Pages() {
     case 'mine':
       return <MyIssues />;
     case 'issue':
-      return <IssueCard key={route.id} id={route.id} />;
+      return <IssueCard key={route.id} id={route.id} flash={route.flash} />;
     case 'report':
-      return <ReportPlaceholder />;
+      return <Report objectCode={route.objectCode} category={route.category} />;
     case 'consent':
       return <Consent />;
     case 'uk':
@@ -94,7 +96,9 @@ export function App() {
     <MaxUI colorScheme={scheme}>
       <div className="app-theme" data-scheme={scheme}>
         <SessionProvider>
-          <Gate />
+          <ErrorBoundary>
+            <Gate />
+          </ErrorBoundary>
         </SessionProvider>
       </div>
     </MaxUI>

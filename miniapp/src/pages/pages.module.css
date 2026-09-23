@@ -252,3 +252,67 @@
   font-size: 12.5px;
   color: var(--text-3);
 }
+.groupTitle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 2px 0;
+  font-family: var(--font-cond);
+  font-size: 15px;
+  font-weight: 700;
+}
+.groupTitle::after {
+  content: '';
+  flex-grow: 1;
+  height: 1px;
+  background: var(--separator);
+}
+.groupLate { color: var(--surik); }
+
+/* Лист смены статуса */
+.sheetBody {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.radios {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-island);
+  background: var(--surface-secondary);
+  overflow: hidden;
+}
+.radio {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 8px 14px;
+  font-size: 17px;
+  cursor: pointer;
+}
+.radio + .radio { border-top: 1px solid var(--separator); }
+.radio input {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  accent-color: var(--enamel);
+}
+.sheetText {
+  width: 100%;
+  min-height: 88px;
+  padding: 10px 12px;
+  border: 1.5px solid var(--separator);
+  border-radius: var(--radius-control);
+  background: var(--surface-card);
+  color: var(--text);
+  font: inherit;
+  font-size: 16px;
+  resize: vertical;
+}
+.sheetText:focus-visible {
+  outline: none;
+  border-color: var(--enamel);
+}

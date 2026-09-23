@@ -5,7 +5,7 @@ export type Route =
   | { name: 'home' }
   | { name: 'houseSearch' }
   | { name: 'mine' }
-  | { name: 'issue'; id: string }
+  | { name: 'issue'; id: string; flash?: string }
   | { name: 'report'; objectCode?: string; category?: string }
   | { name: 'consent' }
   | { name: 'uk' };

@@ -73,6 +73,48 @@ export function buildTimeline(events: IssueEvent[]): TimelineItem[] {
   return out.map((item, i) => ({ ...item, last: i === out.length - 1 }));
 }
 
+const transitions: Record<Status, Status[]> = {
+  sent: ['accepted', 'in_progress', 'rejected'],
+  accepted: ['in_progress', 'done', 'rejected'],
+  in_progress: ['done', 'rejected'],
+  done: [],
+  rejected: [],
+};
+
+/** Куда можно перевести заявку; повторяет правила агрегата Issue на бэкенде. */
+export const nextStatuses = (s: Status): Status[] => transitions[s];
+
+interface QueueItem {
+  status: Status;
+  overdue: boolean;
+  deadline: string;
+}
+
+/** Группы очереди УК: сначала то, что горит, закрытые в конце. Пустые группы не показываются. */
+export function groupQueue<T extends QueueItem>(items: T[], now: Date): { title: string; late?: boolean; items: T[] }[] {
+  const closed = (i: T) => i.status === 'done' || i.status === 'rejected';
+  const groups = [
+    { title: 'Просрочено', late: true, items: items.filter((i) => !closed(i) && i.overdue) },
+    { title: 'Срок сегодня и завтра', items: items.filter((i) => !closed(i) && !i.overdue && calendarDaysBetween(now, i.deadline) <= 1) },
+    { title: 'Новые', items: [] as T[] },
+    { title: 'В работе', items: [] as T[] },
+    { title: 'Закрытые', items: items.filter(closed) },
+  ];
+  const taken = new Set([...groups[0]!.items, ...groups[1]!.items]);
+  for (const i of items) {
+    if (closed(i) || taken.has(i)) continue;
+    (i.status === 'sent' ? groups[2]! : groups[3]!).items.push(i);
+  }
+  return groups.filter((g) => g.items.length > 0);
+}
+
+/** Текст для чата дома: без имён и квартир, только заявка и число сообщивших. */
+export function shareText(it: { number: number; title: string; address?: string; place?: string; participant_count: number }): string {
+  const n = it.participant_count;
+  const where = [it.address, it.place].filter(Boolean).join(', ');
+  return `Заявка № ${it.number}: ${it.title}. ${where}. Уже ${plural(n, 'сообщил', 'сообщили', 'сообщили')} ${n} ${plural(n, 'сосед', 'соседа', 'соседей')}. Если у вас то же самое, присоединяйтесь:`;
+}
+
 export type StartTarget =
   | { kind: 'issue'; id: string }
   | { kind: 'object'; code: string }

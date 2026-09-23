@@ -29,6 +29,7 @@ declare global {
 }
 
 const wa = (): WebApp | undefined => window.WebApp;
+const inMax = () => Boolean(wa()?.initData);
 const mobile = () => wa()?.platform === 'ios' || wa()?.platform === 'android';
 
 /** Имя бота: из него собираются ссылки на мини-приложение для шеринга. */
@@ -38,7 +39,7 @@ export const appLink = (startParam: string) => `https://max.ru/${BOT_NAME}?start
 
 export const bridge = {
   /** Открыто ли приложение внутри MAX: там всегда есть подписанный initData. */
-  inMax: () => Boolean(wa()?.initData),
+  inMax,
   initData: () => wa()?.initData ?? '',
 
   startParam(): string {
@@ -48,11 +49,20 @@ export const bridge = {
     return params.get('WebAppStartParam') ?? params.get('startapp') ?? '';
   },
 
+  // Вне MAX у скрипта Bridge нет транспорта: вызовы только сыплют предупреждениями, пропускаем их.
   backButton: {
-    show: () => wa()?.BackButton?.show(),
-    hide: () => wa()?.BackButton?.hide(),
-    onClick: (cb: () => void) => wa()?.BackButton?.onClick(cb),
-    offClick: (cb: () => void) => wa()?.BackButton?.offClick(cb),
+    show(): void {
+      if (inMax()) wa()?.BackButton?.show();
+    },
+    hide(): void {
+      if (inMax()) wa()?.BackButton?.hide();
+    },
+    onClick(cb: () => void): void {
+      if (inMax()) wa()?.BackButton?.onClick(cb);
+    },
+    offClick(cb: () => void): void {
+      if (inMax()) wa()?.BackButton?.offClick(cb);
+    },
   },
 
   /** Сканер QR есть только в мобильном клиенте MAX. */

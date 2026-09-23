@@ -9,6 +9,7 @@ import { isClosed } from '../shared/api/types';
 import { useResource } from '../shared/api/useResource';
 import { BOT_NAME } from '../shared/bridge/bridge';
 import { calendarDaysBetween } from '../shared/lib/format';
+import { groupQueue } from '../shared/lib/model';
 import { IssueList } from '../shared/ui/IssueRow';
 import { EmptyState, ErrorState, Island, Loading, Screen, Section, useToast } from '../shared/ui/Layout';
 import s from './pages.module.css';
@@ -112,7 +113,7 @@ export function MyIssues() {
   );
 }
 
-/** Очередь УК: пока список заявок по сроку; полноценная очередь с группами и сменой статуса — следующий шаг. */
+/** Очередь УК: сводка и заявки по срочности; статус меняется в карточке заявки. */
 export function UkQueue() {
   const { push } = useRouter();
   const res = useResource(() => api.ukQueue(), []);
@@ -146,11 +147,15 @@ export function UkQueue() {
                   </div>
                 </div>
               </Island>
-              <Section title="Заявки" />
               {res.data.length === 0 ? (
                 <EmptyState title="Заявок нет" text="Когда жители сообщат о проблеме, она появится здесь." />
               ) : (
-                <IssueList issues={res.data} now={now} showAddress onOpen={(id) => push({ name: 'issue', id })} />
+                groupQueue(res.data, now).map((g) => (
+                  <section key={g.title} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <h2 className={`${s.groupTitle} ${g.late ? s.groupLate : ''}`}>{g.title}</h2>
+                    <IssueList issues={g.items} now={now} showAddress onOpen={(id) => push({ name: 'issue', id })} />
+                  </section>
+                ))
               )}
             </>
           );
@@ -197,23 +202,6 @@ export function Consent() {
   );
 }
 
-/** Форма новой заявки появится следующим шагом; пока — понятный переход в бота. */
-export function ReportPlaceholder() {
-  const { back } = useRouter();
-  return (
-    <Screen title="Новая заявка" onBack={back}>
-      <EmptyState
-        title="Форма заявки скоро появится"
-        text="Пока сообщите о проблеме боту: опишите её одним сообщением, бот подскажет ответственного и срок."
-        action={
-          <Button variant="primary" size="medium" asChild>
-            <a href={`https://max.ru/${BOT_NAME}`}>Написать боту</a>
-          </Button>
-        }
-      />
-    </Screen>
-  );
-}
 
 /** Вход вне MAX: ссылка на бота и демо-роли для проверки. */
 export function DemoGate() {

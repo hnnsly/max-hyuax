@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildRail, buildTimeline, parseStartParam, type RailItem } from './model';
+import { buildRail, buildTimeline, groupQueue, nextStatuses, parseStartParam, shareText, type RailItem } from './model';
 
 const sym = { done: 'd', left: '-', late: 'x' } as const;
 const tones = (items: RailItem[]) =>
@@ -39,6 +39,47 @@ describe('хронология', () => {
     ]);
     expect(items[2]?.comment).toBe('Мастер приедет завтра');
     expect(items.map((i) => i.last)).toEqual([false, false, false, true]);
+  });
+});
+
+describe('переходы статуса', () => {
+  it('совпадают с доменом бэкенда', () => {
+    expect(nextStatuses('sent')).toEqual(['accepted', 'in_progress', 'rejected']);
+    expect(nextStatuses('accepted')).toEqual(['in_progress', 'done', 'rejected']);
+    expect(nextStatuses('in_progress')).toEqual(['done', 'rejected']);
+    expect(nextStatuses('done')).toEqual([]);
+  });
+});
+
+describe('группы очереди УК', () => {
+  it('раскладывает заявки по срочности', () => {
+    const now = new Date('2026-09-24T10:00:00+03:00');
+    const base = { participant_count: 1, created_at: '2026-09-20T10:00:00+03:00' };
+    const groups = groupQueue(
+      [
+        { id: 'late', status: 'accepted', overdue: true, deadline: '2026-09-22T23:59:59+03:00', ...base },
+        { id: 'soon', status: 'in_progress', overdue: false, deadline: '2026-09-25T23:59:59+03:00', ...base },
+        { id: 'new', status: 'sent', overdue: false, deadline: '2026-09-30T23:59:59+03:00', ...base },
+        { id: 'work', status: 'accepted', overdue: false, deadline: '2026-09-30T23:59:59+03:00', ...base },
+        { id: 'done', status: 'done', overdue: false, deadline: '2026-09-21T23:59:59+03:00', ...base },
+      ],
+      now,
+    );
+    expect(groups.map((g) => [g.title, g.items.map((i) => i.id)])).toEqual([
+      ['Просрочено', ['late']],
+      ['Срок сегодня и завтра', ['soon']],
+      ['Новые', ['new']],
+      ['В работе', ['work']],
+      ['Закрытые', ['done']],
+    ]);
+  });
+});
+
+describe('текст для чата дома', () => {
+  it('без имён, с согласованием и местом', () => {
+    expect(shareText({ number: 142, title: 'Лифт не работает', address: 'Ореховый бульвар, 17к2', place: 'подъезд 2, пассажирский лифт', participant_count: 1 }))
+      .toBe('Заявка № 142: Лифт не работает. Ореховый бульвар, 17к2, подъезд 2, пассажирский лифт. Уже сообщил 1 сосед. Если у вас то же самое, присоединяйтесь:');
+    expect(shareText({ number: 7, title: 'Свет', address: 'Дом', participant_count: 12 })).toContain('Уже сообщили 12 соседей');
   });
 });
 

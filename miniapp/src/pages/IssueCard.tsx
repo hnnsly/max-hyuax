@@ -1,35 +1,36 @@
 import { Button } from '@maxhub/max-ui';
 import { CheckCircle, ShareNetwork } from '@phosphor-icons/react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from '../app/router';
 import { useUser } from '../app/session';
 import { api, ApiError } from '../shared/api/client';
-import { isClosed, type Issue } from '../shared/api/types';
+import { isClosed, type Issue, type Status } from '../shared/api/types';
 import { useResource } from '../shared/api/useResource';
 import { appLink, bridge } from '../shared/bridge/bridge';
 import { calendarDaysBetween, capitalize, dayMonth, dotDateTime, plural } from '../shared/lib/format';
-import { buildTimeline } from '../shared/lib/model';
+import { buildTimeline, nextStatuses, shareText } from '../shared/lib/model';
 import { ErrorState, Island, Loading, Screen, useToast } from '../shared/ui/Layout';
-import { IssuePlate, Stamp } from '../shared/ui/Plate';
+import { IssuePlate, Stamp, statusLabel } from '../shared/ui/Plate';
+import { Sheet } from '../shared/ui/Sheet';
 import { Rail } from '../shared/ui/Rail';
 import s from './pages.module.css';
 
-/** Текст для чата дома: без имён и квартир, только заявка и число сообщивших. */
-export function shareText(it: Issue): string {
-  const n = it.participant_count;
-  const where = [it.address, it.place].filter(Boolean).join(', ');
-  return `Заявка № ${it.number}: ${it.title}. ${where}. Уже ${plural(n, 'сообщил', 'сообщили', 'сообщили')} ${n} ${plural(n, 'сосед', 'соседа', 'соседей')}. Если у вас то же самое, присоединяйтесь:`;
-}
-
-export function IssueCard({ id }: { id: string }) {
+export function IssueCard({ id, flash }: { id: string; flash?: string }) {
   const user = useUser();
   const { push, back, canGoBack } = useRouter();
   const [toast, showToast] = useToast();
   const [busy, setBusy] = useState(false);
+  const [sheet, setSheet] = useState(false);
+  const [landed, setLanded] = useState(false);
   const res = useResource(async () => {
     const [issue, events] = await Promise.all([api.issue(id), api.timeline(id)]);
     return { issue, events };
   }, [id]);
+
+  // Сообщение с предыдущего экрана (заявка отправлена, присоединились).
+  useEffect(() => {
+    if (flash) showToast(flash);
+  }, [flash, showToast]);
 
   const onBack = canGoBack ? back : undefined;
   if (res.loading && !res.data) {
@@ -81,7 +82,26 @@ export function IssueCard({ id }: { id: string }) {
   };
 
   const canJoin = !closed && !issue.joined && user.role === 'resident';
-  const actions = (
+  const canManage = !closed && user.role === 'uk_operator' && user.organization_id === issue.responsible?.id;
+  const saved = (changed: Issue) => {
+    setSheet(false);
+    setLanded(true);
+    bridge.hapticSuccess();
+    const people = changed.participant_count;
+    showToast(`Статус сохранён. ${people} ${plural(people, 'житель увидит', 'жителя увидят', 'жителей увидят')} его в карточке.`);
+    res.reload();
+  };
+
+  const actions = canManage ? (
+    <>
+      <Button variant="primary" size="large" stretched onClick={() => setSheet(true)}>
+        Сменить статус
+      </Button>
+      <Button variant="secondary" size="medium" stretched iconBefore={<ShareNetwork size={18} />} onClick={share}>
+        Отправить в чат дома
+      </Button>
+    </>
+  ) : (
     <>
       {canJoin ? (
         <Button variant="primary" size="large" stretched loading={busy} onClick={join}>
@@ -110,7 +130,7 @@ export function IssueCard({ id }: { id: string }) {
       <div className={s.cardTop}>
         <IssuePlate number={issue.number} />
         <span className={s.cardStamp}>
-          <Stamp status={issue.status} />
+          <Stamp key={issue.status} status={issue.status} land={landed} />
         </span>
       </div>
       <div>
@@ -188,7 +208,74 @@ export function IssueCard({ id }: { id: string }) {
           </div>
         </Island>
       )}
+      {canManage && <StatusSheet open={sheet} issue={issue} onClose={() => setSheet(false)} onSaved={saved} />}
       {toast}
     </Screen>
+  );
+}
+
+/** Смена статуса оператором УК (холст UkStatus): отказ требует причину для жителей. */
+function StatusSheet({ open, issue, onClose, onSaved }: { open: boolean; issue: Issue; onClose: () => void; onSaved: (i: Issue) => void }) {
+  const options = nextStatuses(issue.status);
+  const [to, setTo] = useState<Status>(options[0] ?? 'accepted');
+  const [comment, setComment] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const n = issue.participant_count;
+  const rejecting = to === 'rejected';
+  const valid = !rejecting || comment.trim() !== '';
+
+  const save = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      onSaved(await api.changeStatus(issue.id, to, comment.trim()));
+      setComment('');
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Не удалось сохранить статус');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Sheet open={open} title="Сменить статус" onClose={onClose}>
+      <div className={s.sheetBody}>
+        <fieldset className={s.radios}>
+          <legend className="visually-hidden">Новый статус</legend>
+          {options.map((st) => (
+            <label key={st} className={s.radio}>
+              <input type="radio" name="status" value={st} checked={to === st} onChange={() => setTo(st)} />
+              <span>{statusLabel[st]}</span>
+              {to === st && <Stamp status={st} small />}
+            </label>
+          ))}
+        </fieldset>
+        <label className={s.blockTitle} htmlFor="status-comment">
+          {rejecting ? 'Причина отказа' : 'Комментарий для жителей'}
+        </label>
+        <textarea
+          id="status-comment"
+          className={s.sheetText}
+          value={comment}
+          maxLength={1000}
+          required={rejecting}
+          onChange={(e) => setComment(e.target.value)}
+        />
+        <p className={s.hint}>
+          {rejecting
+            ? 'Обязательно. Жители увидят причину в карточке.'
+            : `Его ${plural(n, 'увидит', 'увидят', 'увидят')} ${n} ${plural(n, 'человек, который сообщил', 'человека, которые сообщили', 'человек, которые сообщили')} о проблеме.`}
+        </p>
+        {error && (
+          <p className={s.hint} role="alert">
+            {error}
+          </p>
+        )}
+        <Button variant="primary" size="large" stretched loading={busy} disabled={!valid} onClick={save}>
+          Сохранить статус
+        </Button>
+      </div>
+    </Sheet>
   );
 }
