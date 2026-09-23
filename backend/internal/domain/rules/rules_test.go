@@ -49,6 +49,26 @@ func TestLookupUnknownCategory(t *testing.T) {
 	}
 }
 
+func TestClassifyByKeywords(t *testing.T) {
+	cases := map[string]string{
+		"Во втором подъезде не работает лифт": "lift",
+		"Не горит свет на 5 этаже":            "lighting",
+		"С потолка капает, протечка с крыши":  "leak",
+		"Батареи совсем холодные":             "heating",
+		"Сломан ДОМОФОН в первом подъезде":    "door",
+		"Мусоропровод забит, запах":           "garbage",
+	}
+	for text, want := range cases {
+		r, ok := rules.Classify(text)
+		if !ok || r.Code != want {
+			t.Errorf("Classify(%q) = %q, %v; want %q", text, r.Code, ok, want)
+		}
+	}
+	if _, ok := rules.Classify("Непонятно что случилось"); ok {
+		t.Error("text without keywords must not be classified")
+	}
+}
+
 func TestCategoriesAreOrderedAndComplete(t *testing.T) {
 	cats := rules.Categories()
 	if len(cats) < 6 {

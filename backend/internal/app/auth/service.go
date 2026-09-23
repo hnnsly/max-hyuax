@@ -47,22 +47,29 @@ func (s *Service) LoginMax(ctx context.Context, initData string) (Session, error
 	if err != nil {
 		return Session{}, fmt.Errorf("%w: %w", app.ErrUnauthorized, err)
 	}
-	users := s.store.Users()
-	u, err := users.ByMaxID(ctx, d.User.ID)
-	switch {
-	case errors.Is(err, app.ErrNotFound):
-		u, err = users.Create(ctx, user.User{MaxUserID: d.User.ID, FirstName: d.User.FirstName, Role: user.RoleResident})
-	case err == nil && u.Deleted():
-		// Житель удалил аккаунт и вернулся: начинаем с чистого листа, согласие нужно заново.
-		u.DeletedAt, u.FirstName = time.Time{}, d.User.FirstName
-		err = users.Save(ctx, u)
-	}
+	u, err := s.EnsureMaxUser(ctx, d.User.ID, d.User.FirstName)
 	if err != nil {
 		return Session{}, err
 	}
 	sess := s.issue(u)
 	sess.StartParam = d.StartParam
 	return sess, nil
+}
+
+// EnsureMaxUser находит пользователя MAX или создаёт жителя. Нужен и мини-приложению, и боту:
+// бот знает пользователя по user_id из события.
+func (s *Service) EnsureMaxUser(ctx context.Context, maxUserID int64, firstName string) (user.User, error) {
+	users := s.store.Users()
+	u, err := users.ByMaxID(ctx, maxUserID)
+	switch {
+	case errors.Is(err, app.ErrNotFound):
+		return users.Create(ctx, user.User{MaxUserID: maxUserID, FirstName: firstName, Role: user.RoleResident})
+	case err == nil && u.Deleted():
+		// Житель удалил аккаунт и вернулся: начинаем с чистого листа, согласие нужно заново.
+		u.DeletedAt, u.FirstName = time.Time{}, firstName
+		return u, users.Save(ctx, u)
+	}
+	return u, err
 }
 
 // LoginDemo входит тестовым пользователем роли без клиента MAX.

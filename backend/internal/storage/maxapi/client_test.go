@@ -158,6 +158,24 @@ func TestSubscribePostsURLTypesAndSecret(t *testing.T) {
 	}
 }
 
+func TestSetCommandsPatchesMe(t *testing.T) {
+	c := newServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPatch || r.URL.Path != "/me/commands" {
+			t.Errorf("request = %s %s", r.Method, r.URL)
+		}
+		var body struct {
+			Commands []map[string]string `json:"commands"`
+		}
+		if err := json.UnmarshalRead(r.Body, &body); err != nil || len(body.Commands) != 1 || body.Commands[0]["name"] != "new" {
+			t.Errorf("body = %+v, err = %v", body, err)
+		}
+		io.WriteString(w, `{"commands":[{"name":"new","description":"Сообщить о проблеме"}]}`)
+	})
+	if err := c.SetCommands(t.Context(), []maxapi.Command{{Name: "new", Description: "Сообщить о проблеме"}}); err != nil {
+		t.Fatalf("SetCommands: %v", err)
+	}
+}
+
 func TestAnswerSendsCallbackID(t *testing.T) {
 	c := newServer(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/answers" || r.URL.Query().Get("callback_id") != "cb1" {

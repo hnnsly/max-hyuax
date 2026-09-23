@@ -112,6 +112,23 @@ func (c *Client) Subscribe(ctx context.Context, url, secret string, types []Upda
 	return c.doResult(ctx, http.MethodPost, "/subscriptions", nil, body)
 }
 
+// Command — команда в меню бота (PATCH /me/commands): name 1-64 символа, description 1-128.
+type Command struct {
+	Name        string `json:"name"`
+	Description string `json:"description"`
+}
+
+// SetCommands заменяет список команд бота.
+func (c *Client) SetCommands(ctx context.Context, cmds []Command) error {
+	body := struct {
+		Commands []Command `json:"commands"`
+	}{cmds}
+	var out struct {
+		Commands []Command `json:"commands"`
+	}
+	return c.do(ctx, http.MethodPatch, "/me/commands", nil, body, &out)
+}
+
 func (c *Client) Answer(ctx context.Context, callbackID string, a CallbackAnswer) error {
 	return c.doResult(ctx, http.MethodPost, "/answers", url.Values{"callback_id": {callbackID}}, a)
 }

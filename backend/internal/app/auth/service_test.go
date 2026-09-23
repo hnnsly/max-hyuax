@@ -46,6 +46,18 @@ func TestLoginMaxCreatesResidentOnce(t *testing.T) {
 	}
 }
 
+func TestEnsureMaxUserFindsOrCreates(t *testing.T) {
+	svc, _ := newService(t, false)
+	u1, err := svc.EnsureMaxUser(t.Context(), 777, "Ольга")
+	if err != nil || u1.MaxUserID != 777 || u1.Role != user.RoleResident {
+		t.Fatalf("u1 = %+v, err = %v", u1, err)
+	}
+	u2, err := svc.EnsureMaxUser(t.Context(), 777, "Ольга")
+	if err != nil || u2.ID != u1.ID {
+		t.Fatalf("u2 = %+v, err = %v", u2, err)
+	}
+}
+
 func TestSessionTokenAuthenticates(t *testing.T) {
 	svc, _ := newService(t, true)
 	s, err := svc.LoginDemo(t.Context(), "uk_operator")

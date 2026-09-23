@@ -5,6 +5,7 @@ package rules
 import (
 	"errors"
 	"slices"
+	"strings"
 	"time"
 )
 
@@ -60,6 +61,27 @@ func Lookup(code string) (Rule, error) {
 		return Rule{}, ErrUnknownCategory
 	}
 	return catalog[i], nil
+}
+
+// Classify определяет категорию по ключевым словам: побеждает категория с наибольшим
+// числом совпавших основ, при равенстве — первая по порядку. Без совпадений — false.
+// Это подсказка: житель подтверждает категорию сам.
+func Classify(text string) (Rule, bool) {
+	text = strings.ToLower(text)
+	var best Rule
+	var bestScore int
+	for _, r := range catalog {
+		score := 0
+		for _, kw := range r.Keywords {
+			if strings.Contains(text, kw) {
+				score++
+			}
+		}
+		if score > bestScore {
+			best, bestScore = r, score
+		}
+	}
+	return best, bestScore > 0
 }
 
 // AddBusinessDays отсчитывает n рабочих дней (пн–пт) после from и возвращает конец

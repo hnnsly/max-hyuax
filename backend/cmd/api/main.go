@@ -116,7 +116,13 @@ func startBot(ctx context.Context, cfg config, store *postgres.Store, deps *http
 		return nil, err
 	}
 	log.Info("bot authorized", "username", me.Username)
-	h := bot.NewHandler(client, me.Username, log)
+	h := bot.NewHandler(client, me.Username, bot.Services{
+		Auth: deps.Auth, Issues: deps.Issues, Houses: deps.Houses, ConsentVersion: cfg.ConsentVersion, Now: time.Now,
+	}, log)
+	// Меню команд бота; без него бот тоже работает, поэтому ошибка только в лог.
+	if err := client.SetCommands(ctx, bot.Commands); err != nil {
+		log.Warn("set bot commands failed", "err", err)
+	}
 
 	// Живые карточки: очередь outbox отправляется в фоне с лимитами Bot API.
 	cardSvc := cards.NewService(store, bot.NewCardSender(client, me.Username), time.Now)
