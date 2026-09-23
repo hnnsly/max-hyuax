@@ -15,6 +15,27 @@ services:
       - caddy_data:/data
       - caddy_config:/config
 
+  db:
+    # Версия закреплена явно; обновлять осознанно, а не через latest.
+    image: postgres:18.6
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: dommax
+      POSTGRES_DB: dommax
+      # На сервере задать свой пароль в deploy/.env. Наружу порт открыт только на 127.0.0.1.
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dommax}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      # С Postgres 18 образ хранит данные в /var/lib/postgresql/<версия>, том монтируется на уровень выше.
+      - pg_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U dommax -d dommax"]
+      interval: 2s
+      timeout: 3s
+      retries: 30
+
 volumes:
   caddy_data:
   caddy_config:
+  pg_data:

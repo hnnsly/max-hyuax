@@ -1,0 +1,101 @@
+# Команды проекта. Список: task (или task --list). Нужен Task v3: https://taskfile.dev
+version: '3'
+
+# Переменные локальной разработки. На сервере compose читает deploy/.env.
+dotenv: ['.env']
+
+vars:
+  COMPOSE: docker compose -f deploy/compose.yaml
+
+tasks:
+  default:
+    desc: Показать список задач
+    silent: true
+    cmds:
+      - task --list
+
+  # --- Окружение (Docker Compose) ---
+
+  up:
+    desc: Поднять все сервисы compose в фоне
+    cmds:
+      - '{{.COMPOSE}} up -d --build'
+
+  down:
+    desc: Остановить сервисы (данные БД сохраняются)
+    cmds:
+      - '{{.COMPOSE}} down'
+
+  ps:
+    desc: Состояние сервисов
+    cmds:
+      - '{{.COMPOSE}} ps'
+
+  logs:
+    desc: Логи сервисов (task logs -- api, чтобы смотреть один сервис)
+    cmds:
+      - '{{.COMPOSE}} logs -f --tail=100 {{.CLI_ARGS}}'
+
+  db:
+    desc: Поднять только Postgres и дождаться готовности
+    cmds:
+      - '{{.COMPOSE}} up -d --wait db'
+
+  db:psql:
+    desc: Консоль psql в контейнере БД
+    interactive: true
+    cmds:
+      - '{{.COMPOSE}} exec db psql -U dommax dommax'
+
+  db:reset:
+    desc: Удалить локальную БД вместе с данными и поднять заново
+    prompt: Все данные локальной БД будут удалены. Продолжить?
+    cmds:
+      - '{{.COMPOSE}} rm -sfv db'
+      - docker volume rm -f dom-max_pg_data
+      - task: db
+
+  # --- Бэкенд ---
+
+  lint:
+    desc: gofmt и go vet
+    dir: backend
+    cmds:
+      - test -z "$(gofmt -l .)" || (gofmt -l . && exit 1)
+      - go vet ./...
+
+  test:
+    desc: Юнит-тесты бэкенда
+    dir: backend
+    cmds:
+      - go test ./...
+
+  test:integration:
+    desc: Тесты на настоящем Postgres (сначала task db)
+    dir: backend
+    cmds:
+      - go test -tags integration -count=1 ./...
+
+  test:live:
+    desc: Проверка на живом MAX Bot API (нужен MAX_BOT_TOKEN)
+    dir: backend
+    cmds:
+      - go test -tags live -count=1 -v ./internal/storage/maxapi
+
+  build:
+    desc: Собрать бинарник api в backend/bin
+    dir: backend
+    cmds:
+      - go build -o bin/api{{exeExt}} ./cmd/api
+
+  run:
+    desc: Запустить api локально (БД из task db, переменные из .env)
+    dir: backend
+    cmds:
+      - go run ./cmd/api
+
+  sqlc:
+    desc: Сгенерировать код запросов sqlc
+    dir: backend
+    cmds:
+      - go tool sqlc generate

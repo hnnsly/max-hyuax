@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "deny": [
+      "Read(**/node_modules/**)",
+      "Read(./miniapp/dist/**)",
+      "Read(./backend/bin/**)",
+      "Read(**/*.exe)",
+      "Read(**/coverage.out)",
+      "Read(./tmp/**)",
+      "Read(./.obsidian/**)",
+      "Read(./.idea/**)",
+      "Read(./.vscode/**)"
+    ]
+  }
+}
