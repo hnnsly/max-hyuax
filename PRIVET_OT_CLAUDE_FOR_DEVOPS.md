@@ -13,16 +13,18 @@
 
 | Файл | Что это |
 |---|---|
-| `deploy/compose.yaml` | сейчас один сервис `web`: Caddy с автоматическим HTTPS (Let's Encrypt) |
-| `deploy/Caddyfile` | отдаёт статику из `/srv`, проксирует `/api/*` и `/webhook/*` на будущий `api:8080` |
-| `deploy/placeholder/index.html` | страница-заглушка «Скоро открытие» в нашем стиле |
+| `deploy/compose.yaml` | сервисы `web` (Caddy с HTTPS и мини-приложением), `api` (бэкенд), `db` (Postgres) |
+| `deploy/web.Dockerfile` | собирает мини-приложение и кладёт его в образ Caddy |
+| `deploy/Caddyfile` | отдаёт мини-приложение, проксирует `/api/*` и `/webhook/*` на `api:8080` |
 | `deploy/.env.example` | переменные; на сервере копируется в `deploy/.env` |
 | `.github/workflows/ci.yml` | пайплайн: тесты Go, сборка мини-приложения (когда появится), автодеплой по SSH при push в `master` |
 | `hack-docs/DEVOPS.md` | подробная инструкция по этапам А и Б, операции и неполадки |
 
 ## Что сделать (порядок важен)
 
-### 1. Сегодня: заглушка по HTTPS и URL на модерацию (этап А)
+### 1. Сегодня: мини-приложение по HTTPS и URL на модерацию (этап А)
+
+Обновление от 25.09: заглушки больше нет, `web` сразу собирает настоящее мини-приложение (`docker compose up -d --build web`). Бэкенд тоже готов, можно сразу делать и этап Б из `hack-docs/DEVOPS.md`.
 
 1. VPS в РФ, Docker + compose plugin, открыты порты 80 и 443.
 2. A-запись домена указывает на VPS.
@@ -31,9 +33,9 @@
    git clone https://github.com/hnnsly/max-hyuax.git /opt/dom-max
    cd /opt/dom-max/deploy
    cp .env.example .env        # вписать DOMAIN=ваш.домен
-   docker compose up -d web
+   docker compose up -d --build web
    ```
-4. Открыть `https://<домен>/`: должна быть заглушка с валидным сертификатом (замок в браузере). Без валидного HTTPS модерацию не пройти.
+4. Открыть `https://<домен>/`: должно открыться мини-приложение с валидным сертификатом (замок в браузере). Без валидного HTTPS модерацию не пройти.
 5. **Сразу** прописать URL: https://business.max.ru/self → «Чат-боты» → `t105_hakaton_max_bot` → «⋮» → «Настройки» → адрес мини-приложения `https://<домен>/` → сохранить.
 6. Написать домен в чат команды и в `hack-docs/HANDOFF.md` (раздел «Открытые вопросы»).
 

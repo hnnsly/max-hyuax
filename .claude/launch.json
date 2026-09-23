@@ -12,6 +12,12 @@
       "runtimeExecutable": "task",
       "runtimeArgs": ["run"],
       "port": 8080
+    },
+    {
+      "name": "miniapp",
+      "runtimeExecutable": "task",
+      "runtimeArgs": ["miniapp:dev"],
+      "port": 5173
     }
   ]
 }

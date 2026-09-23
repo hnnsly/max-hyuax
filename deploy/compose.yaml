@@ -2,7 +2,10 @@ name: dom-max
 
 services:
   web:
-    image: caddy:2.10-alpine
+    # Caddy с собранным мини-приложением внутри образа (deploy/web.Dockerfile).
+    build:
+      context: ..
+      dockerfile: deploy/web.Dockerfile
     restart: unless-stopped
     ports:
       - "80:80"
@@ -10,8 +13,6 @@ services:
     environment:
       DOMAIN: ${DOMAIN:?set DOMAIN in deploy/.env}
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - ./placeholder:/srv:ro
       - caddy_data:/data
       - caddy_config:/config
 

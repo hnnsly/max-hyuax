@@ -67,8 +67,9 @@ func TestReportTakesCategoryFromObjectAndDeadlineFromRules(t *testing.T) {
 	if is.Category() != "lift" || is.ResponsibleOrgID() != "org-1" || is.Number() == 0 {
 		t.Fatalf("issue = category %q, org %q, number %d", is.Category(), is.ResponsibleOrgID(), is.Number())
 	}
-	if is.Title() == "" {
-		t.Fatal("title must default to the category and object")
+	// Место объекта показывается отдельной строкой, заголовок его не повторяет.
+	if is.Title() != "Лифт" {
+		t.Fatalf("title = %q, want category title", is.Title())
 	}
 	// Лифт — 1 рабочий день: из четверга до конца пятницы.
 	if want := time.Date(2026, 9, 18, 23, 59, 59, 0, msk); !is.Deadline().Equal(want) {

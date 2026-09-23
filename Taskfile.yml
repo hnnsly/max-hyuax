@@ -99,3 +99,35 @@ tasks:
     dir: backend
     cmds:
       - go tool sqlc generate
+
+  # --- Мини-приложение ---
+
+  miniapp:install:
+    desc: Установить зависимости мини-приложения (по package-lock)
+    dir: miniapp
+    cmds:
+      - npm ci
+
+  miniapp:dev:
+    desc: Мини-приложение на :5173, /api проксируется на api :8080 (открыть http://localhost:5173/?demo=resident)
+    dir: miniapp
+    cmds:
+      - npm run dev
+
+  miniapp:test:
+    desc: Тесты мини-приложения (Vitest)
+    dir: miniapp
+    cmds:
+      - npm test
+
+  miniapp:typecheck:
+    desc: Проверка типов TypeScript
+    dir: miniapp
+    cmds:
+      - npm run typecheck
+
+  miniapp:build:
+    desc: Сборка мини-приложения в miniapp/dist
+    dir: miniapp
+    cmds:
+      - npm run build

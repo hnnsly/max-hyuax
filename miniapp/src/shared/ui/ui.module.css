@@ -1,0 +1,396 @@
+/* Компоненты фирменного слоя. Размеры и цвета — по холсту v2 (hack-docs/design/canvas-v2). */
+
+/* --- Табличка --- */
+.plate {
+  position: relative;
+  background: var(--enamel);
+  color: var(--plate-ink);
+  border-radius: var(--radius-plate);
+  box-shadow: inset 0 0 0 1.5px var(--enamel-edge), inset 0 1px 0 rgb(255 255 255 / 0.28);
+}
+.plate::before {
+  content: '';
+  position: absolute;
+  inset: 6px;
+  border: 1.5px solid rgb(255 255 255 / 0.92);
+  border-radius: 4px;
+  pointer-events: none;
+}
+.bolt {
+  position: absolute;
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: rgb(255 255 255 / 0.4);
+}
+.houseInner {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 20px 24px 22px;
+}
+.street {
+  font-family: var(--font-cond);
+  font-size: 17px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: rgb(255 255 255 / 0.88);
+}
+.houseLine {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+.houseNumber {
+  font-family: var(--font-plate);
+  font-size: 78px;
+  font-weight: 900;
+  line-height: 0.82;
+  letter-spacing: -0.015em;
+}
+.chip {
+  border: 1.5px solid rgb(255 255 255 / 0.75);
+  border-radius: 4px;
+  padding: 3px 9px 4px;
+  font-family: var(--font-cond);
+  font-size: 14px;
+  font-weight: 650;
+  margin-bottom: 6px;
+}
+.issuePlate {
+  display: inline-block;
+  padding: 10px 16px 12px;
+}
+.issuePlate::before {
+  inset: 5px;
+  border-width: 1.25px;
+}
+.issuePlateInner {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 2px 4px 0;
+}
+.issuePlateLabel {
+  font-family: var(--font-cond);
+  font-size: 12.5px;
+  font-weight: 600;
+  color: rgb(255 255 255 / 0.85);
+}
+.issuePlateNumber {
+  font-family: var(--font-plate);
+  font-size: 40px;
+  font-weight: 900;
+  line-height: 0.85;
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- Штамп статуса: единственная заглавная подпись --- */
+.stamp {
+  display: inline-block;
+  border: 2.5px solid currentColor;
+  border-radius: 7px;
+  padding: 7px 12px 6px;
+  font-family: var(--font-plate);
+  font-size: 22px;
+  font-weight: 850;
+  letter-spacing: 0.06em;
+  line-height: 1;
+  text-transform: uppercase;
+  opacity: 0.92;
+  transform: rotate(-4deg);
+  box-shadow: inset 0 0 0 3.5px var(--surface), inset 0 0 0 4.5px currentColor;
+}
+.stampSmall {
+  font-size: 15px;
+  padding: 5px 8px 4px;
+  border-width: 2px;
+}
+.stampLand {
+  animation: stamp-land var(--stamp-duration) var(--ease-out) both;
+}
+.st_sent { color: var(--text-2); }
+.st_accepted { color: var(--enamel-text); }
+.st_in_progress { color: var(--amber-text); }
+.st_done { color: var(--stencil-green); }
+.st_rejected { color: var(--surik); }
+
+/* --- Шкала срока --- */
+.rail {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.railFull {
+  align-items: flex-end;
+  height: 26px;
+}
+.seg {
+  height: 6px;
+  width: 14px;
+  border-radius: 2px;
+  background: var(--rail-empty);
+}
+.railFull .seg {
+  flex-grow: 1;
+  width: auto;
+  height: 8px;
+}
+.seg_done { background: var(--enamel); }
+.seg_late { background: var(--surik); }
+.tick {
+  width: 3px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--text);
+}
+.railFull .tick { height: 22px; }
+.tickLate { background: var(--surik); }
+.tickDeadline {
+  width: 3px;
+  height: 16px;
+  border-radius: 2px;
+  background: var(--surik);
+}
+.railLabels {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-family: var(--font-cond);
+  font-size: 12px;
+  color: var(--text-3);
+}
+.railToday {
+  color: var(--text);
+  font-weight: 650;
+}
+.railDeadline { color: var(--surik); }
+
+/* --- Острова и строки заявок --- */
+.island {
+  background: var(--surface-card);
+  border-radius: var(--radius-island);
+  overflow: hidden;
+}
+.row {
+  display: grid;
+  grid-template-columns: 50px minmax(0, 1fr) 12px;
+  gap: 12px;
+  width: 100%;
+  padding: 13px 12px 14px 14px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.row:active { background: var(--surface-secondary); }
+.row + .row { box-shadow: inset 76px 1px 0 -75px var(--surface-card), inset 0 1px 0 var(--separator); }
+.rowCount {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding-top: 2px;
+}
+.rowCountNumber {
+  font-family: var(--font-plate);
+  font-size: 32px;
+  font-weight: 850;
+  line-height: 0.85;
+  font-variant-numeric: tabular-nums;
+}
+.rowCountNoun {
+  font-size: 10.5px;
+  color: var(--text-3);
+}
+.rowBody {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+.rowTitle {
+  font-size: 16.5px;
+  font-weight: 650;
+}
+.rowPlace {
+  font-family: var(--font-cond);
+  font-size: 14px;
+  color: var(--text-2);
+}
+.rowMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding-top: 2px;
+}
+.rowDeadline {
+  font-size: 13px;
+  color: var(--text-2);
+}
+.rowDeadlineLate {
+  color: var(--surik);
+  font-weight: 650;
+}
+.chevron {
+  align-self: center;
+  color: var(--chevron);
+}
+
+/* --- Факты, секции --- */
+.facts {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  padding: 11px 6px;
+}
+.fact {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 0 10px;
+}
+.fact + .fact { border-left: 1px solid var(--separator); }
+.factValue {
+  font-family: var(--font-cond);
+  font-size: 19px;
+  font-weight: 700;
+}
+.factLabel {
+  font-size: 11.5px;
+  color: var(--text-3);
+}
+.section {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 2px 2px 0;
+}
+.sectionTitle {
+  margin: 0;
+  font-family: var(--font-cond);
+  font-size: 21px;
+  font-weight: 700;
+}
+.sectionAside {
+  font-size: 13px;
+  color: var(--text-3);
+}
+.demoMark {
+  font-size: 12px;
+  color: var(--text-3);
+  padding: 0 2px;
+}
+
+/* --- Состояния --- */
+.state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+  padding: 28px 20px;
+}
+.stateTitle {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 650;
+}
+.stateText {
+  margin: 0;
+  font-size: 15px;
+  color: var(--text-2);
+  line-height: 1.35;
+}
+.skeleton {
+  border-radius: var(--radius-island);
+  background: var(--surface-card);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+@keyframes pulse {
+  50% { opacity: 0.55; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .skeleton { animation: none; }
+}
+
+/* --- Каркас экрана --- */
+.screen {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+}
+.content {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 14px 16px 24px;
+}
+.actionBar {
+  position: sticky;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 16px calc(20px + env(safe-area-inset-bottom));
+  background: var(--surface);
+  border-top: 1px solid var(--header-border);
+}
+.header {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  height: 52px;
+  display: grid;
+  grid-template-columns: 88px 1fr 88px;
+  align-items: center;
+  padding: 0 12px;
+  background: var(--surface-card);
+  border-bottom: 1px solid var(--header-border);
+}
+.headerTitle {
+  text-align: center;
+  font-size: 16px;
+  font-weight: 650;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.headerBack {
+  justify-self: start;
+  border: 0;
+  background: none;
+  padding: 8px 0;
+  font: inherit;
+  font-size: 16px;
+  color: var(--enamel-text);
+  cursor: pointer;
+}
+
+/* --- Тост --- */
+.toast {
+  position: fixed;
+  inset: auto 16px calc(96px + env(safe-area-inset-bottom)) 16px;
+  margin: 0;
+  width: auto;
+  border: 0;
+  border-radius: 12px;
+  padding: 12px 14px;
+  background: var(--text);
+  color: var(--surface-card);
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.35;
+  opacity: 1;
+  transition: opacity 200ms, display 200ms allow-discrete, overlay 200ms allow-discrete;
+}
+@starting-style {
+  .toast { opacity: 0; }
+}

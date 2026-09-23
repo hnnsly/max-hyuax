@@ -1,0 +1,10 @@
+**/node_modules
+miniapp/dist
+backend
+hack-docs
+.git
+.github
+.claude
+.obsidian
+.idea
+tmp

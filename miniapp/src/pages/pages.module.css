@@ -1,0 +1,254 @@
+/* Стили экранов, которые не переиспользуются. */
+
+.org {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 10px 10px 10px 14px;
+}
+.orgName {
+  font-size: 16px;
+  font-weight: 650;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.orgNote {
+  font-size: 13.5px;
+  color: var(--text-2);
+}
+.callButton {
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-control);
+  background: var(--control);
+  color: var(--enamel-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Карточка заявки */
+.cardTop {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  min-height: 76px;
+}
+.cardStamp {
+  margin: 14px 0 0 -14px;
+}
+.cardTitle {
+  margin: 0;
+  font-size: 27px;
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  line-height: 1.1;
+}
+.cardPlace {
+  margin: 4px 0 0;
+  font-family: var(--font-cond);
+  font-size: 15px;
+  color: var(--text-2);
+}
+.cardDescription {
+  margin: 8px 0 0;
+  font-size: 15px;
+  line-height: 1.35;
+}
+.figures {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px 16px;
+}
+.figureRow {
+  display: grid;
+  grid-template-columns: auto auto minmax(0, 1fr);
+  gap: 16px;
+  align-items: flex-end;
+}
+.figure {
+  display: flex;
+  flex-direction: column;
+}
+.figureValue {
+  font-family: var(--font-plate);
+  font-size: 46px;
+  font-weight: 900;
+  line-height: 0.85;
+  font-variant-numeric: tabular-nums;
+}
+.figureAccent { color: var(--enamel-text); }
+.figureLate { color: var(--surik); }
+.figureLabel {
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+.figureDivider {
+  width: 1px;
+  height: 42px;
+  background: var(--separator);
+}
+.escalate {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 16px;
+  border-left: 4px solid var(--surik);
+}
+.escalateTitle {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--surik);
+}
+.block {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px 16px;
+}
+.blockTitle {
+  margin: 0;
+  font-family: var(--font-cond);
+  font-size: 17px;
+  font-weight: 700;
+}
+.keyValue {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  gap: 4px 12px;
+  margin: 0;
+  font-size: 15px;
+}
+.keyValue dt { color: var(--text-3); }
+.keyValue dd { margin: 0; }
+.basis {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-3);
+  line-height: 1.35;
+}
+
+/* Хронология */
+.timeline {
+  position: relative;
+  display: grid;
+  grid-template-columns: 62px 9px minmax(0, 1fr);
+  gap: 0 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.timeline::before {
+  content: '';
+  position: absolute;
+  left: 66px;
+  top: 8px;
+  bottom: 10px;
+  width: 1.5px;
+  background: var(--separator);
+}
+.tlItem { display: contents; }
+.tlWhen {
+  font-family: var(--font-cond);
+  font-size: 12.5px;
+  color: var(--text-3);
+  text-align: right;
+  padding-top: 1px;
+  white-space: pre-line;
+}
+.tlDot {
+  position: relative;
+  z-index: 1;
+  width: 9px;
+  height: 9px;
+  margin-top: 4px;
+  border-radius: 2px;
+  background: var(--surface-card);
+  box-shadow: inset 0 0 0 2px var(--chevron);
+}
+.tlDotLast {
+  background: var(--enamel);
+  box-shadow: none;
+}
+.tlText {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding-bottom: 14px;
+  font-size: 15px;
+}
+.quote {
+  border-left: 3px solid var(--enamel);
+  padding: 2px 0 2px 10px;
+  font-size: 14.5px;
+  color: var(--text-2);
+  line-height: 1.35;
+}
+.joinedNote {
+  height: 44px;
+  border-radius: var(--radius-control);
+  background: var(--control);
+  color: var(--text-2);
+  font-size: 15.5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+.joinedNote svg { color: var(--stencil-green); }
+
+/* Вход и согласие */
+.intro {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.introTitle {
+  margin: 0;
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+.text {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.4;
+  color: var(--text-2);
+}
+.hint {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-3);
+  line-height: 1.35;
+}
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.kpi {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  padding: 12px 6px;
+}
+.kpiItem {
+  display: flex;
+  flex-direction: column;
+  padding: 0 10px;
+}
+.kpiItem + .kpiItem { border-left: 1px solid var(--separator); }
+.kpiValue {
+  font-family: var(--font-plate);
+  font-size: 34px;
+  font-weight: 850;
+  line-height: 0.9;
+  font-variant-numeric: tabular-nums;
+}
+.kpiLabel {
+  font-size: 12.5px;
+  color: var(--text-3);
+}

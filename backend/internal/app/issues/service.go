@@ -44,7 +44,7 @@ type ReportInput struct {
 	HouseID     string
 	ObjectID    string // пусто, если проблема не привязана к объекту с QR
 	Category    string // пусто — берётся из объекта
-	Title       string // пусто — формируется из категории и объекта
+	Title       string // пусто — название категории; место объекта показывается отдельно
 	Description string
 }
 
@@ -73,7 +73,7 @@ func (s *Service) Report(ctx context.Context, u user.User, in ReportInput) (*iss
 		HouseID:          h.ID,
 		ObjectID:         obj.ID,
 		Category:         rule.Code,
-		Title:            cmp.Or(strings.TrimSpace(in.Title), defaultTitle(rule, obj)),
+		Title:            cmp.Or(strings.TrimSpace(in.Title), rule.Title),
 		Description:      in.Description,
 		ResponsibleOrgID: h.OrganizationID,
 		ReporterID:       u.ID,
@@ -100,13 +100,6 @@ func (s *Service) object(ctx context.Context, houseID, objectID string) (house.A
 		}
 	}
 	return house.AssetObject{}, fmt.Errorf("%w: object %q is not in house %q", app.ErrInvalidInput, objectID, houseID)
-}
-
-func defaultTitle(r rules.Rule, obj house.AssetObject) string {
-	if obj.Label == "" {
-		return r.Title
-	}
-	return r.Title + ": " + obj.Label
 }
 
 // Join добавляет жителя к существующей заявке вместо создания дубля.

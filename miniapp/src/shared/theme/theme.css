@@ -1,0 +1,126 @@
+/*
+ * «Адресная табличка»: фирменный слой поверх MAX UI.
+ * Источник: hack-docs/design/tokens.css; геометрия таблички и три ширины Sofia Sans — по холсту v2.
+ * Обёртка .app-theme стоит внутри <MaxUI> и переопределяет его переменные для всего приложения.
+ */
+@import '@fontsource-variable/sofia-sans';
+@import '@fontsource-variable/sofia-sans-condensed';
+@import '@fontsource-variable/sofia-sans-extra-condensed';
+
+:root {
+  /* Тема по умолчанию системная: браузер красит полосы прокрутки и поля под неё. */
+  color-scheme: light dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+}
+
+.app-theme {
+  --font-ui: 'Sofia Sans Variable', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-cond: 'Sofia Sans Condensed Variable', 'Sofia Sans Variable', 'Arial Narrow', system-ui, sans-serif;
+  --font-plate: 'Sofia Sans Extra Condensed Variable', 'Sofia Sans Condensed Variable', 'Arial Narrow', system-ui, sans-serif;
+
+  --enamel: #1b3f94;
+  --enamel-pressed: #142f70;
+  --enamel-edge: #122b66;
+  --enamel-text: #1b3f94;
+  --plate-ink: #ffffff;
+  --surik: #c23a22;
+  --stencil-green: #2c7548;
+  --amber-text: #8a5a00;
+
+  --surface: #edeef2;
+  --surface-card: #ffffff;
+  --surface-secondary: #f5f7fa;
+  --control: #e9ebf1;
+  --rail-empty: #d7dae2;
+  --text: #0a0b0d;
+  --text-2: #4a4d55;
+  --text-3: #6e727b;
+  --chevron: #a9adb6;
+  --separator: #e4e6ea;
+  --header-border: #dee0e6;
+  --sheet-shadow: 0 -12px 32px rgb(20 30 60 / 0.16);
+
+  --radius-plate: 8px;
+  --radius-control: 12px;
+  --radius-button: 14px;
+  --radius-island: 14px;
+  --radius-sheet: 16px;
+
+  --stamp-duration: 380ms;
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  /* Переменные MAX UI */
+  --font: var(--font-ui);
+  --family-base: var(--font-ui);
+  --family-headers: var(--font-ui);
+  --button-primary: var(--enamel);
+  --states-button-primary-pressed: var(--enamel-pressed);
+  --states-button-primary-hover: var(--enamel-pressed);
+  --text-themed: var(--enamel-text);
+  --icon-themed: var(--enamel-text);
+  --text-negative: var(--surik);
+  --button-negative: var(--surik);
+
+  color-scheme: light;
+  font-family: var(--font-ui);
+  /* Пока шрифт грузится, запасной выравнивается по высоте строчных, текст не прыгает. */
+  font-size-adjust: from-font;
+  color: var(--text);
+  background: var(--surface);
+  min-height: 100dvh;
+  -webkit-font-smoothing: antialiased;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.app-theme[data-scheme='dark'] {
+  --enamel: #3a5fc4;
+  --enamel-pressed: #2f50aa;
+  --enamel-edge: #24439b;
+  --enamel-text: #93aaf2;
+  --plate-ink: #f4f6fb;
+  --surik: #e2583f;
+  --stencil-green: #56a877;
+  --amber-text: #e0a83a;
+
+  --surface: #0f1013;
+  --surface-card: #17181c;
+  --surface-secondary: #25262d;
+  --control: #2c2d35;
+  --rail-empty: #35373f;
+  --text: #ffffff;
+  --text-2: rgb(255 255 255 / 0.72);
+  --text-3: rgb(255 255 255 / 0.62);
+  --chevron: rgb(255 255 255 / 0.4);
+  --separator: rgb(255 255 255 / 0.1);
+  --header-border: rgb(255 255 255 / 0.08);
+  --sheet-shadow: 0 -12px 32px rgb(0 0 0 / 0.5);
+
+  color-scheme: dark;
+}
+
+@keyframes stamp-land {
+  0% { opacity: 0; transform: scale(1.35) rotate(-10deg); }
+  70% { opacity: 0.92; transform: scale(0.97) rotate(-3deg); }
+  100% { opacity: 0.92; transform: scale(1) rotate(-4deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-theme { --stamp-duration: 0ms; }
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}

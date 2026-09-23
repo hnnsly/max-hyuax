@@ -87,12 +87,13 @@ jobs:
           cache: npm
           cache-dependency-path: miniapp/package-lock.json
 
-      - name: npm ci, typecheck, build
+      - name: npm ci, typecheck, test, build
         if: steps.exists.outputs.found == 'true'
         working-directory: miniapp
         run: |
           npm ci
           npm run typecheck
+          npm test
           npm run build
 
   deploy:
