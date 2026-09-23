@@ -1,1 +1,15 @@
 .idea
+.vscode
+
+# фронтенд
+node_modules/
+miniapp/dist/
+
+# бэкенд
+backend/bin/
+*.exe
+coverage.out
+
+# прочее
+tmp/
+.DS_Store

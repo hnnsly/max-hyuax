@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Скоро здесь будет мини-приложение</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sofia+Sans:wght@400..700&family=Sofia+Sans+Extra+Condensed:wght@800..900&display=swap">
+<style>
+  :root { color-scheme: light dark; --enamel: #1b3f94; --bg: #edeef2; --text: #0a0b0d; --text-2: #4a4d55; }
+  @media (prefers-color-scheme: dark) { :root { --enamel: #3a5fc4; --bg: #0f1013; --text: #ffffff; --text-2: rgba(255,255,255,.72); } }
+  body { margin: 0; min-height: 100dvh; display: grid; place-items: center; background: var(--bg); color: var(--text); font-family: "Sofia Sans", system-ui, sans-serif; padding: 24px; box-sizing: border-box; }
+  .plate { position: relative; background: var(--enamel); color: #fff; border-radius: 8px; padding: 22px 26px 24px; max-width: 360px; box-shadow: inset 0 0 0 1.5px rgba(0,0,0,.25); }
+  .plate::after { content: ""; position: absolute; inset: 6px; border: 1.5px solid rgba(255,255,255,.92); border-radius: 4px; pointer-events: none; }
+  .plate b { display: block; font-family: "Sofia Sans Extra Condensed", sans-serif; font-weight: 900; font-size: 44px; line-height: .9; }
+  p { margin: 8px 0 0; font-size: 16px; line-height: 1.35; color: rgba(255,255,255,.9); }
+</style>
+</head>
+<body>
+  <div class="plate">
+    <b>Скоро открытие</b>
+    <p>Здесь будет мини-приложение для заявок по общему имуществу дома. Мы заканчиваем настройку.</p>
+  </div>
+</body>
+</html>
