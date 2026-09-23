@@ -5,7 +5,6 @@ package issues
 import (
 	"cmp"
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -169,14 +168,4 @@ func (s *Service) Queue(ctx context.Context, u user.User) ([]*issue.Issue, error
 		return nil, app.ErrForbidden
 	}
 	return s.store.Issues().Queue(ctx, u.OrganizationID, queueLimit)
-}
-
-// IsDomainError сообщает, что ошибка — нарушение правил заявки, а не сбой.
-func IsDomainError(err error) bool {
-	for _, target := range []error{issue.ErrInvalid, issue.ErrAlreadyJoined, issue.ErrClosed, issue.ErrTransition, issue.ErrReasonRequired} {
-		if errors.Is(err, target) {
-			return true
-		}
-	}
-	return false
 }

@@ -8,6 +8,7 @@ import (
 	"dommax/internal/app"
 	"dommax/internal/app/apptest"
 	"dommax/internal/app/auth"
+	"dommax/internal/domain/house"
 	"dommax/internal/domain/user"
 )
 
@@ -83,6 +84,27 @@ func TestDemoLoginUnknownRole(t *testing.T) {
 	svc, _ := newService(t, true)
 	if _, err := svc.LoginDemo(t.Context(), "admin"); !errors.Is(err, app.ErrInvalidInput) {
 		t.Fatalf("err = %v, want ErrInvalidInput", err)
+	}
+}
+
+func TestAccountConsentHouseAndDelete(t *testing.T) {
+	svc, s := newService(t, true)
+	s.HouseMap["h-1"] = house.House{ID: "h-1"}
+	u := s.UserMap[1]
+
+	u, err := svc.AcceptConsent(t.Context(), u, "v1")
+	if err != nil || !u.HasConsent("v1") {
+		t.Fatalf("consent: %+v, %v", u, err)
+	}
+	if _, err := svc.SetHouse(t.Context(), u, "nope"); !errors.Is(err, app.ErrNotFound) {
+		t.Fatalf("unknown house err = %v", err)
+	}
+	u, err = svc.SetHouse(t.Context(), u, "h-1")
+	if err != nil || s.UserMap[1].HouseID != "h-1" {
+		t.Fatalf("house: %+v, %v", s.UserMap[1], err)
+	}
+	if err := svc.DeleteAccount(t.Context(), u); err != nil || !s.UserMap[1].Deleted() {
+		t.Fatalf("delete: %+v, %v", s.UserMap[1], err)
 	}
 }
 

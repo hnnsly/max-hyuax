@@ -94,6 +94,30 @@ func (s *Service) Authenticate(ctx context.Context, token string) (user.User, er
 	return u, err
 }
 
+// AcceptConsent фиксирует согласие на обработку ПДн указанной версии документа.
+func (s *Service) AcceptConsent(ctx context.Context, u user.User, version string) (user.User, error) {
+	if version == "" {
+		return u, fmt.Errorf("%w: consent version is required", app.ErrInvalidInput)
+	}
+	u.AcceptConsent(version, s.cfg.Now())
+	return u, s.store.Users().Save(ctx, u)
+}
+
+// SetHouse привязывает жителя к дому, чтобы главный экран показывал его заявки.
+func (s *Service) SetHouse(ctx context.Context, u user.User, houseID string) (user.User, error) {
+	if _, err := s.store.Houses().Get(ctx, houseID); err != nil {
+		return u, err
+	}
+	u.HouseID = houseID
+	return u, s.store.Users().Save(ctx, u)
+}
+
+// DeleteAccount обезличивает аккаунт; заявки остаются, но без имени и телефона автора.
+func (s *Service) DeleteAccount(ctx context.Context, u user.User) error {
+	u.Delete(s.cfg.Now())
+	return s.store.Users().Save(ctx, u)
+}
+
 func (s *Service) issue(u user.User) Session {
 	exp := s.cfg.Now().Add(s.cfg.SessionTTL)
 	return Session{Token: signToken(s.cfg.SessionSecret, u.ID, exp), ExpiresAt: exp, User: u}

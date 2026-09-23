@@ -25,12 +25,12 @@ type User struct {
 }
 
 // CanManageIssues сообщает, может ли пользователь менять статусы заявок организации orgID.
-func (u *User) CanManageIssues(orgID string) bool {
+func (u User) CanManageIssues(orgID string) bool {
 	return u.Role == RoleOperator && u.OrganizationID != "" && u.OrganizationID == orgID
 }
 
 // HasConsent проверяет согласие именно на текущую версию документа.
-func (u *User) HasConsent(docVersion string) bool {
+func (u User) HasConsent(docVersion string) bool {
 	return u.ConsentVersion != "" && u.ConsentVersion == docVersion
 }
 
@@ -45,4 +45,4 @@ func (u *User) Delete(at time.Time) {
 	u.DeletedAt = at
 }
 
-func (u *User) Deleted() bool { return !u.DeletedAt.IsZero() }
+func (u User) Deleted() bool { return !u.DeletedAt.IsZero() }
