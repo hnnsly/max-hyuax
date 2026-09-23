@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	"dommax/internal/app"
 	"dommax/internal/domain/house"
@@ -24,8 +25,8 @@ type Details struct {
 
 func (s *Service) Search(ctx context.Context, query string) ([]house.House, error) {
 	query = strings.TrimSpace(query)
-	if len([]rune(query)) < 2 {
-		return nil, fmt.Errorf("%w: query must be at least 2 characters", app.ErrInvalidInput)
+	if !utf8.ValidString(query) || utf8.RuneCountInString(query) < 2 {
+		return nil, fmt.Errorf("%w: query must be valid UTF-8, at least 2 characters", app.ErrInvalidInput)
 	}
 	return s.store.Houses().Search(ctx, query)
 }

@@ -137,6 +137,27 @@ func TestEditPutsMessageByID(t *testing.T) {
 	}
 }
 
+func TestSubscribePostsURLTypesAndSecret(t *testing.T) {
+	c := newServer(t, func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodPost || r.URL.Path != "/subscriptions" {
+			t.Errorf("request = %s %s", r.Method, r.URL)
+		}
+		var body map[string]any
+		if err := json.UnmarshalRead(r.Body, &body); err != nil {
+			t.Fatal(err)
+		}
+		if body["url"] != "https://dom.example/webhook/max" || body["secret"] != "s3cret" || len(body["update_types"].([]any)) != 3 {
+			t.Errorf("body = %v", body)
+		}
+		io.WriteString(w, `{"success":true}`)
+	})
+	err := c.Subscribe(t.Context(), "https://dom.example/webhook/max", "s3cret",
+		[]maxapi.UpdateType{maxapi.UpdateBotStarted, maxapi.UpdateMessageCreated, maxapi.UpdateMessageCallback})
+	if err != nil {
+		t.Fatalf("Subscribe: %v", err)
+	}
+}
+
 func TestAnswerSendsCallbackID(t *testing.T) {
 	c := newServer(t, func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/answers" || r.URL.Query().Get("callback_id") != "cb1" {

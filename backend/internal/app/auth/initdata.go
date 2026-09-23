@@ -37,6 +37,9 @@ type InitData struct {
 // где launch_params — декодированные пары key=value без hash, отсортированные по ключу и
 // соединённые через \n. Каждый ключ встречается один раз, auth_date не старше InitDataTTL.
 func ParseInitData(raw, botToken string, now time.Time) (InitData, error) {
+	if botToken == "" {
+		return InitData{}, fmt.Errorf("%w: bot token is not configured", ErrInvalidInitData)
+	}
 	var (
 		hash  string
 		lines []string

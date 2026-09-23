@@ -99,6 +99,16 @@ func (c *Client) Edit(ctx context.Context, mid string, m NewMessage) error {
 	return c.doResult(ctx, http.MethodPut, "/messages", url.Values{"message_id": {mid}}, m)
 }
 
+// Subscribe включает доставку событий на webhook. Пока подписка активна, long polling не работает.
+func (c *Client) Subscribe(ctx context.Context, url, secret string, types []UpdateType) error {
+	body := struct {
+		URL         string       `json:"url"`
+		UpdateTypes []UpdateType `json:"update_types,omitempty"`
+		Secret      string       `json:"secret,omitempty"`
+	}{URL: url, UpdateTypes: types, Secret: secret}
+	return c.doResult(ctx, http.MethodPost, "/subscriptions", nil, body)
+}
+
 func (c *Client) Answer(ctx context.Context, callbackID string, a CallbackAnswer) error {
 	return c.doResult(ctx, http.MethodPost, "/answers", url.Values{"callback_id": {callbackID}}, a)
 }

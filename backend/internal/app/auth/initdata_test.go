@@ -62,6 +62,13 @@ func TestParseInitDataRejectsWrongToken(t *testing.T) {
 	}
 }
 
+func TestParseInitDataRejectsEmptyBotToken(t *testing.T) {
+	// Без токена любой мог бы подписать initData пустым ключом.
+	if _, err := auth.ParseInitData(sign(t, "", validParams()), "", now); !errors.Is(err, auth.ErrInvalidInitData) {
+		t.Fatalf("err = %v", err)
+	}
+}
+
 func TestParseInitDataRejectsTamperedValue(t *testing.T) {
 	raw := strings.Replace(sign(t, botToken, validParams()), "67890", "11111", 1)
 	if _, err := auth.ParseInitData(raw, botToken, now); !errors.Is(err, auth.ErrInvalidInitData) {

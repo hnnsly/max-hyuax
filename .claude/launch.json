@@ -6,6 +6,12 @@
       "runtimeExecutable": "python",
       "runtimeArgs": ["-m", "http.server", "4173", "--bind", "127.0.0.1", "--directory", "hack-docs/design/prototype"],
       "port": 4173
+    },
+    {
+      "name": "api",
+      "runtimeExecutable": "task",
+      "runtimeArgs": ["run"],
+      "port": 8080
     }
   ]
 }
