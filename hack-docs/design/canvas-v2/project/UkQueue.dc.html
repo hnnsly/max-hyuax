@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<title>Очередь УК</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Sofia+Sans:wght@300..900&amp;family=Sofia+Sans+Condensed:wght@400..900&amp;family=Sofia+Sans+Extra+Condensed:wght@400..900&amp;display=swap">
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:"Sofia Sans",system-ui,sans-serif;background:#e4e6ea;color:#0a0b0d}
+a{color:#1b3f94}a:hover{color:#142f70}
+</style>
+</helmet>
+<div style="width: 390px; height: 844px; background: #edeef2; display: flex; flex-direction: column; overflow: hidden;">
+
+  <div style="height: 52px; flex: none; background: #ffffff; border-bottom: 1px solid #dee0e6; display: grid; grid-template-columns: 56px 1fr 56px; align-items: center; padding: 0 12px;">
+    <div style="width: 26px; height: 26px; border-radius: 5px; background: #1b3f94; position: relative; box-shadow: inset 0 0 0 1px #122b66;">
+      <div style="position: absolute; inset: 3px; border: 1px solid rgba(255,255,255,0.9); border-radius: 3px;"></div>
+    </div>
+    <div style="text-align: center; font-size: 16px; font-weight: 650;">УК «Ореховый квартал»</div>
+    <div style="text-align: right; font-size: 15px; color: #6e727b; letter-spacing: 0.12em;">•••</div>
+  </div>
+
+  <div style="flex: none; padding: 14px 16px 12px; display: flex; flex-direction: column; gap: 12px; background: #edeef2;">
+    <div style="display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); background: #ffffff; border-radius: 12px; padding: 12px 4px;">
+      <div style="padding: 0 12px; display: flex; flex-direction: column; gap: 1px;">
+        <div style="font-family: 'Sofia Sans Extra Condensed', sans-serif; font-size: 34px; font-weight: 900; line-height: 0.85; color: #c23a22; font-variant-numeric: tabular-nums;">9</div>
+        <div style="font-size: 12px; color: #4a4d55;">просрочено</div>
+      </div>
+      <div style="padding: 0 12px; border-left: 1px solid #e4e6ea; display: flex; flex-direction: column; gap: 1px;">
+        <div style="font-family: 'Sofia Sans Extra Condensed', sans-serif; font-size: 34px; font-weight: 900; line-height: 0.85; font-variant-numeric: tabular-nums;">4</div>
+        <div style="font-size: 12px; color: #4a4d55;">срок сегодня</div>
+      </div>
+      <div style="padding: 0 12px; border-left: 1px solid #e4e6ea; display: flex; flex-direction: column; gap: 1px;">
+        <div style="font-family: 'Sofia Sans Extra Condensed', sans-serif; font-size: 34px; font-weight: 900; line-height: 0.85; font-variant-numeric: tabular-nums;">54</div>
+        <div style="font-size: 12px; color: #4a4d55;">всего открыто</div>
+      </div>
+    </div>
+
+    <div style="display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; background: #e0e2e9; border-radius: 12px; padding: 3px; gap: 3px;">
+      <div style="border-radius: 9px; background: #ffffff; padding: 8px 8px 9px; text-align: center; font-size: 15px; font-weight: 650; box-shadow: 0 1px 2px rgba(10,11,13,0.12);">Заявки</div>
+      <a href="UkMetrics.dc.html" style="border-radius: 9px; padding: 8px 8px 9px; text-align: center; font-size: 15px; font-weight: 600; color: #4a4d55; text-decoration: none;">Метрики</a>
+    </div>
+  </div>
+
+  <div style="flex-grow: 1; overflow: hidden; padding: 0 16px; display: flex; flex-direction: column; gap: 10px;">
+
+    <div style="display: flex; align-items: center; gap: 8px; padding-top: 2px;">
+      <div style="font-family: 'Sofia Sans Condensed', sans-serif; font-size: 15px; font-weight: 700; color: #c23a22;">Просрочено</div>
+      <div style="flex-grow: 1; height: 1px; background: #d7dae2;"></div>
+    </div>
+
+    <a href="UkStatus.dc.html" style="background: #ffffff; border-radius: 14px; padding: 12px 12px 14px 14px; display: grid; grid-template-columns: 46px minmax(0, 1fr) 12px; gap: 12px; text-decoration: none; color: inherit;">
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 1px; padding-top: 2px;">
+        <div style="font-family: 'Sofia Sans Extra Condensed', sans-serif; font-size: 30px; font-weight: 850; line-height: 0.85; font-variant-numeric: tabular-nums;">4</div>
+        <div style="font-size: 10px; color: #6e727b;">соседа</div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 4px; min-width: 0;">
+        <div style="font-size: 16px; font-weight: 650;">Не горит свет на 5 этаже</div>
+        <div style="font-family: 'Sofia Sans Condensed', sans-serif; font-size: 13.5px; color: #4a4d55;">17к2, подъезд 1, заявка № 0138</div>
+        <div style="display: flex; align-items: center; gap: 8px; padding-top: 2px;">
+          <span style="border: 1.5px solid #8a5a00; color: #8a5a00; border-radius: 5px; padding: 1px 6px 2px; font-family: 'Sofia Sans Condensed', sans-serif; font-size: 12px; font-weight: 650;">в работе</span>
+          <span style="font-size: 13px; color: #c23a22; font-weight: 650;">просрочено на 1 день</span>
+        </div>
+      </div>
+      <svg viewBox="0 0 24 24" width="12" height="20" fill="none" stroke="#a9adb6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="align-self: center;" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>
+    </a>
+
+    <div style="display: flex; align-items: center; gap: 8px; padding-top: 4px;">
+      <div style="font-family: 'Sofia Sans Condensed', sans-serif; font-size: 15px; font-weight: 700;">Срок в ближайшие 2 дня</div>
+      <div style="flex-grow: 1; height: 1px; background: #d7dae2;"></div>
+    </div>
+
+    <a href="UkStatus.dc.html" style="background: #ffffff; border-radius: 14px; padding: 12px 12px 14px 14px; display: grid; grid-template-columns: 46px minmax(0, 1fr) 12px; gap: 12px; text-decoration: none; color: inherit;">
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 1px; padding-top: 2px;">
+        <div style="font-family: 'Sofia Sans Extra Condensed', sans-serif; font-size: 30px; font-weight: 850; line-height: 0.85; color: #1b3f94; font-variant-numeric: tabular-nums;">13</div>
+        <div style="font-size: 10px; color: #6e727b;">соседей</div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 4px; min-width: 0;">
+        <div style="font-size: 16px; font-weight: 650;">Лифт не работает</div>
+        <div style="font-family: 'Sofia Sans Condensed', sans-serif; font-size: 13.5px; color: #4a4d55;">17к2, подъезд 2, заявка № 0142</div>
+        <div style="display: flex; align-items: center; gap: 8px; padding-top: 2px;">
+          <span style="border: 1.5px solid #1b3f94; color: #1b3f94; border-radius: 5px; padding: 1px 6px 2px; font-family: 'Sofia Sans Condensed', sans-serif; font-size: 12px; font-weight: 650;">принято</span>
+          <span style="font-size: 13px; color: #4a4d55;">до 19 сентября</span>
+        </div>
+      </div>
+      <svg viewBox="0 0 24 24" width="12" height="20" fill="none" stroke="#a9adb6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="align-self: center;" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>
+    </a>
+
+    <a href="UkStatus.dc.html" style="background: #ffffff; border-radius: 14px; padding: 12px 12px 14px 14px; display: grid; grid-template-columns: 46px minmax(0, 1fr) 12px; gap: 12px; text-decoration: none; color: inherit;">
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 1px; padding-top: 2px;">
+        <div style="font-family: 'Sofia Sans Extra Condensed', sans-serif; font-size: 30px; font-weight: 850; line-height: 0.85; font-variant-numeric: tabular-nums;">7</div>
+        <div style="font-size: 10px; color: #6e727b;">соседей</div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 4px; min-width: 0;">
+        <div style="font-size: 16px; font-weight: 650;">Протекает кровля</div>
+        <div style="font-family: 'Sofia Sans Condensed', sans-serif; font-size: 13.5px; color: #4a4d55;">17к2, подъезд 3, заявка № 0145</div>
+        <div style="display: flex; align-items: center; gap: 8px; padding-top: 2px;">
+          <span style="border: 1.5px solid #1b3f94; color: #1b3f94; border-radius: 5px; padding: 1px 6px 2px; font-family: 'Sofia Sans Condensed', sans-serif; font-size: 12px; font-weight: 650;">принято</span>
+          <span style="font-size: 13px; color: #4a4d55;">до 25 сентября</span>
+        </div>
+      </div>
+      <svg viewBox="0 0 24 24" width="12" height="20" fill="none" stroke="#a9adb6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="align-self: center;" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>
+    </a>
+
+    <div style="display: flex; align-items: center; gap: 8px; padding-top: 4px;">
+      <div style="font-family: 'Sofia Sans Condensed', sans-serif; font-size: 15px; font-weight: 700;">Новые</div>
+      <div style="flex-grow: 1; height: 1px; background: #d7dae2;"></div>
+    </div>
+
+    <a href="UkStatus.dc.html" style="background: #ffffff; border-radius: 14px; padding: 12px 12px 14px 14px; display: grid; grid-template-columns: 46px minmax(0, 1fr) 12px; gap: 12px; text-decoration: none; color: inherit;">
+      <div style="display: flex; flex-direction: column; align-items: center; gap: 1px; padding-top: 2px;">
+        <div style="font-family: 'Sofia Sans Extra Condensed', sans-serif; font-size: 30px; font-weight: 850; line-height: 0.85; font-variant-numeric: tabular-nums;">2</div>
+        <div style="font-size: 10px; color: #6e727b;">соседа</div>
+      </div>
+      <div style="display: flex; flex-direction: column; gap: 4px; min-width: 0;">
+        <div style="font-size: 16px; font-weight: 650;">Не закрывается дверь подъезда</div>
+        <div style="font-family: 'Sofia Sans Condensed', sans-serif; font-size: 13.5px; color: #4a4d55;">17к1, подъезд 4, заявка № 0147</div>
+        <div style="display: flex; align-items: center; gap: 8px; padding-top: 2px;">
+          <span style="border: 1.5px solid #6e727b; color: #4a4d55; border-radius: 5px; padding: 1px 6px 2px; font-family: 'Sofia Sans Condensed', sans-serif; font-size: 12px; font-weight: 650;">новая</span>
+          <span style="font-size: 13px; color: #4a4d55;">получена сегодня в 09:20</span>
+        </div>
+      </div>
+      <svg viewBox="0 0 24 24" width="12" height="20" fill="none" stroke="#a9adb6" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="align-self: center;" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg>
+    </a>
+
+  </div>
+
+  <div style="flex: none; height: 20px;"></div>
+
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":390,"height":844}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

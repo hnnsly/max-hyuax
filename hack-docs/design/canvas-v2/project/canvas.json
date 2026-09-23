@@ -1,0 +1,43 @@
+{
+  "v": 3,
+  "createdOnFiles": { "v": 1, "at": "2026-09-23T09:20:00Z" },
+  "title": "Адресная табличка, версия 2",
+  "launch": { "view": "canvas" },
+  "pages": [],
+  "boards": {
+    "Main.dc.html": { "x": 0, "y": 0, "w": 390, "h": 844, "title": "Мой дом" },
+    "Report.dc.html": { "x": 470, "y": 0, "w": 390, "h": 844, "title": "Новая заявка" },
+    "Duplicate.dc.html": { "x": 940, "y": 0, "w": 390, "h": 844, "title": "Соседи уже сообщили" },
+    "Card.dc.html": { "x": 1410, "y": 0, "w": 390, "h": 844, "title": "Карточка заявки" },
+    "Overdue.dc.html": { "x": 1880, "y": 0, "w": 390, "h": 844, "title": "Просрочка и эскалация" },
+    "UkQueue.dc.html": { "x": 0, "y": 964, "w": 390, "h": 844, "title": "УК: очередь" },
+    "UkMetrics.dc.html": { "x": 470, "y": 964, "w": 390, "h": 844, "title": "УК: метрики" },
+    "UkStatus.dc.html": { "x": 940, "y": 964, "w": 390, "h": 844, "title": "УК: смена статуса" },
+    "Bot.dc.html": { "x": 1410, "y": 964, "w": 390, "h": 844, "title": "Живая карточка в чате" },
+    "Sticker.dc.html": { "x": 1880, "y": 964, "w": 420, "h": 592, "title": "Наклейка в лифт" },
+    "HubDark.dc.html": { "x": 0, "y": 1928, "w": 390, "h": 844, "title": "Мой дом, тёмная тема" },
+    "System.dc.html": { "x": 470, "y": 1928, "w": 1240, "h": 860, "title": "Разбор системы" }
+  },
+  "order": [
+    "Main.dc.html",
+    "Report.dc.html",
+    "Duplicate.dc.html",
+    "Card.dc.html",
+    "Overdue.dc.html",
+    "UkQueue.dc.html",
+    "UkMetrics.dc.html",
+    "UkStatus.dc.html",
+    "Bot.dc.html",
+    "Sticker.dc.html",
+    "HubDark.dc.html",
+    "System.dc.html"
+  ],
+  "notes": {
+    "t-resident": { "x": 0, "y": -230, "text": "Житель: от поломки до ответа УК", "kind": "title1", "maxW": 2270 },
+    "t-uk": { "x": 0, "y": 734, "text": "Сотрудник УК и бот", "kind": "title1", "maxW": 2300 },
+    "t-system": { "x": 0, "y": 1698, "text": "Тёмная тема и разбор системы", "kind": "title1", "maxW": 1710 },
+    "n-scale": { "x": 2380, "y": 0, "w": 300, "text": "Шкала срока и плитка квартир это данные, а не украшение: видно, сколько дней осталось и какая доля подъезда затронута.", "fill": "blue" },
+    "n-stamp": { "x": 2380, "y": 220, "w": 300, "text": "Штамп единственный элемент с заглавными буквами и единственная автоматическая анимация. Он появляется только при смене статуса.", "fill": "gray" }
+  },
+  "designSystems": []
+}
