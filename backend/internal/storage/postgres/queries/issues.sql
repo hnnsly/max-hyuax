@@ -47,6 +47,21 @@ WHERE responsible_org_id = @org_id
 ORDER BY status IN ('done', 'rejected'), deadline_at
 LIMIT @max_rows;
 
+-- name: ListParticipantIssues :many
+SELECT i.id, i.number, i.house_id, COALESCE(i.object_id, '')::text AS object_id, i.category, i.title, i.description,
+       i.responsible_org_id, i.status, i.status_at, i.status_comment, i.created_by, i.created_at, i.deadline_at
+FROM issues i
+JOIN issue_participants p ON p.issue_id = i.id
+WHERE p.user_id = @user_id
+ORDER BY i.status IN ('done', 'rejected'), i.created_at DESC
+LIMIT @max_rows;
+
+-- name: ListIssueEvents :many
+SELECT kind, COALESCE(user_id, 0)::bigint AS user_id, status, comment, at
+FROM issue_events
+WHERE issue_id = @issue_id
+ORDER BY at, id;
+
 -- name: ListParticipants :many
 SELECT issue_id, user_id, joined_at
 FROM issue_participants

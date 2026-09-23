@@ -154,6 +154,19 @@ func (s *Service) ListByHouse(ctx context.Context, houseID string) ([]*issue.Iss
 	return s.store.Issues().ListByHouse(ctx, houseID, listLimit)
 }
 
+// Mine — заявки пользователя: где он автор или присоединился.
+func (s *Service) Mine(ctx context.Context, u user.User) ([]*issue.Issue, error) {
+	return s.store.Issues().ListByParticipant(ctx, u.ID, listLimit)
+}
+
+// Timeline — события заявки для хронологии в карточке.
+func (s *Service) Timeline(ctx context.Context, issueID string) ([]issue.Event, error) {
+	if _, err := s.store.Issues().Get(ctx, issueID); err != nil {
+		return nil, err
+	}
+	return s.store.Issues().Events(ctx, issueID)
+}
+
 // FindSimilar ищет открытые заявки того же дома и категории за последние две недели.
 func (s *Service) FindSimilar(ctx context.Context, houseID, category, objectID string) ([]*issue.Issue, error) {
 	if houseID == "" || category == "" {

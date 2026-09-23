@@ -109,6 +109,7 @@ type issueDTO struct {
 	HouseID          string    `json:"house_id"`
 	Address          string    `json:"address,omitempty"`
 	ObjectID         string    `json:"object_id,omitempty"`
+	Place            string    `json:"place,omitempty"` // подпись объекта: «подъезд 2, пассажирский лифт»
 	Category         string    `json:"category"`
 	CategoryTitle    string    `json:"category_title"`
 	Title            string    `json:"title"`
@@ -123,6 +124,14 @@ type issueDTO struct {
 	Joined           bool      `json:"joined"` // текущий пользователь среди участников
 	Responsible      *orgDTO   `json:"responsible,omitzero"`
 	Basis            string    `json:"basis,omitempty"`
+}
+
+// eventDTO — шаг хронологии заявки. Кто именно действовал, не раскрывается.
+type eventDTO struct {
+	Kind    string    `json:"kind"`
+	Status  string    `json:"status"`
+	Comment string    `json:"comment,omitempty"`
+	At      time.Time `json:"at"`
 }
 
 func toIssueDTO(is *issue.Issue, viewer user.User, now time.Time) issueDTO {

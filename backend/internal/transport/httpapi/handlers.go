@@ -1,12 +1,14 @@
 package httpapi
 
 import (
+	"context"
 	"strconv"
 
 	"github.com/gofiber/fiber/v3"
 
 	"dommax/internal/app"
 	"dommax/internal/app/auth"
+	"dommax/internal/app/houses"
 	"dommax/internal/app/issues"
 	"dommax/internal/domain/issue"
 	"dommax/internal/domain/rules"
@@ -138,7 +140,7 @@ func (h *handlers) houseIssues(c fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(h.issueList(currentUser(c), list))
+	return h.sendList(c, list)
 }
 
 func (h *handlers) similarIssues(c fiber.Ctx) error {
@@ -146,7 +148,7 @@ func (h *handlers) similarIssues(c fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(h.issueList(currentUser(c), list))
+	return h.sendList(c, list)
 }
 
 func (h *handlers) reportIssue(c fiber.Ctx) error {
@@ -167,7 +169,7 @@ func (h *handlers) reportIssue(c fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	return c.Status(fiber.StatusCreated).JSON(toIssueDTO(is, u, h.Now()))
+	return h.sendOne(c, fiber.StatusCreated, is)
 }
 
 // getIssue отдаёт карточку заявки: плюс адрес, ответственная организация и основание срока.
@@ -177,12 +179,15 @@ func (h *handlers) getIssue(c fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	d := toIssueDTO(is, u, h.Now())
+	one := []issueDTO{toIssueDTO(is, u, h.Now())}
+	if err := h.locate(c.Context(), one); err != nil {
+		return err
+	}
+	d := one[0]
 	details, err := h.Houses.Get(c.Context(), is.HouseID())
 	if err != nil {
 		return err
 	}
-	d.Address = details.House.Address
 	if details.Organization.ID == is.ResponsibleOrgID() {
 		d.Responsible = toOrgDTO(details.Organization)
 	}
@@ -198,7 +203,7 @@ func (h *handlers) joinIssue(c fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(toIssueDTO(is, u, h.Now()))
+	return h.sendOne(c, fiber.StatusOK, is)
 }
 
 func (h *handlers) changeStatus(c fiber.Ctx) error {
@@ -214,30 +219,65 @@ func (h *handlers) changeStatus(c fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(toIssueDTO(is, u, h.Now()))
+	return h.sendOne(c, fiber.StatusOK, is)
 }
 
-// ukQueue — очередь оператора УК; к каждой заявке добавляется адрес дома.
+// ukQueue — очередь оператора УК.
 func (h *handlers) ukQueue(c fiber.Ctx) error {
-	u := currentUser(c)
-	list, err := h.Issues.Queue(c.Context(), u)
+	list, err := h.Issues.Queue(c.Context(), currentUser(c))
 	if err != nil {
 		return err
 	}
-	out := h.issueList(u, list)
-	addr := map[string]string{}
-	for i := range out {
-		id := out[i].HouseID
-		if _, ok := addr[id]; !ok {
-			d, err := h.Houses.Get(c.Context(), id)
-			if err != nil {
-				return err
-			}
-			addr[id] = d.House.Address
-		}
-		out[i].Address = addr[id]
+	return h.sendList(c, list)
+}
+
+func (h *handlers) myIssues(c fiber.Ctx) error {
+	list, err := h.Issues.Mine(c.Context(), currentUser(c))
+	if err != nil {
+		return err
+	}
+	return h.sendList(c, list)
+}
+
+func (h *handlers) timeline(c fiber.Ctx) error {
+	events, err := h.Issues.Timeline(c.Context(), c.Params("id"))
+	if err != nil {
+		return err
+	}
+	return c.JSON(mapSlice(events, func(e issue.Event) eventDTO {
+		return eventDTO{Kind: string(e.Kind), Status: string(e.Status), Comment: e.Comment, At: e.At}
+	}))
+}
+
+// sendList отдаёт заявки с адресом дома и подписью объекта.
+func (h *handlers) sendList(c fiber.Ctx, list []*issue.Issue) error {
+	out := h.issueList(currentUser(c), list)
+	if err := h.locate(c.Context(), out); err != nil {
+		return err
 	}
 	return c.JSON(out)
+}
+
+// locate заполняет адрес и место; каждый дом запрашивается один раз.
+func (h *handlers) locate(ctx context.Context, out []issueDTO) error {
+	homes := map[string]houses.Details{}
+	for i := range out {
+		d, ok := homes[out[i].HouseID]
+		if !ok {
+			var err error
+			if d, err = h.Houses.Get(ctx, out[i].HouseID); err != nil {
+				return err
+			}
+			homes[out[i].HouseID] = d
+		}
+		out[i].Address = d.House.Address
+		for _, o := range d.Objects {
+			if o.ID == out[i].ObjectID {
+				out[i].Place = o.Label
+			}
+		}
+	}
+	return nil
 }
 
 func (h *handlers) issueList(viewer user.User, list []*issue.Issue) []issueDTO {
@@ -251,4 +291,13 @@ func mapSlice[S, D any](in []S, f func(S) D) []D {
 		out[i] = f(v)
 	}
 	return out
+}
+
+// sendOne отдаёт одну заявку с адресом дома и подписью объекта.
+func (h *handlers) sendOne(c fiber.Ctx, status int, is *issue.Issue) error {
+	one := []issueDTO{toIssueDTO(is, currentUser(c), h.Now())}
+	if err := h.locate(c.Context(), one); err != nil {
+		return err
+	}
+	return c.Status(status).JSON(one[0])
 }

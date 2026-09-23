@@ -115,9 +115,24 @@ func (r issueRepo) Queue(ctx context.Context, orgID string, limit int) ([]*issue
 	return r.restore(ctx, convert(rows))
 }
 
+func (r issueRepo) ListByParticipant(ctx context.Context, userID int64, limit int) ([]*issue.Issue, error) {
+	rows, err := r.s.q.ListParticipantIssues(ctx, sqlcdb.ListParticipantIssuesParams{UserID: userID, MaxRows: int32(limit)})
+	if err != nil {
+		return nil, err
+	}
+	return r.restore(ctx, convert(rows))
+}
+
+func (r issueRepo) Events(ctx context.Context, issueID string) ([]issue.Event, error) {
+	rows, err := r.s.q.ListIssueEvents(ctx, issueID)
+	return mapSlice(rows, func(e sqlcdb.ListIssueEventsRow) issue.Event {
+		return issue.Event{Kind: issue.EventKind(e.Kind), IssueID: issueID, UserID: e.UserID, Status: issue.Status(e.Status), Comment: e.Comment, At: e.At}
+	}), err
+}
+
 // issueRow — строки разных запросов sqlc с одинаковым набором колонок.
 type issueRow interface {
-	sqlcdb.GetIssueRow | sqlcdb.ListHouseIssuesRow | sqlcdb.FindSimilarIssuesRow | sqlcdb.ListOrgQueueRow
+	sqlcdb.GetIssueRow | sqlcdb.ListHouseIssuesRow | sqlcdb.FindSimilarIssuesRow | sqlcdb.ListOrgQueueRow | sqlcdb.ListParticipantIssuesRow
 }
 
 func convert[T issueRow](rows []T) []sqlcdb.GetIssueRow {

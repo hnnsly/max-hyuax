@@ -166,6 +166,26 @@ func TestListsAndSimilar(t *testing.T) {
 	}
 }
 
+func TestParticipantIssuesAndEvents(t *testing.T) {
+	anna, sergey := demoUser(t, "resident_demo_1"), demoUser(t, "resident_demo_2")
+	is := newIssue(t, anna.ID)
+	if err := store.Issues().Create(t.Context(), is); err != nil {
+		t.Fatal(err)
+	}
+	_ = is.Join(sergey.ID, time.Now())
+	if err := store.Issues().Save(t.Context(), is); err != nil {
+		t.Fatal(err)
+	}
+	mine, err := store.Issues().ListByParticipant(t.Context(), sergey.ID, 50)
+	if err != nil || len(mine) == 0 || !mine[0].HasParticipant(sergey.ID) {
+		t.Fatalf("mine = %v, err = %v", mine, err)
+	}
+	events, err := store.Issues().Events(t.Context(), is.ID())
+	if err != nil || len(events) != 2 || events[0].Kind != issue.EventCreated || events[1].Kind != issue.EventJoined || events[1].UserID != sergey.ID {
+		t.Fatalf("events = %+v, err = %v", events, err)
+	}
+}
+
 func TestUnknownIssueIsNotFound(t *testing.T) {
 	if _, err := store.Issues().Get(t.Context(), uuid.NewV7().String()); !errors.Is(err, app.ErrNotFound) {
 		t.Fatalf("err = %v", err)

@@ -133,6 +133,22 @@ func (r issueRepo) Queue(_ context.Context, orgID string, limit int) ([]*issue.I
 	}, limit), nil
 }
 
+func (r issueRepo) ListByParticipant(_ context.Context, userID int64, limit int) ([]*issue.Issue, error) {
+	return r.filter(func(is *issue.Issue) bool { return is.HasParticipant(userID) }, newestFirst, limit), nil
+}
+
+func (r issueRepo) Events(_ context.Context, issueID string) ([]issue.Event, error) {
+	r.s.mu.Lock()
+	defer r.s.mu.Unlock()
+	var out []issue.Event
+	for _, e := range r.s.Events {
+		if e.IssueID == issueID {
+			out = append(out, e)
+		}
+	}
+	return out, nil
+}
+
 func cmpBool(a, b bool) int {
 	switch {
 	case a == b:

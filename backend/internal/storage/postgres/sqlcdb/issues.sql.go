@@ -287,6 +287,47 @@ func (q *Queries) ListHouseIssues(ctx context.Context, arg ListHouseIssuesParams
 	return items, nil
 }
 
+const listIssueEvents = `-- name: ListIssueEvents :many
+SELECT kind, COALESCE(user_id, 0)::bigint AS user_id, status, comment, at
+FROM issue_events
+WHERE issue_id = $1
+ORDER BY at, id
+`
+
+type ListIssueEventsRow struct {
+	Kind    string
+	UserID  int64
+	Status  string
+	Comment string
+	At      time.Time
+}
+
+func (q *Queries) ListIssueEvents(ctx context.Context, issueID string) ([]ListIssueEventsRow, error) {
+	rows, err := q.db.Query(ctx, listIssueEvents, issueID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListIssueEventsRow
+	for rows.Next() {
+		var i ListIssueEventsRow
+		if err := rows.Scan(
+			&i.Kind,
+			&i.UserID,
+			&i.Status,
+			&i.Comment,
+			&i.At,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listOrgQueue = `-- name: ListOrgQueue :many
 SELECT id, number, house_id, COALESCE(object_id, '')::text AS object_id, category, title, description,
        responsible_org_id, status, status_at, status_comment, created_by, created_at, deadline_at
@@ -327,6 +368,73 @@ func (q *Queries) ListOrgQueue(ctx context.Context, arg ListOrgQueueParams) ([]L
 	var items []ListOrgQueueRow
 	for rows.Next() {
 		var i ListOrgQueueRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Number,
+			&i.HouseID,
+			&i.ObjectID,
+			&i.Category,
+			&i.Title,
+			&i.Description,
+			&i.ResponsibleOrgID,
+			&i.Status,
+			&i.StatusAt,
+			&i.StatusComment,
+			&i.CreatedBy,
+			&i.CreatedAt,
+			&i.DeadlineAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listParticipantIssues = `-- name: ListParticipantIssues :many
+SELECT i.id, i.number, i.house_id, COALESCE(i.object_id, '')::text AS object_id, i.category, i.title, i.description,
+       i.responsible_org_id, i.status, i.status_at, i.status_comment, i.created_by, i.created_at, i.deadline_at
+FROM issues i
+JOIN issue_participants p ON p.issue_id = i.id
+WHERE p.user_id = $1
+ORDER BY i.status IN ('done', 'rejected'), i.created_at DESC
+LIMIT $2
+`
+
+type ListParticipantIssuesParams struct {
+	UserID  int64
+	MaxRows int32
+}
+
+type ListParticipantIssuesRow struct {
+	ID               string
+	Number           int64
+	HouseID          string
+	ObjectID         string
+	Category         string
+	Title            string
+	Description      string
+	ResponsibleOrgID string
+	Status           string
+	StatusAt         time.Time
+	StatusComment    string
+	CreatedBy        int64
+	CreatedAt        time.Time
+	DeadlineAt       time.Time
+}
+
+func (q *Queries) ListParticipantIssues(ctx context.Context, arg ListParticipantIssuesParams) ([]ListParticipantIssuesRow, error) {
+	rows, err := q.db.Query(ctx, listParticipantIssues, arg.UserID, arg.MaxRows)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListParticipantIssuesRow
+	for rows.Next() {
+		var i ListParticipantIssuesRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.Number,

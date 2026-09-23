@@ -189,7 +189,23 @@ func TestResidentReportsNeighbourJoinsOperatorWorks(t *testing.T) {
 		detail.body["responsible"].(map[string]any)["name"] == "" || detail.body["basis"] == "" {
 		t.Fatalf("detail = %v", detail.body)
 	}
+	if detail.body["place"] != "подъезд 3, пассажирский лифт" {
+		t.Fatalf("place = %v", detail.body["place"])
+	}
 	expect(t, call(t, "GET", "/api/v1/issues/"+uuid.NewV7().String(), sergey, nil), 404, "unknown issue")
+
+	mine := expect(t, call(t, "GET", "/api/v1/me/issues", sergey, nil), 200, "my issues")
+	if len(mine.list) == 0 || mine.list[0].(map[string]any)["place"] == "" || mine.list[0].(map[string]any)["address"] == "" {
+		t.Fatalf("mine = %v", mine.list)
+	}
+	tl := expect(t, call(t, "GET", "/api/v1/issues/"+id+"/timeline", sergey, nil), 200, "timeline")
+	if len(tl.list) != 3 {
+		t.Fatalf("timeline = %v, want created, joined, status_changed", tl.list)
+	}
+	last := tl.list[2].(map[string]any)
+	if last["kind"] != "status_changed" || last["comment"] != "Мастер едет" || last["user_id"] != nil {
+		t.Fatalf("last event = %v (no user ids must leak)", last)
+	}
 }
 
 func TestWebhookChecksSecret(t *testing.T) {

@@ -54,6 +54,7 @@ func New(d Deps) *fiber.App {
 	api.Post("/me/consent", h.auth, h.acceptConsent)
 	api.Post("/me/house", h.auth, h.setHouse)
 	api.Delete("/me", h.auth, h.deleteAccount)
+	api.Get("/me/issues", h.auth, h.myIssues)
 
 	api.Get("/houses", h.auth, h.searchHouses)
 	api.Get("/houses/nearest", h.auth, h.nearestHouses)
@@ -64,6 +65,7 @@ func New(d Deps) *fiber.App {
 	api.Get("/issues/similar", h.auth, h.similarIssues)
 	api.Post("/issues", h.auth, h.reportIssue)
 	api.Get("/issues/:id", h.auth, h.getIssue)
+	api.Get("/issues/:id/timeline", h.auth, h.timeline)
 	api.Post("/issues/:id/join", h.auth, h.joinIssue)
 	api.Post("/issues/:id/status", h.auth, h.changeStatus)
 

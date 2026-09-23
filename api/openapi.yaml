@@ -109,6 +109,13 @@ paths:
         "204": { description: Аккаунт удалён }
         "401": { $ref: "#/components/responses/Error" }
 
+  /me/issues:
+    get:
+      tags: [me]
+      summary: Мои заявки (автор или присоединился), открытые первыми
+      responses:
+        "200": { $ref: "#/components/responses/IssueList" }
+
   /me/consent:
     post:
       tags: [me]
@@ -272,6 +279,29 @@ paths:
           content:
             application/json:
               schema: { $ref: "#/components/schemas/Issue" }
+        "404": { $ref: "#/components/responses/Error" }
+
+  /issues/{id}/timeline:
+    get:
+      tags: [issues]
+      summary: Хронология заявки для карточки
+      description: Кто именно действовал, не раскрывается.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: События по времени
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    kind: { type: string, enum: [created, joined, status_changed] }
+                    status: { $ref: "#/components/schemas/Status" }
+                    comment: { type: string }
+                    at: { type: string, format: date-time }
         "404": { $ref: "#/components/responses/Error" }
 
   /issues/{id}/join:
@@ -464,8 +494,9 @@ components:
         id: { type: string, format: uuid }
         number: { type: integer, format: int64, example: 142 }
         house_id: { type: string }
-        address: { type: string, description: В карточке и очереди УК }
+        address: { type: string }
         object_id: { type: string }
+        place: { type: string, description: "Подпись объекта, например «подъезд 2, пассажирский лифт»" }
         category: { type: string }
         category_title: { type: string }
         title: { type: string }

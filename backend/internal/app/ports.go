@@ -31,6 +31,10 @@ type IssueRepo interface {
 	ListByHouse(ctx context.Context, houseID string, limit int) ([]*issue.Issue, error)
 	FindSimilar(ctx context.Context, houseID, category, objectID string, since time.Time) ([]*issue.Issue, error)
 	Queue(ctx context.Context, orgID string, limit int) ([]*issue.Issue, error)
+	// ListByParticipant — заявки, где пользователь автор или присоединился; открытые первыми.
+	ListByParticipant(ctx context.Context, userID int64, limit int) ([]*issue.Issue, error)
+	// Events — журнал событий заявки по времени.
+	Events(ctx context.Context, issueID string) ([]issue.Event, error)
 }
 
 type HouseRepo interface {

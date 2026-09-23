@@ -163,6 +163,25 @@ func TestQueueIsForOperatorsOnly(t *testing.T) {
 	}
 }
 
+func TestMineAndTimeline(t *testing.T) {
+	f := setup(t)
+	is := report(t, f, f.anna)
+	if _, err := f.svc.Join(t.Context(), f.sergey, is.ID()); err != nil {
+		t.Fatal(err)
+	}
+	mine, err := f.svc.Mine(t.Context(), f.sergey)
+	if err != nil || len(mine) != 1 {
+		t.Fatalf("mine = %v, err = %v", mine, err)
+	}
+	tl, err := f.svc.Timeline(t.Context(), is.ID())
+	if err != nil || len(tl) != 2 || tl[1].Kind != issue.EventJoined {
+		t.Fatalf("timeline = %+v, err = %v", tl, err)
+	}
+	if _, err := f.svc.Timeline(t.Context(), "nope"); !errors.Is(err, app.ErrNotFound) {
+		t.Fatalf("unknown issue timeline err = %v", err)
+	}
+}
+
 func TestGetUnknownIssue(t *testing.T) {
 	f := setup(t)
 	if _, err := f.svc.Get(t.Context(), "nope"); !errors.Is(err, app.ErrNotFound) {
