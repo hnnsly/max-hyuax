@@ -14,6 +14,7 @@ import (
 
 var (
 	ErrNotFound        = errors.New("not found")
+	ErrUnauthorized    = errors.New("unauthorized")
 	ErrForbidden       = errors.New("forbidden")
 	ErrConsentRequired = errors.New("consent required")
 	ErrInvalidInput    = errors.New("invalid input")
