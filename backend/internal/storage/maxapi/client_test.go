@@ -1,6 +1,8 @@
 package maxapi_test
 
 import (
+	"bytes"
+	"encoding/json/jsontext"
 	"encoding/json/v2"
 	"errors"
 	"io"
@@ -225,5 +227,51 @@ func TestMeDecodesBot(t *testing.T) {
 	}
 	if me.UserID != 426323711 || me.Username != "t105_hakaton_max_bot" || !me.IsBot {
 		t.Fatalf("me = %+v", me)
+	}
+}
+
+func TestPhotoURLFromAttachment(t *testing.T) {
+	a := maxapi.IncomingAttachment{Type: "image", Payload: jsontext.Value(`{"photo_id":1,"token":"t","url":"https://i.oneme.ru/p.jpg"}`)}
+	if got := a.PhotoURL(); got != "https://i.oneme.ru/p.jpg" {
+		t.Fatalf("PhotoURL = %q", got)
+	}
+	for _, other := range []maxapi.IncomingAttachment{
+		{Type: "location"},
+		{Type: "image", Payload: jsontext.Value(`{"photo_id":1}`)},
+		{Type: "image", Payload: jsontext.Value(`not json`)},
+	} {
+		if got := other.PhotoURL(); got != "" {
+			t.Errorf("PhotoURL(%+v) = %q, want empty", other, got)
+		}
+	}
+}
+
+// Файл скачивается без токена бота: ссылка ведёт на CDN, а не в Bot API.
+func TestDownloadRespectsLimitAndSendsNoToken(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Header.Get("Authorization") != "" {
+			t.Errorf("token leaked to %s", r.URL)
+		}
+		switch r.URL.Path {
+		case "/small.jpg":
+			w.Write([]byte("\xff\xd8\xff small"))
+		case "/big.jpg":
+			w.Write(make([]byte, 2048))
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	defer srv.Close()
+	c := maxapi.New(srv.URL, "secret-token", srv.Client())
+
+	data, err := c.Download(t.Context(), srv.URL+"/small.jpg", 1024)
+	if err != nil || !bytes.HasPrefix(data, []byte{0xff, 0xd8}) {
+		t.Fatalf("small: %q, %v", data, err)
+	}
+	if _, err := c.Download(t.Context(), srv.URL+"/big.jpg", 1024); err == nil {
+		t.Fatal("big file must be rejected")
+	}
+	if _, err := c.Download(t.Context(), srv.URL+"/missing.jpg", 1024); err == nil {
+		t.Fatal("404 must be an error")
 	}
 }

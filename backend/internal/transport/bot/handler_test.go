@@ -1,8 +1,12 @@
 package bot_test
 
 import (
+	"bytes"
 	"context"
+	"encoding/json/jsontext"
 	"fmt"
+	"image"
+	"image/jpeg"
 	"io"
 	"log/slog"
 	"strings"
@@ -14,6 +18,7 @@ import (
 	"dommax/internal/app/hints"
 	"dommax/internal/app/houses"
 	"dommax/internal/app/issues"
+	"dommax/internal/app/photos"
 	"dommax/internal/domain/house"
 	"dommax/internal/domain/issue"
 	"dommax/internal/domain/rules"
@@ -28,8 +33,17 @@ type sent struct {
 }
 
 type fakeMax struct {
-	sent    []sent
-	answers map[string]maxapi.CallbackAnswer
+	sent       []sent
+	answers    map[string]maxapi.CallbackAnswer
+	downloaded []string
+}
+
+// Download отдаёт маленький JPEG по любой ссылке и запоминает её.
+func (f *fakeMax) Download(_ context.Context, url string, _ int64) ([]byte, error) {
+	f.downloaded = append(f.downloaded, url)
+	var buf bytes.Buffer
+	_ = jpeg.Encode(&buf, image.NewRGBA(image.Rect(0, 0, 32, 24)), nil)
+	return buf.Bytes(), nil
 }
 
 func (f *fakeMax) Send(_ context.Context, to maxapi.Target, m maxapi.NewMessage) (maxapi.Message, error) {
@@ -104,6 +118,7 @@ func newEnvWithLLM(t *testing.T, llm hints.LLM) env {
 		Issues:         issues.NewService(s, issues.Config{Now: now, NewID: func() string { n++; return fmt.Sprintf("i-%d", n) }, ConsentVersion: "v1"}),
 		Houses:         houses.NewService(s),
 		Hints:          hints.NewService(llm, time.Second, slog.New(slog.NewTextHandler(io.Discard, nil))),
+		Photos:         photos.NewService(s, &apptest.MemFiles{}, photos.Config{Now: now, NewID: func() string { n++; return fmt.Sprintf("p-%d", n) }}),
 		ConsentVersion: "v1",
 		Now:            now,
 	}
@@ -209,6 +224,59 @@ func TestProblemIsConfirmedThenReported(t *testing.T) {
 	}
 	if txt, _ := e.max.last("cb2"); !strings.Contains(txt, fmt.Sprintf("Заявка № %d", list[0].Number())) {
 		t.Fatalf("answer = %q", txt)
+	}
+}
+
+func photoMessage(from int64, url string) maxapi.Update {
+	u := text(from, "")
+	payload := `{"photo_id":7,"token":"t"}`
+	if url != "" {
+		payload = `{"photo_id":7,"token":"t","url":"` + url + `"}`
+	}
+	u.Message.Body.Attachments = []maxapi.IncomingAttachment{{Type: "image", Payload: jsontext.Value(payload)}}
+	return u
+}
+
+// Фото после заявки прикрепляется к последней открытой заявке жителя (FR-BOT-04).
+func TestPhotoIsAttachedToLatestIssue(t *testing.T) {
+	e := newEnv(t)
+	e.resident(3020, true)
+	e.handle(t, text(3020, "Не горит свет на лестнице"))
+	_, bs := e.max.last("")
+	e.handle(t, press(3020, "cb1", findButton(t, bs, "Отправить").Payload))
+	list, _ := e.store.Issues().ListByHouse(t.Context(), "h-1", 10)
+
+	e.handle(t, photoMessage(3020, "https://i.oneme.ru/photo.jpg"))
+	photos, _ := e.store.Photos().ListByIssue(t.Context(), list[0].ID())
+	if len(photos) != 1 || len(e.max.downloaded) != 1 {
+		t.Fatalf("photos = %+v, downloaded = %v", photos, e.max.downloaded)
+	}
+	txt, bs := e.max.last("")
+	if !strings.Contains(txt, fmt.Sprintf("Фото добавлено к заявке № %d", list[0].Number())) {
+		t.Fatalf("reply = %q", txt)
+	}
+	findButton(t, bs, "Открыть заявку")
+}
+
+func TestPhotoWithoutIssueOrLink(t *testing.T) {
+	e := newEnv(t)
+	e.resident(3021, true)
+	e.handle(t, photoMessage(3021, "https://i.oneme.ru/photo.jpg"))
+	if txt, _ := e.max.last(""); !strings.Contains(txt, "Сначала опишите проблему") || len(e.max.downloaded) != 0 {
+		t.Fatalf("no issue: reply = %q, downloaded = %v", txt, e.max.downloaded)
+	}
+
+	e.handle(t, text(3021, "Не горит свет на лестнице"))
+	_, bs := e.max.last("")
+	e.handle(t, press(3021, "cb1", findButton(t, bs, "Отправить").Payload))
+	for _, url := range []string{"", "http://insecure.example/p.jpg"} {
+		e.handle(t, photoMessage(3021, url))
+		if txt, _ := e.max.last(""); !strings.Contains(txt, "Не получилось получить фото") {
+			t.Fatalf("url %q: reply = %q", url, txt)
+		}
+	}
+	if len(e.max.downloaded) != 0 {
+		t.Fatalf("downloaded = %v, want nothing", e.max.downloaded)
 	}
 }
 

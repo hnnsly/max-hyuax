@@ -1,6 +1,6 @@
 // Клиент API: JSON, токен сессии, единый формат ошибок {"error": {"code", "message"}}.
 import type {
-  Category, CategoryHint, House, HouseDetails, Issue, IssueEvent, AssetObject, ReportInput, Session, Status, UkMetrics, User,
+  Category, CategoryHint, House, HouseDetails, Issue, IssueEvent, AssetObject, Photo, ReportInput, Session, Status, UkMetrics, User,
 } from './types';
 
 export class ApiError extends Error {
@@ -27,28 +27,35 @@ export function setUnauthorizedHandler(fn: () => void) {
   onUnauthorized = fn;
 }
 
-async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+/** Запрос с токеном сессии. FormData уходит как есть: границу multipart выставляет браузер. */
+async function send(method: string, path: string, body?: unknown): Promise<Response> {
+  const form = body instanceof FormData;
   let res: Response;
   try {
     res = await fetch(`/api/v1${path}`, {
       method,
       headers: {
-        ...(body !== undefined ? { 'Content-Type': 'application/json' } : {}),
+        ...(body !== undefined && !form ? { 'Content-Type': 'application/json' } : {}),
         ...(token ? { Authorization: `Bearer ${token}` } : {}),
       },
-      body: body !== undefined ? JSON.stringify(body) : undefined,
+      body: form ? body : body !== undefined ? JSON.stringify(body) : undefined,
     });
   } catch {
     throw new ApiError(0, 'offline', OFFLINE);
   }
-  if (res.status === 204) return undefined as T;
-  const data: unknown = await res.json().catch(() => null);
   if (!res.ok) {
+    const data: unknown = await res.json().catch(() => null);
     const err = (data as { error?: { code?: string; message?: string } } | null)?.error;
     if (res.status === 401) onUnauthorized();
     throw new ApiError(res.status, err?.code ?? 'http_error', err?.message ?? 'Что-то пошло не так. Попробуйте позже');
   }
-  return data as T;
+  return res;
+}
+
+async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
+  const res = await send(method, path, body);
+  if (res.status === 204) return undefined as T;
+  return (await res.json().catch(() => null)) as T;
 }
 
 const q = (params: Record<string, string | undefined>) => {
@@ -67,6 +74,14 @@ export const api = {
   myIssues: () => request<Issue[]>('GET', '/me/issues'),
   categories: () => request<Category[]>('GET', '/categories'),
   classify: (text: string) => request<CategoryHint>('POST', '/classify', { text }),
+  photos: (issueId: string) => request<Photo[]>('GET', `/issues/${encodeURIComponent(issueId)}/photos`),
+  uploadPhotos: (issueId: string, files: File[]) => {
+    const form = new FormData();
+    for (const f of files) form.append('photo', f);
+    return request<Photo[]>('POST', `/issues/${encodeURIComponent(issueId)}/photos`, form);
+  },
+  /** Фото отдаются только с токеном, поэтому грузятся через fetch, а не <img src>. */
+  photoBlob: async (photoId: string) => (await send('GET', `/photos/${encodeURIComponent(photoId)}`)).blob(),
   appeal: (issueId: string) =>
     request<{ url: string; expires_at: string; file_name: string }>('POST', `/issues/${encodeURIComponent(issueId)}/appeal`),
   searchHouses: (query: string) => request<House[]>('GET', `/houses?${q({ query })}`),

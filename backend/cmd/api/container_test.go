@@ -30,7 +30,7 @@ func testConfig(t *testing.T) config {
 	t.Cleanup(drop)
 	return config{
 		DatabaseURL: dsn, HTTPAddr: "127.0.0.1:0", SessionSecret: "0123456789abcdef",
-		ConsentVersion: "v1", BotMode: "off", DemoAuth: true,
+		ConsentVersion: "v1", BotMode: "off", DemoAuth: true, PhotosDir: t.TempDir(),
 	}
 }
 

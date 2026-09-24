@@ -7,8 +7,11 @@ import (
 	"context"
 	"encoding/json/v2"
 	"fmt"
+	"image"
+	"image/jpeg"
 	"io"
 	"log/slog"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -23,10 +26,12 @@ import (
 	"github.com/jackc/pgx/v5"
 
 	"dommax/internal/app/appeal"
+	"dommax/internal/app/apptest"
 	"dommax/internal/app/auth"
 	"dommax/internal/app/hints"
 	"dommax/internal/app/houses"
 	"dommax/internal/app/issues"
+	"dommax/internal/app/photos"
 	"dommax/internal/storage/maxapi"
 	"dommax/internal/storage/postgres"
 	"dommax/internal/storage/postgres/pgtest"
@@ -79,6 +84,7 @@ func TestMain(m *testing.M) {
 			Houses:         houses.NewService(store),
 			Hints:          hints.NewService(nil, time.Second, log),
 			Appeal:         appeal.NewService(store, appeal.Config{Secret: []byte("s"), TTL: 10 * time.Minute, Now: time.Now}),
+			Photos:         photos.NewService(store, &apptest.MemFiles{}, photos.Config{Now: time.Now, NewID: func() string { return uuid.NewV7().String() }}),
 			Webhook:        bot.NewWebhook("hook-secret", webhooks, store, log),
 			Ping:           store.Ping,
 			ConsentVersion: "v1",
@@ -297,6 +303,111 @@ func TestAppealPDFForOverdueIssue(t *testing.T) {
 	bad := callRaw(t, api, "GET", "/api/v1/appeal/forged.token", "", nil)
 	if bad.status != 403 || bad.body["error"].(map[string]any)["code"] != "forbidden" {
 		t.Fatalf("forged link = %d %v", bad.status, bad.body)
+	}
+}
+
+// uploadPhotos отправляет файлы полем photo в multipart/form-data.
+func uploadPhotos(t *testing.T, path, token string, files ...[]byte) resp {
+	t.Helper()
+	var body bytes.Buffer
+	mw := multipart.NewWriter(&body)
+	for i, f := range files {
+		w, err := mw.CreateFormFile("photo", fmt.Sprintf("p%d.jpg", i))
+		if err != nil {
+			t.Fatal(err)
+		}
+		w.Write(f)
+	}
+	mw.Close()
+	req := httptest.NewRequest("POST", path, &body)
+	req.Header.Set("Content-Type", mw.FormDataContentType())
+	req.Header.Set("Authorization", "Bearer "+token)
+	res, err := api.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	raw, _ := io.ReadAll(res.Body)
+	out := resp{status: res.StatusCode, ctype: res.Header.Get("Content-Type")}
+	if len(raw) > 0 && raw[0] == '[' {
+		_ = json.Unmarshal(raw, &out.list)
+	} else if len(raw) > 0 {
+		_ = json.Unmarshal(raw, &out.body)
+	}
+	return out
+}
+
+func testJPEG(t *testing.T) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	if err := jpeg.Encode(&buf, image.NewRGBA(image.Rect(0, 0, 80, 60)), nil); err != nil {
+		t.Fatal(err)
+	}
+	return buf.Bytes()
+}
+
+func TestPhotosUploadListAndOpen(t *testing.T) {
+	anna, sergey, oper := login(t, "resident"), login(t, "resident_2"), login(t, "uk_operator")
+	id := expect(t, call(t, "POST", "/api/v1/issues", anna, map[string]string{"house_id": "h-17k2", "category": "door"}), 201, "report").body["id"].(string)
+	path := "/api/v1/issues/" + id + "/photos"
+
+	added := uploadPhotos(t, path, anna, testJPEG(t), testJPEG(t))
+	if added.status != 201 || len(added.list) != 2 {
+		t.Fatalf("upload = %d %v %v", added.status, added.body, added.list)
+	}
+	first := added.list[0].(map[string]any)
+	if first["width"] != 80.0 || !strings.HasPrefix(first["url"].(string), "/api/v1/photos/") {
+		t.Fatalf("photo = %v", first)
+	}
+
+	list := expect(t, call(t, "GET", path, oper, nil), 200, "operator list").list
+	if len(list) != 2 {
+		t.Fatalf("list = %v", list)
+	}
+	res, err := api.Test(func() *http.Request {
+		r := httptest.NewRequest("GET", first["url"].(string), http.NoBody)
+		r.Header.Set("Authorization", "Bearer "+anna)
+		return r
+	}())
+	if err != nil {
+		t.Fatal(err)
+	}
+	img, _ := io.ReadAll(res.Body)
+	res.Body.Close()
+	if res.StatusCode != 200 || res.Header.Get("Content-Type") != "image/jpeg" || !bytes.HasPrefix(img, []byte{0xFF, 0xD8}) {
+		t.Fatalf("open photo: %d %q", res.StatusCode, res.Header.Get("Content-Type"))
+	}
+
+	// Сосед, который не присоединился, фото не видит и добавить не может.
+	expect(t, call(t, "GET", path, sergey, nil), 403, "non-participant list")
+	expect(t, call(t, "GET", first["url"].(string), sergey, nil), 403, "non-participant open")
+	if r := uploadPhotos(t, path, sergey, testJPEG(t)); r.status != 403 {
+		t.Fatalf("non-participant upload = %d", r.status)
+	}
+
+	for name, tc := range map[string]struct {
+		files  [][]byte
+		status int
+		code   string
+	}{
+		"не картинка":   {[][]byte{[]byte("%PDF-1.7")}, 415, "unsupported_media"},
+		"больше 5 МБ":   {[][]byte{append(testJPEG(t), make([]byte, 5<<20)...)}, 413, "photo_too_large"},
+		"без файлов":    {nil, 422, "invalid_input"},
+		"четыре за раз": {[][]byte{testJPEG(t), testJPEG(t), testJPEG(t), testJPEG(t)}, 422, "invalid_input"},
+	} {
+		r := uploadPhotos(t, path, anna, tc.files...)
+		if r.status != tc.status || r.body["error"].(map[string]any)["code"] != tc.code {
+			t.Errorf("%s: %d %v, want %d %s", name, r.status, r.body, tc.status, tc.code)
+		}
+	}
+	// Лимит на заявку: 2 уже есть, ещё 4 проходят, седьмое фото — 409.
+	for range 2 {
+		if r := uploadPhotos(t, path, anna, testJPEG(t), testJPEG(t)); r.status != 201 {
+			t.Fatalf("fill up = %d %v", r.status, r.body)
+		}
+	}
+	if r := uploadPhotos(t, path, anna, testJPEG(t)); r.status != 409 || r.body["error"].(map[string]any)["code"] != "too_many_photos" {
+		t.Fatalf("over limit = %d %v", r.status, r.body)
 	}
 }
 

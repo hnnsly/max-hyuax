@@ -23,6 +23,7 @@ type MemStore struct {
 	Objects  []house.AssetObject
 	UserMap  map[int64]user.User
 	DemoKeys map[string]int64 // демо-ключ → ID пользователя
+	photos   []app.Photo
 	issues   map[string]*issue.Issue
 	Events   []issue.Event
 	nextNum  int64
@@ -382,4 +383,68 @@ func (r houseRepo) ByOrganization(_ context.Context, orgID string) ([]house.Hous
 	}
 	slices.SortFunc(out, func(a, b house.House) int { return strings.Compare(a.Address, b.Address) })
 	return out, nil
+}
+
+func (s *MemStore) Photos() app.PhotoRepo { return photoRepo{s} }
+
+type photoRepo struct{ s *MemStore }
+
+func (r photoRepo) Add(_ context.Context, p app.Photo) error {
+	r.s.mu.Lock()
+	defer r.s.mu.Unlock()
+	r.s.photos = append(r.s.photos, p)
+	return nil
+}
+
+func (r photoRepo) ListByIssue(_ context.Context, issueID string) ([]app.Photo, error) {
+	r.s.mu.Lock()
+	defer r.s.mu.Unlock()
+	var out []app.Photo
+	for _, p := range r.s.photos {
+		if p.IssueID == issueID {
+			out = append(out, p)
+		}
+	}
+	return out, nil
+}
+
+func (r photoRepo) Get(_ context.Context, id string) (app.Photo, error) {
+	r.s.mu.Lock()
+	defer r.s.mu.Unlock()
+	for _, p := range r.s.photos {
+		if p.ID == id {
+			return p, nil
+		}
+	}
+	return app.Photo{}, app.ErrNotFound
+}
+
+// MemFiles — хранилище файлов в памяти для тестов; Fail заставляет Put вернуть ошибку.
+type MemFiles struct {
+	mu   sync.Mutex
+	data map[string][]byte
+	Fail error
+}
+
+func (f *MemFiles) Put(_ context.Context, key string, data []byte) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.Fail != nil {
+		return f.Fail
+	}
+	if f.data == nil {
+		f.data = map[string][]byte{}
+	}
+	f.data[key] = slices.Clone(data)
+	return nil
+}
+
+func (f *MemFiles) Get(_ context.Context, key string) ([]byte, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	d, ok := f.data[key]
+	if !ok {
+		return nil, app.ErrNotFound
+	}
+	return d, nil
 }

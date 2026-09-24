@@ -7,6 +7,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -16,6 +17,7 @@ import (
 	"dommax/internal/app/hints"
 	"dommax/internal/app/houses"
 	"dommax/internal/app/issues"
+	"dommax/internal/app/photos"
 	"dommax/internal/domain/issue"
 	"dommax/internal/domain/rules"
 	"dommax/internal/domain/user"
@@ -38,6 +40,8 @@ const (
 type Messenger interface {
 	Send(ctx context.Context, to maxapi.Target, m maxapi.NewMessage) (maxapi.Message, error)
 	Answer(ctx context.Context, callbackID string, a maxapi.CallbackAnswer) error
+	// Download скачивает присланный файл по ссылке из вложения.
+	Download(ctx context.Context, url string, limit int64) ([]byte, error)
 }
 
 // Services — сценарии приложения, которыми пользуется диалог бота.
@@ -46,6 +50,7 @@ type Services struct {
 	Issues         *issues.Service
 	Houses         *houses.Service
 	Hints          *hints.Service
+	Photos         *photos.Service
 	ConsentVersion string
 	Now            func() time.Time
 }
@@ -97,8 +102,11 @@ func (h *Handler) onMessage(ctx context.Context, m *maxapi.Message) error {
 	}
 	to := target(m.Recipient.ChatID, m.Sender.UserID)
 	for _, a := range m.Body.Attachments {
-		if a.Type == "location" {
+		switch a.Type {
+		case "location":
 			return h.onLocation(ctx, to, m.Sender, a.Latitude, a.Longitude)
+		case "image":
+			return h.onPhoto(ctx, to, m.Sender, a.PhotoURL())
 		}
 	}
 	txt := strings.TrimSpace(m.Body.Text)
@@ -240,6 +248,43 @@ func (h *Handler) myIssues(ctx context.Context, to maxapi.Target, from maxapi.Us
 	}
 	_, err = h.max.Send(ctx, to, maxapi.NewMessage{Text: "Ваши заявки:", Attachments: []maxapi.Attachment{maxapi.Keyboard(rows...)}})
 	return err
+}
+
+// onPhoto прикрепляет присланное фото к последней открытой заявке жителя (FR-BOT-04).
+// Ссылку на фото MAX отдаёт не во всех клиентах: тогда предлагаем добавить фото в карточке.
+func (h *Handler) onPhoto(ctx context.Context, to maxapi.Target, from maxapi.User, url string) error {
+	u, err := h.resident(ctx, from)
+	if err != nil {
+		return err
+	}
+	list, err := h.svc.Issues.Mine(ctx, u)
+	if err != nil {
+		return err
+	}
+	i := slices.IndexFunc(list, func(is *issue.Issue) bool { return !is.Status().Closed() })
+	if i < 0 {
+		return h.send(ctx, to, "Фото прикладывается к заявке. Сначала опишите проблему одним сообщением: что сломалось и где.")
+	}
+	is := list[i]
+	open := []maxapi.Button{maxapi.OpenAppButton("Открыть заявку", h.botName, "i_"+is.ID())}
+	if !strings.HasPrefix(url, "https://") {
+		return h.sendKeyboard(ctx, to, "Не получилось получить фото. Добавьте его в карточке заявки.", open)
+	}
+	data, err := h.max.Download(ctx, url, photos.MaxBytes)
+	if err != nil {
+		h.log.WarnContext(ctx, "photo download failed", "err", err)
+		return h.sendKeyboard(ctx, to, "Не получилось получить фото. Добавьте его в карточке заявки.", open)
+	}
+	_, err = h.svc.Photos.Add(ctx, u, is.ID(), data)
+	switch {
+	case errors.Is(err, photos.ErrTooMany):
+		return h.sendKeyboard(ctx, to, fmt.Sprintf("К заявке № %d уже приложено %d фото, больше добавить нельзя.", is.Number(), photos.MaxPerIssue), open)
+	case errors.Is(err, photos.ErrNotImage), errors.Is(err, photos.ErrTooLarge):
+		return h.sendKeyboard(ctx, to, "Фото не подошло: нужен снимок JPEG или PNG до 5 МБ.", open)
+	case err != nil:
+		return err
+	}
+	return h.sendKeyboard(ctx, to, fmt.Sprintf("Фото добавлено к заявке № %d. Его увидят соседи, которые сообщили о проблеме, и УК.", is.Number()), open)
 }
 
 func (h *Handler) myHouse(ctx context.Context, to maxapi.Target, from maxapi.User) error {

@@ -193,3 +193,28 @@ func (c *Client) do(ctx context.Context, method, path string, q url.Values, body
 	}
 	return nil
 }
+
+// Download скачивает файл по ссылке из вложения (CDN MAX) не больше limit байт.
+// Токен бота не передаётся: он нужен только самому Bot API.
+func (c *Client) Download(ctx context.Context, fileURL string, limit int64) ([]byte, error) {
+	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fileURL, nil)
+	if err != nil {
+		return nil, err
+	}
+	resp, err := c.http.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("maxapi: download: %w", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		return nil, &Error{Status: resp.StatusCode, Code: "download_failed"}
+	}
+	data, err := io.ReadAll(io.LimitReader(resp.Body, limit+1))
+	if err != nil {
+		return nil, fmt.Errorf("maxapi: download: %w", err)
+	}
+	if int64(len(data)) > limit {
+		return nil, fmt.Errorf("maxapi: download: file is larger than %d bytes", limit)
+	}
+	return data, nil
+}

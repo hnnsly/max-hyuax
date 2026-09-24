@@ -2,7 +2,9 @@ package httpapi
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"strconv"
 
 	"github.com/gofiber/fiber/v3"
@@ -11,6 +13,7 @@ import (
 	"dommax/internal/app/auth"
 	"dommax/internal/app/houses"
 	"dommax/internal/app/issues"
+	"dommax/internal/app/photos"
 	"dommax/internal/domain/issue"
 	"dommax/internal/domain/rules"
 	"dommax/internal/domain/user"
@@ -369,4 +372,59 @@ func (h *handlers) appealPDF(c fiber.Ctx) error {
 	c.Set(fiber.HeaderContentDisposition, fmt.Sprintf(`attachment; filename="obrashchenie-%d.pdf"`, doc.Number))
 	c.Set(fiber.HeaderCacheControl, "no-store")
 	return c.Send(out)
+}
+
+// maxPhotosPerUpload — сколько фото принимается за один запрос.
+const maxPhotosPerUpload = 3
+
+// uploadPhotos принимает до трёх файлов в поле photo (multipart/form-data).
+func (h *handlers) uploadPhotos(c fiber.Ctx) error {
+	form, err := c.MultipartForm()
+	if err != nil {
+		return errors.Join(app.ErrInvalidInput, err)
+	}
+	files := form.File["photo"]
+	if len(files) == 0 || len(files) > maxPhotosPerUpload {
+		return fmt.Errorf("%w: send 1..%d files in the photo field", app.ErrInvalidInput, maxPhotosPerUpload)
+	}
+	out := make([]photoDTO, 0, len(files))
+	for _, fh := range files {
+		if fh.Size > photos.MaxBytes {
+			return photos.ErrTooLarge
+		}
+		f, err := fh.Open()
+		if err != nil {
+			return err
+		}
+		raw, err := io.ReadAll(io.LimitReader(f, photos.MaxBytes+1))
+		f.Close()
+		if err != nil {
+			return err
+		}
+		p, err := h.Photos.Add(c.Context(), currentUser(c), c.Params("id"), raw)
+		if err != nil {
+			return err
+		}
+		out = append(out, toPhotoDTO(p))
+	}
+	return c.Status(fiber.StatusCreated).JSON(out)
+}
+
+func (h *handlers) listPhotos(c fiber.Ctx) error {
+	list, err := h.Photos.List(c.Context(), currentUser(c), c.Params("id"))
+	if err != nil {
+		return err
+	}
+	return c.JSON(mapSlice(list, toPhotoDTO))
+}
+
+// openPhoto отдаёт JPEG: только с сессией, поэтому мини-приложение грузит его через fetch, а не <img src>.
+func (h *handlers) openPhoto(c fiber.Ctx) error {
+	_, data, err := h.Photos.Open(c.Context(), currentUser(c), c.Params("id"))
+	if err != nil {
+		return err
+	}
+	c.Set(fiber.HeaderContentType, "image/jpeg")
+	c.Set(fiber.HeaderCacheControl, "private, max-age=86400")
+	return c.Send(data)
 }

@@ -4,6 +4,7 @@ import (
 	"math"
 	"time"
 
+	"dommax/internal/app"
 	"dommax/internal/app/issues"
 	"dommax/internal/domain/house"
 	"dommax/internal/domain/issue"
@@ -206,4 +207,17 @@ type appealLinkDTO struct {
 	URL       string    `json:"url"`
 	ExpiresAt time.Time `json:"expires_at"`
 	FileName  string    `json:"file_name"`
+}
+
+// photoDTO — фото к заявке; url отдаёт JPEG с тем же токеном сессии.
+type photoDTO struct {
+	ID        string    `json:"id"`
+	URL       string    `json:"url"`
+	Width     int       `json:"width"`
+	Height    int       `json:"height"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
+func toPhotoDTO(p app.Photo) photoDTO {
+	return photoDTO{ID: p.ID, URL: "/api/v1/photos/" + p.ID, Width: p.Width, Height: p.Height, CreatedAt: p.CreatedAt}
 }

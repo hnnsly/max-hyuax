@@ -121,11 +121,37 @@ type OutboxRepo interface {
 	SaveCardMID(ctx context.Context, issueID string, userID int64, mid string) error
 }
 
+// Photo — метаданные фото к заявке; сам файл лежит в FileStore под ключом ID.
+type Photo struct {
+	ID         string
+	IssueID    string
+	UploadedBy int64
+	Width      int
+	Height     int
+	SizeBytes  int
+	CreatedAt  time.Time
+}
+
+type PhotoRepo interface {
+	Add(ctx context.Context, p Photo) error
+	// ListByIssue — фото заявки в порядке загрузки.
+	ListByIssue(ctx context.Context, issueID string) ([]Photo, error)
+	Get(ctx context.Context, id string) (Photo, error)
+}
+
+// FileStore — хранилище файлов вне базы (фото к заявкам).
+type FileStore interface {
+	Put(ctx context.Context, key string, data []byte) error
+	// Get возвращает ErrNotFound, если файла нет.
+	Get(ctx context.Context, key string) ([]byte, error)
+}
+
 // Store — доступ к репозиториям; InTx выполняет fn в одной транзакции.
 type Store interface {
 	Issues() IssueRepo
 	Houses() HouseRepo
 	Users() UserRepo
 	Outbox() OutboxRepo
+	Photos() PhotoRepo
 	InTx(ctx context.Context, fn func(tx Store) error) error
 }

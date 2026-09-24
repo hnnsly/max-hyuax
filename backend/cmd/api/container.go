@@ -17,6 +17,8 @@ import (
 	"dommax/internal/app/hints"
 	"dommax/internal/app/houses"
 	"dommax/internal/app/issues"
+	"dommax/internal/app/photos"
+	"dommax/internal/storage/files"
 	"dommax/internal/storage/llm"
 	"dommax/internal/storage/maxapi"
 	"dommax/internal/storage/postgres"
@@ -41,11 +43,13 @@ type Container struct {
 	log   *slog.Logger
 	ctx   context.Context // корневой контекст для провайдеров, которым нужна сеть
 	store *postgres.Store
+	files *files.Disk
 
 	auth       func() *auth.Service
 	issues     func() *issues.Service
 	houses     func() *houses.Service
 	hints      func() *hints.Service
+	photos     func() *photos.Service
 	maxClient  func() (*maxapi.Client, error)
 	botMe      func() (maxapi.User, error)
 	botHandler func() (*bot.Handler, error)
@@ -65,7 +69,13 @@ func Open(ctx context.Context, cfg config, log *slog.Logger) (*Container, error)
 	if err != nil {
 		return nil, fmt.Errorf("database open: %w", err)
 	}
-	c := &Container{cfg: cfg, log: log, ctx: ctx, store: store}
+	// Каталог фото проверяется при старте: без него загрузка фото сломается уже у жителя.
+	disk, err := files.NewDisk(cfg.PhotosDir)
+	if err != nil {
+		store.Close()
+		return nil, fmt.Errorf("photos dir: %w", err)
+	}
+	c := &Container{cfg: cfg, log: log, ctx: ctx, store: store, files: disk}
 
 	c.auth = sync.OnceValue(func() *auth.Service {
 		return auth.NewService(store, auth.Config{
@@ -79,6 +89,9 @@ func Open(ctx context.Context, cfg config, log *slog.Logger) (*Container, error)
 		})
 	})
 	c.houses = sync.OnceValue(func() *houses.Service { return houses.NewService(store) })
+	c.photos = sync.OnceValue(func() *photos.Service {
+		return photos.NewService(store, disk, photos.Config{Now: time.Now, NewID: func() string { return uuid.NewV7().String() }})
+	})
 	c.hints = sync.OnceValue(func() *hints.Service {
 		// Без OLLAMA_URL подсказка работает на ключевых словах.
 		var model hints.LLM
@@ -116,7 +129,7 @@ func Open(ctx context.Context, cfg config, log *slog.Logger) (*Container, error)
 			return nil, err
 		}
 		return bot.NewHandler(client, me.Username, bot.Services{
-			Auth: c.Auth(), Issues: c.Issues(), Houses: c.Houses(), Hints: c.Hints(), ConsentVersion: cfg.ConsentVersion, Now: time.Now,
+			Auth: c.Auth(), Issues: c.Issues(), Houses: c.Houses(), Hints: c.Hints(), Photos: c.Photos(), ConsentVersion: cfg.ConsentVersion, Now: time.Now,
 		}, log), nil
 	})
 	c.webhook = sync.OnceValues(func() (*bot.Webhook, error) {
@@ -160,6 +173,7 @@ func Open(ctx context.Context, cfg config, log *slog.Logger) (*Container, error)
 		deps := httpapi.Deps{
 			Auth: c.Auth(), Issues: c.Issues(), Houses: c.Houses(), Hints: c.Hints(),
 			Appeal: appeal.NewService(store, appeal.Config{Secret: []byte(cfg.SessionSecret), TTL: appealLinkTTL, Now: time.Now}),
+			Photos: c.Photos(),
 			Ping:   store.Ping, ConsentVersion: cfg.ConsentVersion, Now: time.Now, Log: log,
 		}
 		if cfg.BotMode == "webhook" {
@@ -174,13 +188,17 @@ func Open(ctx context.Context, cfg config, log *slog.Logger) (*Container, error)
 	return c, nil
 }
 
-func (c *Container) Close() { c.store.Close() }
+func (c *Container) Close() {
+	c.store.Close()
+	_ = c.files.Close()
+}
 
 func (c *Container) Store() *postgres.Store  { return c.store }
 func (c *Container) Auth() *auth.Service     { return c.auth() }
 func (c *Container) Issues() *issues.Service { return c.issues() }
 func (c *Container) Houses() *houses.Service { return c.houses() }
 func (c *Container) Hints() *hints.Service   { return c.hints() }
+func (c *Container) Photos() *photos.Service { return c.photos() }
 
 func (c *Container) MaxClient() (*maxapi.Client, error)        { return c.maxClient() }
 func (c *Container) BotIdentity() (maxapi.User, error)         { return c.botMe() }

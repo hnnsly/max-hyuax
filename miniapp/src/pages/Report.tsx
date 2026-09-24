@@ -9,6 +9,7 @@ import { useResource } from '../shared/api/useResource';
 import { capitalize, dayMonth, plural, time } from '../shared/lib/format';
 import { hintOffer, worthHint } from '../shared/lib/model';
 import { EmptyState, ErrorState, Island, Loading, Screen, useToast } from '../shared/ui/Layout';
+import { PhotoSlots } from '../shared/ui/Photos';
 import { Stamp } from '../shared/ui/Plate';
 import s from './report.module.css';
 import p from './pages.module.css';
@@ -95,6 +96,7 @@ function ReportFlow({ ctx, initialCategory }: { ctx: Context; initialCategory?: 
   const [agree, setAgree] = useState(user.has_consent);
   const [busy, setBusy] = useState(false);
   const [hint, setHint] = useState<CategoryHint | null>(null);
+  const [photos, setPhotos] = useState<File[]>([]);
 
   // Подсказка категории по тексту: спрашиваем после паузы в наборе; по QR категория уже известна.
   useEffect(() => {
@@ -142,12 +144,24 @@ function ReportFlow({ ctx, initialCategory }: { ctx: Context; initialCategory?: 
     setUser(await api.acceptConsent(user.consent_version));
   };
 
+  // Фото грузятся после заявки: сбой загрузки не отменяет саму заявку, фото можно добавить в карточке.
+  const attachPhotos = async (issueId: string): Promise<string> => {
+    if (photos.length === 0) return '';
+    try {
+      await api.uploadPhotos(issueId, photos);
+      return '';
+    } catch {
+      return ' Фото не загрузились, добавьте их в карточке заявки.';
+    }
+  };
+
   const join = async (issue: Issue) => {
     setBusy(true);
     try {
       await ensureConsent();
       await api.join(issue.id);
-      toHome(issue.id, 'Вы присоединились. Карточка со статусом придёт в чат с ботом.');
+      const note = await attachPhotos(issue.id);
+      toHome(issue.id, 'Вы присоединились. Карточка со статусом придёт в чат с ботом.' + note);
     } catch (err) {
       showToast(err instanceof ApiError ? err.message : 'Не получилось. Попробуйте ещё раз');
       setBusy(false);
@@ -159,7 +173,8 @@ function ReportFlow({ ctx, initialCategory }: { ctx: Context; initialCategory?: 
     try {
       await ensureConsent();
       const created = await api.report({ house_id: house.id, object_id: objectId || undefined, category, description: text.trim() });
-      toHome(created.id, `Заявка № ${created.number} ушла в ${house.organization.name}. Карточка со статусом придёт в чат с ботом.`);
+      const note = await attachPhotos(created.id);
+      toHome(created.id, `Заявка № ${created.number} ушла в ${house.organization.name}. Карточка со статусом придёт в чат с ботом.` + note);
     } catch (err) {
       showToast(err instanceof ApiError ? err.message : 'Не получилось отправить. Попробуйте ещё раз');
       setBusy(false);
@@ -351,6 +366,8 @@ function ReportFlow({ ctx, initialCategory }: { ctx: Context; initialCategory?: 
           </button>
         </div>
       )}
+      <p className={s.label}>Фото</p>
+      <PhotoSlots files={photos} onChange={setPhotos} onError={showToast} />
       {toast}
     </Screen>
   );

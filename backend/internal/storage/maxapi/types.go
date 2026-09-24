@@ -1,6 +1,9 @@
 package maxapi
 
-import "encoding/json/jsontext"
+import (
+	"encoding/json/jsontext"
+	"encoding/json/v2"
+)
 
 type UpdateType string
 
@@ -128,3 +131,18 @@ type Target struct {
 
 func ToUser(id int64) Target { return Target{userID: id} }
 func ToChat(id int64) Target { return Target{chatID: id} }
+
+// PhotoURL — ссылка на присланное фото (вложение image). Срок жизни ссылки ограничен,
+// и MAX отдаёт её не во всех клиентах: пустая строка, если ссылки нет.
+func (a IncomingAttachment) PhotoURL() string {
+	if a.Type != "image" || len(a.Payload) == 0 {
+		return ""
+	}
+	var p struct {
+		URL string `json:"url"`
+	}
+	if json.Unmarshal(a.Payload, &p) != nil {
+		return ""
+	}
+	return p.URL
+}

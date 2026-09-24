@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json/v2"
 	"errors"
+	"fmt"
 	"log/slog"
 	"strings"
 	"time"
@@ -18,6 +19,7 @@ import (
 	"dommax/internal/app/hints"
 	"dommax/internal/app/houses"
 	"dommax/internal/app/issues"
+	"dommax/internal/app/photos"
 	"dommax/internal/domain/issue"
 	"dommax/internal/domain/user"
 	"dommax/internal/transport/bot"
@@ -29,6 +31,7 @@ type Deps struct {
 	Houses         *houses.Service
 	Hints          *hints.Service
 	Appeal         *appeal.Service
+	Photos         *photos.Service
 	Webhook        *bot.Webhook // nil — webhook выключен (BOT_MODE не webhook)
 	Ping           func(context.Context) error
 	ConsentVersion string
@@ -43,8 +46,10 @@ func New(d Deps) *fiber.App {
 	app := fiber.New(fiber.Config{
 		AppName:      "dom-max api",
 		ErrorHandler: h.onError,
-		JSONEncoder:  func(v any) ([]byte, error) { return json.Marshal(v) },
-		JSONDecoder:  func(data []byte, v any) error { return json.Unmarshal(data, v) },
+		// Три фото по 5 МБ и служебные поля формы; остальные запросы маленькие.
+		BodyLimit:   16 << 20,
+		JSONEncoder: func(v any) ([]byte, error) { return json.Marshal(v) },
+		JSONDecoder: func(data []byte, v any) error { return json.Unmarshal(data, v) },
 	})
 
 	api := app.Group("/api/v1")
@@ -74,6 +79,9 @@ func New(d Deps) *fiber.App {
 	api.Post("/issues/:id/join", h.auth, h.joinIssue)
 	api.Post("/issues/:id/status", h.auth, h.changeStatus)
 	api.Post("/issues/:id/appeal", h.auth, h.prepareAppeal)
+	api.Post("/issues/:id/photos", h.auth, h.uploadPhotos)
+	api.Get("/issues/:id/photos", h.auth, h.listPhotos)
+	api.Get("/photos/:id", h.auth, h.openPhoto)
 	// Без сессии: ссылка подписана и живёт 10 минут, а WebApp.downloadFile не передаёт заголовки.
 	api.Get("/appeal/:token", h.appealPDF)
 
@@ -135,6 +143,12 @@ func classify(err error) (int, string, string) {
 		return fiber.StatusConflict, "invalid_transition", "Такой переход статуса невозможен"
 	case errors.Is(err, appeal.ErrNotOverdue):
 		return fiber.StatusConflict, "not_overdue", "Срок ответа ещё не истёк"
+	case errors.Is(err, photos.ErrTooMany):
+		return fiber.StatusConflict, "too_many_photos", fmt.Sprintf("К заявке можно приложить не больше %d фото", photos.MaxPerIssue)
+	case errors.Is(err, photos.ErrNotImage):
+		return fiber.StatusUnsupportedMediaType, "unsupported_media", "Нужна фотография в формате JPEG или PNG"
+	case errors.Is(err, photos.ErrTooLarge):
+		return fiber.StatusRequestEntityTooLarge, "photo_too_large", "Фото слишком большое: до 5 МБ"
 	case errors.Is(err, issue.ErrReasonRequired):
 		return fiber.StatusUnprocessableEntity, "reason_required", "Укажите причину отказа"
 	case errors.Is(err, app.ErrInvalidInput), errors.Is(err, issue.ErrInvalid):

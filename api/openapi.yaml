@@ -411,6 +411,79 @@ paths:
         "404": { $ref: "#/components/responses/Error" }
         "409": { $ref: "#/components/responses/Error" }
 
+  /issues/{id}/photos:
+    get:
+      tags: [issues]
+      summary: Фото заявки
+      description: Только участникам заявки и сотрудникам ответственной УК.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Фото в порядке загрузки
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Photo" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+    post:
+      tags: [issues]
+      summary: Приложить фото к открытой заявке
+      description: |
+        Участник или сотрудник ответственной УК. До 3 файлов за запрос в поле photo, JPEG или PNG до 5 МБ,
+        не больше 6 фото на заявку. Сервер уменьшает снимок до 1600 px по длинной стороне, поворачивает по EXIF
+        и перекодирует в JPEG без EXIF: геометка и данные камеры не сохраняются.
+        413 photo_too_large, 415 unsupported_media, 409 too_many_photos или issue_closed.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [photo]
+              properties:
+                photo:
+                  type: array
+                  maxItems: 3
+                  items: { type: string, format: binary }
+      responses:
+        "201":
+          description: Загруженные фото
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Photo" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+        "413": { $ref: "#/components/responses/Error" }
+        "415": { $ref: "#/components/responses/Error" }
+        "422": { $ref: "#/components/responses/Error" }
+
+  /photos/{id}:
+    get:
+      tags: [issues]
+      summary: Файл фото (JPEG)
+      description: Только с токеном сессии; мини-приложение загружает файл через fetch, а не <img src>.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Фото
+          content:
+            image/jpeg:
+              schema: { type: string, format: binary }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+
   /appeal/{token}:
     get:
       tags: [issues]
@@ -617,6 +690,16 @@ components:
     Status:
       type: string
       enum: [sent, accepted, in_progress, done, rejected]
+
+    Photo:
+      type: object
+      required: [id, url, width, height, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        url: { type: string, example: /api/v1/photos/0190a000-0000-7000-8000-000000000001 }
+        width: { type: integer, example: 1600 }
+        height: { type: integer, example: 1200 }
+        created_at: { type: string, format: date-time }
 
     Issue:
       type: object

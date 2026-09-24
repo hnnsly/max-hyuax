@@ -42,6 +42,9 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    volumes:
+      # Фото к заявкам (ADR-015): переживают пересборку и перезапуск контейнера.
+      - photos:/data/photos
     # Порт наружу не публикуется: запросы приходят через Caddy (/api/*, /webhook/*).
     environment:
       DATABASE_URL: postgres://dommax:${POSTGRES_PASSWORD:-dommax}@db:5432/dommax?sslmode=disable
@@ -53,6 +56,7 @@ services:
       MAX_BOT_TOKEN: ${MAX_BOT_TOKEN:-}
       MAX_WEBHOOK_SECRET: ${MAX_WEBHOOK_SECRET:-}
       DOMAIN: ${DOMAIN:-}
+      PHOTOS_DIR: /data/photos
       # Подсказка категории через LLM (профиль llm). Пусто — только ключевые слова.
       OLLAMA_URL: ${OLLAMA_URL:-}
       OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:4b}
@@ -83,6 +87,7 @@ services:
     restart: "no"
 
 volumes:
+  photos:
   ollama_models:
   caddy_data:
   caddy_config:

@@ -75,7 +75,9 @@ OLLAMA_URL=http://ollama:11434
 
 **Обновление:** `git pull`, затем та же команда `up -d --build`. Миграции накатываются при старте.
 
-**Бэкап:** `docker compose -f deploy/compose.yaml exec db pg_dump -U dommax dommax > backup.sql`.
+**Бэкап:**
+- база: `docker compose -f deploy/compose.yaml exec db pg_dump -U dommax dommax > backup.sql`;
+- фото к заявкам лежат в томе `photos`: `docker run --rm -v dom-max_photos:/data -v "$PWD":/out alpine tar czf /out/photos.tgz -C /data .`.
 
 ## Особенности MAX
 

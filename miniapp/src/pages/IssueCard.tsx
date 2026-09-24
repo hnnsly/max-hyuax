@@ -11,6 +11,7 @@ import { calendarDaysBetween, capitalize, dayMonth, dotDateTime, plural } from '
 import { buildTimeline, nextStatuses, shareText } from '../shared/lib/model';
 import { ErrorState, Island, Loading, Screen, useToast } from '../shared/ui/Layout';
 import { IssuePlate, Stamp, statusLabel } from '../shared/ui/Plate';
+import { IssuePhotos } from '../shared/ui/Photos';
 import { Sheet } from '../shared/ui/Sheet';
 import { Rail } from '../shared/ui/Rail';
 import s from './pages.module.css';
@@ -98,6 +99,9 @@ export function IssueCard({ id, flash }: { id: string; flash?: string }) {
 
   const canJoin = !closed && !issue.joined && user.role === 'resident';
   const canManage = !closed && user.role === 'uk_operator' && user.organization_id === issue.responsible?.id;
+  // Фото видят участники и УК заявки: на снимках могут быть люди и двери квартир.
+  const ownUK = user.role === 'uk_operator' && user.organization_id === issue.responsible?.id;
+  const canSeePhotos = issue.joined || ownUK;
   const saved = (changed: Issue) => {
     setSheet(false);
     setLanded(true);
@@ -208,6 +212,14 @@ export function IssueCard({ id, flash }: { id: string; flash?: string }) {
           {issue.basis && <p className={s.basis}>{issue.basis}</p>}
         </div>
       </Island>
+
+      {canSeePhotos && (
+        <Island>
+          <div className={s.block}>
+            <IssuePhotos issueId={issue.id} canAdd={!closed} onToast={showToast} />
+          </div>
+        </Island>
+      )}
 
       {timeline.length > 0 && (
         <Island>

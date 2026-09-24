@@ -104,6 +104,15 @@ export interface ReportInput {
 
 export const isClosed = (s: Status) => s === 'done' || s === 'rejected';
 
+/** Фото к заявке; url отдаёт JPEG только с токеном сессии. */
+export interface Photo {
+  id: string;
+  url: string;
+  width: number;
+  height: number;
+  created_at: string;
+}
+
 /** Подсказка категории по тексту; все поля null, если не узнали. */
 export interface CategoryHint {
   category: string | null;

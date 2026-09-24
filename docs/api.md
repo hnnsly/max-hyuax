@@ -49,6 +49,9 @@ curl -X POST https://<домен>/api/v1/auth/demo -H "Content-Type: application
 | 409 | `issue_closed` | заявка закрыта |
 | 409 | `invalid_transition` | недопустимый переход статуса |
 | 409 | `not_overdue` | обращение в жилинспекцию раньше, чем истёк срок ответа |
+| 409 | `too_many_photos` | к заявке уже приложено 6 фото |
+| 413 | `photo_too_large` | фото больше 5 МБ или слишком большого разрешения |
+| 415 | `unsupported_media` | файл не JPEG и не PNG |
 | 422 | `reason_required` | отказ без причины |
 | 422 | `invalid_input` | некорректные данные запроса |
 

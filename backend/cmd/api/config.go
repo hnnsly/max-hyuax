@@ -25,6 +25,7 @@ type config struct {
 	MaxCAFile      string
 	MaxInsecureTLS bool
 
+	PhotosDir   string // каталог фото к заявкам (том в Docker)
 	OllamaURL   string // пусто — LLM не подключена, подсказка по ключевым словам
 	OllamaModel string
 }
@@ -47,6 +48,7 @@ func loadConfig(getenv func(string) string) (config, error) {
 		WebhookSecret:  getenv("MAX_WEBHOOK_SECRET"),
 		MaxAPIURL:      cmp.Or(getenv("MAX_API_URL"), maxapi.DefaultBaseURL),
 		MaxCAFile:      getenv("MAX_API_CA_FILE"),
+		PhotosDir:      cmp.Or(getenv("PHOTOS_DIR"), "data/photos"),
 		OllamaURL:      getenv("OLLAMA_URL"),
 		OllamaModel:    cmp.Or(getenv("OLLAMA_MODEL"), "qwen3:4b"),
 	}

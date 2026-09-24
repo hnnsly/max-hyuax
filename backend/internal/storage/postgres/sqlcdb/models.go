@@ -80,6 +80,16 @@ type IssueParticipant struct {
 	JoinedAt time.Time
 }
 
+type IssuePhoto struct {
+	ID         string
+	IssueID    string
+	UploadedBy int64
+	Width      int32
+	Height     int32
+	SizeBytes  int32
+	CreatedAt  time.Time
+}
+
 type Organization struct {
 	ID              string
 	Type            string
