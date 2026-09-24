@@ -2,7 +2,13 @@
 
 Чат-бот + мини-приложение в мессенджере MAX (хакатон MAX, трек «Умный город»): жители превращают хаос сообщений в домовом чате в одну доказательную заявку с ответственным, нормативным сроком и живым статусом.
 
-**Статус (24.09.2026, вечер):** план спайка выполнен: к ядру добавлены просрочка, метрики УК, QR-наклейки, удаление аккаунта, подсказка категории (правила + Ollama), PDF-обращение в жилинспекцию, фото к заявке и материалы к сдаче (README, DATA-API.yaml, запуск одной командой). Нужны деплой и проверка в MAX. Сдача 30.09, заморозка кода 29.09 днём. **Текущее состояние и следующий шаг — в `hack-docs/HANDOFF.md`.**
+**Статус (25.09.2026):**
+- План спайка выполнен: к ядру добавлены просрочка, метрики УК, QR-наклейки, удаление аккаунта, подсказка категории (правила + Ollama), PDF-обращение в жилинспекцию, фото к заявке и материалы к сдаче (README, DATA-API.yaml, запуск одной командой).
+- По GEN_V2 сделаны части 0–5: ревью и UX-проход, подтверждение ремонта жителями, телефон для мастера (`requestContact`), кабинет района (ADR-017).
+- Нужны деплой и проверка в MAX.
+- Сдача 30.09, заморозка кода 29.09 днём.
+
+**Текущее состояние и следующий шаг — в `hack-docs/HANDOFF.md`.**
 
 **Статус (23.09.2026)**: Выдали информацию по боту, получилось зафетчить:
 ```shell
@@ -93,7 +99,7 @@ docs/                   документация продукта (ведётс�
 - **Go:** версия 1.27.1. Перед правкой Go-файла — скилл `modern-go-guidelines:use-modern-go` (`list --go-version 1.27`), после правок — диагностика gopls.
 - **Бот:** свой тонкий клиент `internal/storage/maxapi` (около 6 методов). SDK `max-bot-api-client-go` — только если он поддерживает `platform-api2` без обходных путей.
 - **LLM:** Ollama self-hosted, профиль compose `llm` (ADR-008).
-- **Auth:** `initData` → HMAC + TTL → сессия; демо-роли через `POST /api/v1/auth/demo` при `DEMO_AUTH_ENABLED=true` (ADR-004).
+- **Auth:** `initData` → HMAC + TTL → сессия; демо-роли `resident`, `resident_2`, `uk_operator`, `district` через `POST /api/v1/auth/demo` при `DEMO_AUTH_ENABLED=true` (ADR-004, ADR-017).
 - **Хостинг:** российский VPS + Caddy TLS (ADR-005).
 
 ## Команды
@@ -103,14 +109,14 @@ docs/                   документация продукта (ведётс�
 - `task db` — поднять Postgres 18.6 в Docker (Docker Desktop должен быть запущен);
 - `task test` — юнит-тесты; `task test:integration` — тесты на Postgres (временная база на каждый прогон);
 - `task lint` — `gofmt` и `go vet`;
-- `task test:cover` — integration с профилем по `./internal/...` + порог `tools/covercheck` (всего ≥ 80%, пакеты domain и app ≥ 80%; на 24.09 — 91,3%); `task miniapp:cover` — Vitest, порог 90% по `src/shared/lib`;
+- `task test:cover` — integration с профилем по `./internal/...` + порог `tools/covercheck` (всего ≥ 80%, пакеты domain и app ≥ 80%; на 25.09 — 91,4%); `task miniapp:cover` — Vitest, порог 90% по `src/shared/lib`;
 - `task run` — api на `:8080`, миграции при старте; бот по `BOT_MODE` из `.env` (локально `off`);
 - `task test:live` — проверка на живом MAX Bot API; `task test:llm` — подсказка категории на настоящем Ollama (нужны `OLLAMA_URL` и скачанная модель);
 - локально одной командой, как у жюри: `docker compose -f deploy/compose.yaml --env-file deploy/.env.example up -d --build` (ADR-013);
 - `task sqlc` — перегенерировать код запросов после правки `queries/*.sql` или миграций;
 - `task up` / `task down` / `task logs -- api` — весь стек в compose;
 - `task miniapp:install` — зависимости мини-приложения (`npm ci`);
-- `task miniapp:dev` — мини-приложение на `:5173`, `/api` проксируется на `task run`; открыть `http://localhost:5173/?demo=resident` (`resident_2`, `uk`), тема `&theme=dark`;
+- `task miniapp:dev` — мини-приложение на `:5173`, `/api` проксируется на `task run`; открыть `http://localhost:5173/?demo=resident` (`resident_2`, `uk`, `district`), тема `&theme=dark`;
 - `task miniapp:test` / `task miniapp:typecheck` / `task miniapp:build` — Vitest, TypeScript, сборка в `miniapp/dist`;
 - превью для агента: `.claude/launch.json`, конфигурации `api` и `miniapp`; если `:8080` занят — `api-8081` и `miniapp-8081` (прокси Vite берёт адрес из `API_PROXY`).
 
@@ -151,7 +157,7 @@ docs/                   документация продукта (ведётс�
 - `hack-docs/HANDOFF.md` — текущее состояние работы и следующий шаг
 - `hack-docs/INDEX.md` — вход в базу знаний
 - `hack-docs/SRS.md` + `hack-docs/requirements/` — требования (user-stories, ux-flows, nfr, data-model)
-- `hack-docs/adr/` — решения 001–015
+- `hack-docs/adr/` — решения 001–015 и 017 (016 зарезервирован под геокодер)
 - `hack-docs/design/canvas-v2/project/` — утверждённый дизайн v2 (эталон экранов), `hack-docs/design/DESIGN-SYSTEM.md`
 - `hack-docs/GEN_V2_PLAN.md` — действующий план на 24–30.09 (части 0–7, линия отсечения); `hack-docs/GENERAL_PLAN.md` (v1) и `hack-docs/ROADMAP.md` — исходный план и вехи M0–M5
 - `hack-docs/research/max-platform-capabilities.md` — справка по Bot API, Bridge, MAX UI
