@@ -3,18 +3,50 @@ import { useEffect, useRef, useState } from 'react';
 import { api, ApiError } from '../api/client';
 import type { Photo } from '../api/types';
 import { useResource } from '../api/useResource';
-import { pickPhotos } from '../lib/photos';
+import { fitSize, PHOTO_SIDE, pickPhotos } from '../lib/photos';
 import { Sheet } from './Sheet';
 import s from './ui.module.css';
 
 const ACCEPT = 'image/jpeg,image/png';
+const ISSUE_MAX = 6; // столько фото сервер хранит у одной заявки
+
+/**
+ * Ужимает снимок на телефоне до PHOTO_SIDE и перекодирует в JPEG: снимки камер бывают больше 5 МБ,
+ * а метаданные с геопозицией не уходят с устройства. Если браузер не смог декодировать файл,
+ * возвращаем как есть: pickPhotos объяснит, что не так.
+ */
+async function shrinkPhoto(file: File): Promise<File> {
+  if (typeof createImageBitmap !== 'function') return file;
+  let bitmap: ImageBitmap;
+  try {
+    bitmap = await createImageBitmap(file, { imageOrientation: 'from-image' });
+  } catch {
+    return file;
+  }
+  const { width, height } = fitSize(bitmap.width, bitmap.height, PHOTO_SIDE);
+  const canvas = document.createElement('canvas');
+  canvas.width = width;
+  canvas.height = height;
+  canvas.getContext('2d')?.drawImage(bitmap, 0, 0, width, height);
+  bitmap.close();
+  const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.85));
+  if (!blob) return file;
+  return new File([blob], `${file.name.replace(/\.[^.]*$/, '') || 'photo'}.jpg`, { type: 'image/jpeg' });
+}
 
 /** Кнопка «Добавить»: скрытый input с выбором файлов (в MAX UI загрузки файлов нет). */
 function AddTile({ onFiles, disabled }: { onFiles: (files: File[]) => void; disabled?: boolean }) {
   const input = useRef<HTMLInputElement>(null);
+  const [preparing, setPreparing] = useState(false);
   return (
     <>
-      <button type="button" className={s.photoAdd} disabled={disabled} onClick={() => input.current?.click()}>
+      <button
+        type="button"
+        className={s.photoAdd}
+        disabled={disabled || preparing}
+        aria-label="Добавить фото"
+        onClick={() => input.current?.click()}
+      >
         <Plus size={20} aria-hidden="true" />
         Добавить
       </button>
@@ -25,8 +57,13 @@ function AddTile({ onFiles, disabled }: { onFiles: (files: File[]) => void; disa
         multiple
         hidden
         onChange={(e) => {
-          onFiles([...(e.target.files ?? [])]);
+          const picked = [...(e.target.files ?? [])];
           e.target.value = ''; // тот же файл можно выбрать снова
+          if (picked.length === 0) return;
+          setPreparing(true);
+          Promise.all(picked.map(shrinkPhoto))
+            .then(onFiles)
+            .finally(() => setPreparing(false));
         }}
       />
     </>
@@ -34,7 +71,7 @@ function AddTile({ onFiles, disabled }: { onFiles: (files: File[]) => void; disa
 }
 
 /** Превью выбранного, но ещё не загруженного файла. */
-function FilePreview({ file, onRemove }: { file: File; onRemove: () => void }) {
+function FilePreview({ file, n, onRemove }: { file: File; n: number; onRemove: () => void }) {
   const [url, setUrl] = useState('');
   useEffect(() => {
     const u = URL.createObjectURL(file);
@@ -44,7 +81,7 @@ function FilePreview({ file, onRemove }: { file: File; onRemove: () => void }) {
   return (
     <div className={s.photoTile}>
       {url && <img src={url} alt="" />}
-      <button type="button" className={s.photoRemove} aria-label="Убрать фото" onClick={onRemove}>
+      <button type="button" className={s.photoRemove} aria-label={`Убрать фото ${n}`} onClick={onRemove}>
         <X size={14} weight="bold" aria-hidden="true" />
       </button>
     </div>
@@ -57,7 +94,7 @@ export function PhotoSlots({ files, onChange, onError }: { files: File[]; onChan
   return (
     <div className={s.photoRow}>
       {files.map((f, i) => (
-        <FilePreview key={`${f.name}-${f.size}-${i}`} file={f} onRemove={() => onChange(files.filter((_, j) => j !== i))} />
+        <FilePreview key={`${f.name}-${f.size}-${i}`} file={f} n={i + 1} onRemove={() => onChange(files.filter((_, j) => j !== i))} />
       ))}
       {files.length < max && (
         <AddTile
@@ -73,7 +110,7 @@ export function PhotoSlots({ files, onChange, onError }: { files: File[]; onChan
 }
 
 /** Загруженное фото: файл отдаётся только с токеном, поэтому берём его через fetch. */
-function Thumb({ photo, onOpen }: { photo: Photo; onOpen: (url: string) => void }) {
+function Thumb({ photo, label, onOpen }: { photo: Photo; label: string; onOpen: (url: string) => void }) {
   const [url, setUrl] = useState('');
   useEffect(() => {
     let alive = true;
@@ -92,7 +129,7 @@ function Thumb({ photo, onOpen }: { photo: Photo; onOpen: (url: string) => void 
     };
   }, [photo.id]);
   return (
-    <button type="button" className={s.photoTile} aria-label="Открыть фото" disabled={!url} onClick={() => onOpen(url)}>
+    <button type="button" className={s.photoTile} aria-label={label} disabled={!url} onClick={() => onOpen(url)}>
       {url && <img src={url} alt="" />}
     </button>
   );
@@ -106,18 +143,21 @@ export function IssuePhotos({ issueId, canAdd, onToast }: { issueId: string; can
   const list = res.data ?? [];
   if (res.error || (!res.data && res.loading) || (list.length === 0 && !canAdd)) return null;
 
+  // За раз не больше трёх и не больше, чем осталось мест у заявки.
+  const left = ISSUE_MAX - list.length;
   const upload = async (added: File[]) => {
-    const r = pickPhotos([], added, 3);
+    const r = pickPhotos([], added, Math.min(3, left), left < 3 ? `У заявки уже ${list.length} фото из ${ISSUE_MAX}` : undefined);
     if (r.error) onToast(r.error);
     if (r.files.length === 0) return;
     setBusy(true);
     try {
       await api.uploadPhotos(issueId, r.files);
-      res.reload();
     } catch (err) {
       onToast(err instanceof ApiError ? err.message : 'Не получилось загрузить фото');
     } finally {
+      // Сервер сохраняет по одному: даже при ошибке часть фото могла сохраниться.
       setBusy(false);
+      res.reload();
     }
   };
 
@@ -125,10 +165,10 @@ export function IssuePhotos({ issueId, canAdd, onToast }: { issueId: string; can
     <section className={s.photoSection} aria-label="Фото">
       <h3 className={s.photoTitle}>Фото</h3>
       <div className={s.photoRow}>
-        {list.map((p) => (
-          <Thumb key={p.id} photo={p} onOpen={setOpen} />
+        {list.map((p, i) => (
+          <Thumb key={p.id} photo={p} label={`Открыть фото ${i + 1} из ${list.length}`} onOpen={setOpen} />
         ))}
-        {canAdd && list.length < 6 && <AddTile onFiles={upload} disabled={busy} />}
+        {canAdd && left > 0 && <AddTile onFiles={upload} disabled={busy} />}
       </div>
       <Sheet open={open !== ''} title="Фото" onClose={() => setOpen('')}>
         {open && <img className={s.photoFull} src={open} alt="Фото к заявке" />}

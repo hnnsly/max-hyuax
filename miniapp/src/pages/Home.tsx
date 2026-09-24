@@ -4,11 +4,10 @@ import { useState } from 'react';
 import { useRouter } from '../app/router';
 import { useSession, useUser } from '../app/session';
 import { api, ApiError } from '../shared/api/client';
-import { isClosed } from '../shared/api/types';
 import { useResource } from '../shared/api/useResource';
 import { bridge } from '../shared/bridge/bridge';
 import { capitalize, plural } from '../shared/lib/format';
-import { parseStartParam } from '../shared/lib/model';
+import { houseOpenIssues, parseStartParam } from '../shared/lib/model';
 import { IssueList } from '../shared/ui/IssueRow';
 import { DemoMark, EmptyState, ErrorState, Facts, Island, Loading, Screen, Section } from '../shared/ui/Layout';
 import { HousePlate } from '../shared/ui/Plate';
@@ -65,7 +64,7 @@ export function Home() {
   }
 
   const { house, issues, mine } = res.data;
-  const open = issues.filter((i) => !isClosed(i.status));
+  const open = houseOpenIssues(issues);
   const org = house.organization;
   const dispatcher = org.phone_dispatcher ?? org.phone_office;
   const schedule = capitalize(org.schedule?.split('; ').pop() ?? '');
@@ -134,8 +133,14 @@ function DeleteAccountSheet({ open, onClose }: { open: boolean; onClose: () => v
     }
   };
 
+  // Ошибка прошлой попытки не должна встречать при следующем открытии листа.
+  const close = () => {
+    setError('');
+    onClose();
+  };
+
   return (
-    <Sheet open={open} title="Удалить аккаунт?" onClose={onClose}>
+    <Sheet open={open} title="Удалить аккаунт?" onClose={close} locked={busy}>
       <div className={s.sheetBody}>
         <ul className={s.plainList}>
           <li>Имя, телефон и согласие на обработку данных сотрутся.</li>
@@ -150,7 +155,7 @@ function DeleteAccountSheet({ open, onClose }: { open: boolean; onClose: () => v
         <Button variant="destructive" size="large" stretched loading={busy} onClick={remove}>
           Удалить аккаунт
         </Button>
-        <Button variant="secondary" size="large" stretched disabled={busy} onClick={onClose}>
+        <Button variant="secondary" size="large" stretched disabled={busy} onClick={close}>
           Отмена
         </Button>
       </div>

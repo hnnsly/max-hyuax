@@ -66,6 +66,9 @@ export const bridge = {
     },
   },
 
+  /** Печать из WebView телефона не гарантирована: кнопку показываем на компьютере и в браузере. */
+  canPrint: () => !mobile() && typeof window.print === 'function',
+
   /** Сканер QR есть только в мобильном клиенте MAX. */
   canScan: () => Boolean(wa()?.openCodeReader) && mobile(),
   scan: async () => (await wa()!.openCodeReader!(false)).value,
@@ -85,20 +88,21 @@ export const bridge = {
   },
 
   /**
-   * Скачать файл. В MAX ссылки href не скачиваются, нужен downloadFile с абсолютным https-адресом
-   * (dev-max/docs/webapps/bridge.md); в браузере — обычная ссылка с атрибутом download.
+   * Скачать файл. В MAX ссылки href не скачиваются, нужен downloadFile с абсолютным https-адресом,
+   * и MAX проверяет, что перед вызовом было нажатие (dev-max/docs/webapps/bridge.md): вызывать сразу
+   * из обработчика, без сетевых запросов перед ним. В браузере — обычная ссылка с атрибутом download.
    */
-  async download(path: string, fileName: string): Promise<void> {
+  async download(path: string, fileName: string): Promise<'downloading' | 'cancelled'> {
     const url = new URL(path, window.location.origin).href;
     const w = wa();
     if (w?.initData && w.downloadFile) {
-      await w.downloadFile(url, fileName);
-      return;
+      return (await w.downloadFile(url, fileName)).status;
     }
     const a = document.createElement('a');
     a.href = url;
     a.download = fileName;
     a.click();
+    return 'downloading';
   },
 
   /** Тактильный отклик есть только на телефонах; в остальных местах молча пропускаем. */

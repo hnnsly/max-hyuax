@@ -100,10 +100,9 @@ function ReportFlow({ ctx, initialCategory }: { ctx: Context; initialCategory?: 
 
   // Подсказка категории по тексту: спрашиваем после паузы в наборе; по QR категория уже известна.
   useEffect(() => {
-    if (ctx.fixedObject || !worthHint(text)) {
-      setHint(null);
-      return;
-    }
+    // Старая подсказка не должна висеть, пока текст уже другой.
+    setHint(null);
+    if (ctx.fixedObject || !worthHint(text)) return;
     let alive = true;
     const t = setTimeout(() => {
       api.classify(text).then(
@@ -150,7 +149,9 @@ function ReportFlow({ ctx, initialCategory }: { ctx: Context; initialCategory?: 
     try {
       await api.uploadPhotos(issueId, photos);
       return '';
-    } catch {
+    } catch (err) {
+      // У заявки, к которой присоединились, мест для фото может уже не быть.
+      if (err instanceof ApiError && err.code === 'too_many_photos') return ' У заявки уже есть 6 фото, ваши не добавились.';
       return ' Фото не загрузились, добавьте их в карточке заявки.';
     }
   };

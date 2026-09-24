@@ -2,7 +2,7 @@ import { MaxUI, Spinner } from '@maxhub/max-ui';
 import { useEffect, useState } from 'react';
 import type { User } from '../shared/api/types';
 import { parseStartParam } from '../shared/lib/model';
-import { EmptyState, Screen } from '../shared/ui/Layout';
+import { ErrorState, Screen } from '../shared/ui/Layout';
 import { Home } from '../pages/Home';
 import { IssueCard } from '../pages/IssueCard';
 import { AccountDeleted, Consent, DemoGate, HouseSearch, MyIssues, UkQueue } from '../pages/Other';
@@ -65,7 +65,7 @@ function Pages() {
 }
 
 function Gate() {
-  const { state } = useSession();
+  const { state, retry } = useSession();
   switch (state.phase) {
     case 'loading':
       return (
@@ -80,7 +80,7 @@ function Gate() {
     case 'error':
       return (
         <Screen title="Мой дом">
-          <EmptyState title="Не удалось войти" text={state.message} />
+          <ErrorState title="Не удалось войти" message={state.message} onRetry={retry} />
         </Screen>
       );
     case 'ready':

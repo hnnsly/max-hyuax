@@ -336,6 +336,8 @@
 .actionBar {
   position: sticky;
   bottom: 0;
+  /* Выше точек хронологии и шкал, у которых свой слой. */
+  z-index: 2;
   display: flex;
   flex-direction: column;
   gap: 8px;
@@ -497,6 +499,12 @@ button.photoTile { cursor: zoom-in; }
   background: rgb(10 11 13 / 0.6);
   color: #fff;
   cursor: pointer;
+}
+/* Зона нажатия шире кружка: пальцем по 24 px легко промахнуться. */
+.photoRemove::before {
+  content: '';
+  position: absolute;
+  inset: -10px;
 }
 .photoFull {
   display: block;

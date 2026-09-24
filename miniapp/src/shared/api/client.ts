@@ -1,6 +1,6 @@
 // Клиент API: JSON, токен сессии, единый формат ошибок {"error": {"code", "message"}}.
 import type {
-  Category, CategoryHint, House, HouseDetails, Issue, IssueEvent, AssetObject, Photo, ReportInput, Session, Status, UkMetrics, User,
+  AppealLink, Category, CategoryHint, House, HouseDetails, Issue, IssueEvent, AssetObject, Photo, ReportInput, Session, Status, UkMetrics, User,
 } from './types';
 
 export class ApiError extends Error {
@@ -83,7 +83,7 @@ export const api = {
   /** Фото отдаются только с токеном, поэтому грузятся через fetch, а не <img src>. */
   photoBlob: async (photoId: string) => (await send('GET', `/photos/${encodeURIComponent(photoId)}`)).blob(),
   appeal: (issueId: string) =>
-    request<{ url: string; expires_at: string; file_name: string }>('POST', `/issues/${encodeURIComponent(issueId)}/appeal`),
+    request<AppealLink>('POST', `/issues/${encodeURIComponent(issueId)}/appeal`),
   searchHouses: (query: string) => request<House[]>('GET', `/houses?${q({ query })}`),
   nearestHouses: (lat: number, lon: number) => request<House[]>('GET', `/houses/nearest?${q({ lat: String(lat), lon: String(lon) })}`),
   house: (id: string) => request<HouseDetails>('GET', `/houses/${encodeURIComponent(id)}`),

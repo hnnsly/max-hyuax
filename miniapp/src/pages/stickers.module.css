@@ -232,21 +232,33 @@
   margin: 0;
 }
 @media print {
-  /* Скрывается всё, кроме наклейки, и только когда наклейка есть на странице. */
-  body:has(.sticker) * {
-    visibility: hidden;
+  /*
+   * Только когда наклейка есть на странице: всё, что не наклейка и не её предок, убирается из потока,
+   * а предки теряют отступы и высоту экрана. Документ становится ровно одним листом A6.
+   */
+  body:has(.sticker) *:not(.sticker, .sticker *, :has(.sticker)) {
+    display: none !important;
   }
-  .sticker,
-  .sticker * {
-    visibility: visible;
+  html:has(.sticker),
+  body:has(.sticker),
+  body:has(.sticker) :has(.sticker) {
+    display: block !important;
+    min-height: 0 !important;
+    height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: none !important;
+    overflow: visible !important;
   }
   .sticker {
-    position: fixed;
-    inset: 0;
     width: 105mm;
     max-width: none;
     height: 148mm;
     overflow: hidden;
+    break-inside: avoid;
     print-color-adjust: exact;
   }
 }

@@ -4,10 +4,28 @@ import s from './sheet.module.css';
 /**
  * Нижний лист на нативном <dialog>: showModal() держит фокус внутри и закрывается по Esc,
  * closedby="any" — нажатием мимо листа. В Safari closedby нет, там то же делает обработчик клика.
+ * locked — идёт запрос: лист не закрывается ни по Esc, ни нажатием мимо.
  */
-export function Sheet({ open, title, onClose, children }: { open: boolean; title: string; onClose: () => void; children: ReactNode }) {
+export function Sheet({
+  open,
+  title,
+  onClose,
+  locked = false,
+  children,
+}: {
+  open: boolean;
+  title: string;
+  onClose: () => void;
+  locked?: boolean;
+  children: ReactNode;
+}) {
   const ref = useRef<HTMLDialogElement>(null);
+  const lockedRef = useRef(locked);
   const titleId = useId();
+
+  useEffect(() => {
+    lockedRef.current = locked;
+  }, [locked]);
 
   useEffect(() => {
     const d = ref.current;
@@ -20,7 +38,7 @@ export function Sheet({ open, title, onClose, children }: { open: boolean; title
     const d = ref.current;
     if (!d || 'closedBy' in HTMLDialogElement.prototype) return;
     const onClick = (e: MouseEvent) => {
-      if (e.target !== d) return;
+      if (e.target !== d || lockedRef.current) return;
       const r = d.getBoundingClientRect();
       const inside = r.top <= e.clientY && e.clientY <= r.bottom && r.left <= e.clientX && e.clientX <= r.right;
       if (!inside) d.close();
@@ -30,7 +48,16 @@ export function Sheet({ open, title, onClose, children }: { open: boolean; title
   }, []);
 
   return (
-    <dialog ref={ref} className={s.sheet} aria-labelledby={titleId} onClose={onClose} {...{ closedby: 'any' }}>
+    <dialog
+      ref={ref}
+      className={s.sheet}
+      aria-labelledby={titleId}
+      onClose={onClose}
+      onCancel={(e) => {
+        if (locked) e.preventDefault();
+      }}
+      {...{ closedby: locked ? 'none' : 'any' }}
+    >
       <div className={s.grabber} aria-hidden="true" />
       <h2 id={titleId} className={s.title}>
         {title}

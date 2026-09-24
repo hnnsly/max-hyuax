@@ -113,6 +113,13 @@ export interface Photo {
   created_at: string;
 }
 
+/** Подписанная ссылка на PDF-обращение: живёт 10 минут и привязана к пользователю. */
+export interface AppealLink {
+  url: string;
+  expires_at: string;
+  file_name: string;
+}
+
 /** Подсказка категории по тексту; все поля null, если не узнали. */
 export interface CategoryHint {
   category: string | null;

@@ -47,6 +47,8 @@ function demoRoleFromUrl(): DemoRole | null {
 interface SessionValue {
   state: State;
   loginDemo(role: DemoRole): void;
+  /** Повторить вход после ошибки. */
+  retry(): void;
   setUser(u: User): void;
   logout(): void;
   /** Аккаунт удалён на сервере: сессию забываем и показываем экран прощания. */
@@ -76,12 +78,10 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     [accept, fail],
   );
 
-  useEffect(() => {
-    setUnauthorizedHandler(() => {
-      setToken('');
-      setState(bridge.inMax() ? { phase: 'error', message: 'Сессия истекла. Закройте и откройте приложение заново.' } : { phase: 'anon' });
-    });
+  // Вход при запуске; повторяется кнопкой на экране ошибки.
+  const start = useCallback(() => {
     if (bridge.inMax()) {
+      setState({ phase: 'loading' });
       api.loginMax(bridge.initData()).then((s) => accept(s, s.start_param || bridge.startParam()), fail);
       return;
     }
@@ -90,9 +90,18 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     else setState({ phase: 'anon' });
   }, [accept, fail, loginDemo]);
 
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      setToken('');
+      setState(bridge.inMax() ? { phase: 'error', message: 'Сессия истекла. Закройте и откройте приложение заново.' } : { phase: 'anon' });
+    });
+    start();
+  }, [start]);
+
   const value: SessionValue = {
     state,
     loginDemo,
+    retry: start,
     setUser: (user) => setState((s) => (s.phase === 'ready' ? { ...s, user } : s)),
     logout: () => {
       storage.set(null);

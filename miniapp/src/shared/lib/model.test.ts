@@ -1,5 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { buildRail, buildTimeline, groupQueue, hintOffer, nextStatuses, parseStartParam, shareText, worthHint, type RailItem } from './model';
+import {
+  buildRail,
+  buildTimeline,
+  groupQueue,
+  hintOffer,
+  houseOpenIssues,
+  nextStatuses,
+  parseStartParam,
+  shareText,
+  worthHint,
+  type RailItem,
+} from './model';
 
 const sym = { done: 'd', left: '-', late: 'x' } as const;
 const tones = (items: RailItem[]) =>
@@ -79,6 +90,18 @@ describe('переходы статуса', () => {
     expect(nextStatuses('accepted')).toEqual(['in_progress', 'done', 'rejected']);
     expect(nextStatuses('in_progress')).toEqual(['done', 'rejected']);
     expect(nextStatuses('done')).toEqual([]);
+  });
+});
+
+describe('заявки дома', () => {
+  it('открытые, просроченные сверху, остальные в порядке сервера', () => {
+    const items = [
+      { id: 'new', status: 'sent', overdue: false },
+      { id: 'closed', status: 'done', overdue: false },
+      { id: 'late', status: 'accepted', overdue: true },
+      { id: 'work', status: 'in_progress', overdue: false },
+    ] as const;
+    expect(houseOpenIssues([...items]).map((i) => i.id)).toEqual(['late', 'new', 'work']);
   });
 });
 

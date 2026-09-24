@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { api } from '../shared/api/client';
 import type { AssetObject, HouseDetails } from '../shared/api/types';
 import { useResource } from '../shared/api/useResource';
-import { appLink, BOT_NAME } from '../shared/bridge/bridge';
+import { appLink, bridge, BOT_NAME } from '../shared/bridge/bridge';
 import { capitalize, splitAddress } from '../shared/lib/format';
 import { objectStartParam, qrPath, stickerCopy } from '../shared/lib/sticker';
 import { EmptyState, ErrorState, Island, Loading } from '../shared/ui/Layout';
@@ -66,10 +66,16 @@ function HouseStickers({ houseId }: { houseId: string }) {
       <Island style={{ overflow: 'hidden' }}>
         <Sticker house={house} object={object} />
       </Island>
-      <Button variant="primary" size="large" stretched iconBefore={<Printer size={20} />} onClick={() => window.print()}>
-        Распечатать
-      </Button>
-      <p className={s.hint}>Формат A6, для кабины лифта или двери подъезда. Печатайте из браузера на компьютере.</p>
+      {bridge.canPrint() ? (
+        <>
+          <Button variant="primary" size="large" stretched iconBefore={<Printer size={20} />} onClick={() => window.print()}>
+            Распечатать
+          </Button>
+          <p className={s.hint}>Формат A6, для кабины лифта или двери подъезда.</p>
+        </>
+      ) : (
+        <p className={s.hint}>Формат A6, для кабины лифта или двери подъезда. Печать доступна, если открыть кабинет УК в MAX на компьютере.</p>
+      )}
     </>
   );
 }

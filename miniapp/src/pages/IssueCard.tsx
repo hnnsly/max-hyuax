@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from '../app/router';
 import { useUser } from '../app/session';
 import { api, ApiError } from '../shared/api/client';
-import { isClosed, type Issue, type Status } from '../shared/api/types';
+import { isClosed, type AppealLink, type Issue, type Status } from '../shared/api/types';
 import { useResource } from '../shared/api/useResource';
 import { appLink, bridge } from '../shared/bridge/bridge';
 import { calendarDaysBetween, capitalize, dayMonth, dotDateTime, plural } from '../shared/lib/format';
@@ -24,6 +24,7 @@ export function IssueCard({ id, flash }: { id: string; flash?: string }) {
   const [sheet, setSheet] = useState(false);
   const [landed, setLanded] = useState(false);
   const [appealBusy, setAppealBusy] = useState(false);
+  const [appealLink, setAppealLink] = useState<(AppealLink & { until: number }) | null>(null);
   const res = useResource(async () => {
     const [issue, events] = await Promise.all([api.issue(id), api.timeline(id)]);
     return { issue, events };
@@ -83,13 +84,29 @@ export function IssueCard({ id, flash }: { id: string; flash?: string }) {
     bridge.share(shareText(issue), appLink(`i_${issue.id}`)).catch(() => showToast('Не получилось поделиться'));
   };
 
-  // Черновик обращения в жилинспекцию: сервер выдаёт ссылку на 10 минут, файл скачивается сразу.
+  // Черновик обращения в жилинспекцию: сервер выдаёт ссылку на 10 минут.
+  const appealReady = appealLink !== null && appealLink.until > Date.now();
+  const download = (link: AppealLink) =>
+    bridge.download(link.url, link.file_name).then(
+      (status) =>
+        showToast(status === 'cancelled' ? 'Скачивание отменено' : 'Черновик обращения скачивается. Проверьте его, впишите ФИО и подпишите.'),
+      () => showToast('Не получилось скачать обращение'),
+    );
   const appeal = async () => {
+    if (appealReady) {
+      await download(appealLink);
+      return;
+    }
     setAppealBusy(true);
     try {
       const link = await api.appeal(issue.id);
-      await bridge.download(link.url, link.file_name);
-      showToast('Черновик обращения скачивается. Проверьте его, впишите ФИО и подпишите.');
+      // В MAX файл скачивается только по свежему нажатию: после запроса просим нажать ещё раз.
+      if (bridge.inMax()) {
+        setAppealLink({ ...link, until: Date.now() + 9 * 60_000 });
+        showToast('Обращение готово. Нажмите «Скачать PDF».');
+      } else {
+        await download(link);
+      }
     } catch (err) {
       showToast(err instanceof ApiError ? err.message : 'Не получилось подготовить обращение');
     } finally {
@@ -194,7 +211,7 @@ export function IssueCard({ id, flash }: { id: string; flash?: string }) {
             <p className={s.text}>Если ответа не будет, соседи могут обратиться в Мосжилинспекцию. Даты, комментарии УК и число сообщивших уже собраны в заявке.</p>
             {issue.joined && !closed && (
               <Button variant="secondary" size="medium" stretched iconBefore={<FilePdf size={18} />} loading={appealBusy} onClick={appeal}>
-                Подготовить обращение
+                {appealReady ? 'Скачать PDF' : 'Подготовить обращение'}
               </Button>
             )}
           </div>

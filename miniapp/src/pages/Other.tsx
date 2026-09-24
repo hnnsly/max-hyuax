@@ -32,16 +32,24 @@ export function HouseSearch() {
       setFound(null);
       return;
     }
+    // Ответ на устаревший запрос не должен перезаписать результат для нового текста.
+    let stale = false;
     const t = setTimeout(() => {
       api.searchHouses(q).then(
         (list) => {
+          if (stale) return;
           setFound(list);
           setError('');
         },
-        (err: unknown) => setError(err instanceof ApiError ? err.message : 'Поиск не удался'),
+        (err: unknown) => {
+          if (!stale) setError(err instanceof ApiError ? err.message : 'Поиск не удался');
+        },
       );
     }, 300);
-    return () => clearTimeout(t);
+    return () => {
+      stale = true;
+      clearTimeout(t);
+    };
   }, [query]);
 
   const nearby = () => {

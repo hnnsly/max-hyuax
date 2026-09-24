@@ -93,6 +93,11 @@ interface QueueItem {
   deadline: string;
 }
 
+/** Открытые заявки дома: просроченные сверху, остальные в порядке сервера (новые первыми). */
+export function houseOpenIssues<T extends { status: Status; overdue: boolean }>(items: T[]): T[] {
+  return items.filter((i) => i.status !== 'done' && i.status !== 'rejected').sort((a, b) => Number(b.overdue) - Number(a.overdue));
+}
+
 /** Группы очереди УК: сначала то, что горит, закрытые в конце. Пустые группы не показываются. */
 export function groupQueue<T extends QueueItem>(items: T[], now: Date): { title: string; late?: boolean; items: T[] }[] {
   const closed = (i: T) => i.status === 'done' || i.status === 'rejected';
