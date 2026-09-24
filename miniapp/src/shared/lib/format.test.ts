@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { calendarDaysBetween, capitalize, dayMonth, deadlineLabel, dotDateTime, plural, splitAddress } from './format';
+import { calendarDaysBetween, capitalize, dayMonth, deadlineLabel, dotDateTime, plural, splitAddress, time } from './format';
 
 describe('plural', () => {
   it('согласует числительные', () => {
@@ -20,6 +20,7 @@ describe('даты по Москве', () => {
 
   it('дата и время для хронологии', () => {
     expect(dotDateTime('2026-09-17T05:10:00Z')).toBe('17.09 08:10');
+    expect(time(new Date('2026-09-17T20:05:00Z'))).toBe('23:05');
   });
 
   it('календарные дни между датами по Москве', () => {

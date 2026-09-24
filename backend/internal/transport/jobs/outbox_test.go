@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"sync"
 	"testing"
 	"time"
 
@@ -55,6 +56,86 @@ func (q *queue) Release(context.Context) error          { return nil }
 func (q *queue) Retry(_ context.Context, id int64, _ time.Time, _ string, failed bool) error {
 	q.retried[id] = failed
 	return nil
+}
+
+// cycleQueue — очередь для полного цикла Run: одна пачка, потом пусто; считает вызовы.
+type cycleQueue struct {
+	mu       sync.Mutex
+	items    []app.OutboxItem
+	released bool
+	done     []int64
+	claimErr error
+}
+
+func (q *cycleQueue) Claim(context.Context, int) ([]app.OutboxItem, error) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	if q.claimErr != nil {
+		err := q.claimErr
+		q.claimErr = nil
+		return nil, err
+	}
+	items := q.items
+	q.items = nil
+	return items, nil
+}
+func (q *cycleQueue) Done(_ context.Context, id int64) error {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	q.done = append(q.done, id)
+	return nil
+}
+func (q *cycleQueue) Retry(context.Context, int64, time.Time, string, bool) error { return nil }
+func (q *cycleQueue) Release(context.Context) error {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	q.released = true
+	return nil
+}
+func (q *cycleQueue) doneCount() int {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	return len(q.done)
+}
+
+func TestWorkerRunReleasesProcessesIdlesAndStops(t *testing.T) {
+	q := &cycleQueue{
+		claimErr: errors.New("db hiccup"), // первая попытка падает: воркер не должен умереть
+		items:    []app.OutboxItem{{ID: 7, Notification: app.Notification{UserID: 1}, Attempts: 1}},
+	}
+	w := jobs.NewOutboxWorker(q, func(context.Context, app.Notification) error { return nil },
+		jobs.NewLimiter(0, 0, time.Now, jobs.SleepCtx), slog.New(slog.NewTextHandler(io.Discard, nil)))
+	ctx, cancel := context.WithCancel(t.Context())
+	done := make(chan error, 1)
+	go func() { done <- w.Run(ctx) }()
+
+	deadline := time.Now().Add(5 * time.Second)
+	for q.doneCount() == 0 && time.Now().Before(deadline) {
+		time.Sleep(20 * time.Millisecond)
+	}
+	if q.doneCount() != 1 || !q.released {
+		t.Fatalf("done = %d, released = %v", q.doneCount(), q.released)
+	}
+	cancel()
+	select {
+	case err := <-done:
+		if !errors.Is(err, context.Canceled) {
+			t.Fatalf("Run = %v, want context.Canceled", err)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("Run did not stop while idle")
+	}
+}
+
+func TestSleepCtx(t *testing.T) {
+	if err := jobs.SleepCtx(t.Context(), time.Millisecond); err != nil {
+		t.Fatalf("short sleep = %v", err)
+	}
+	ctx, cancel := context.WithCancel(t.Context())
+	cancel()
+	if err := jobs.SleepCtx(ctx, time.Hour); !errors.Is(err, context.Canceled) {
+		t.Fatalf("cancelled sleep = %v", err)
+	}
 }
 
 type limited struct{}

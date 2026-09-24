@@ -63,11 +63,15 @@ jobs:
       - name: go test
         run: go test -race -count=1 ./...
 
-      # Репозитории и сквозной сценарий API на настоящем Postgres (тег integration).
-      - name: go test (integration)
+      # Репозитории и сквозной сценарий API на настоящем Postgres (тег integration) + профиль покрытия.
+      - name: go test (integration, coverage)
         env:
           DATABASE_URL: postgres://dommax:dommax@localhost:5432/dommax?sslmode=disable
-        run: go test -tags integration -count=1 ./...
+        run: go test -tags integration -count=1 -coverpkg=./internal/... -coverprofile=coverage.out ./...
+
+      # Порог покрытия: всего ≥ 80%, каждый пакет domain и app ≥ 80% (tools/covercheck).
+      - name: coverage threshold
+        run: go run ./tools/covercheck -profile coverage.out
 
   miniapp:
     name: miniapp (build)
@@ -93,7 +97,7 @@ jobs:
         run: |
           npm ci
           npm run typecheck
-          npm test
+          npm run test:cover
           npm run build
 
   deploy:

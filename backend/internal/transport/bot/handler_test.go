@@ -14,6 +14,7 @@ import (
 	"dommax/internal/app/houses"
 	"dommax/internal/app/issues"
 	"dommax/internal/domain/house"
+	"dommax/internal/domain/issue"
 	"dommax/internal/domain/user"
 	"dommax/internal/storage/maxapi"
 	"dommax/internal/transport/bot"
@@ -264,6 +265,113 @@ func TestConsentIsAskedBeforeReport(t *testing.T) {
 	list, _ := e.store.Issues().ListByHouse(t.Context(), "h-1", 10)
 	if !u.HasConsent("v1") || len(list) != 1 {
 		t.Fatalf("consent = %v, issues = %d", u.HasConsent("v1"), len(list))
+	}
+}
+
+func TestStaleAndBrokenButtonsAreExplained(t *testing.T) {
+	e := newEnv(t)
+	e.resident(8001, true)
+	cases := map[string]string{
+		"x:whatever": "устарела",
+		"h:nope":     "Не получилось",
+		"j:nope":     "не найдена",
+	}
+	i := 0
+	for payload, want := range cases {
+		i++
+		id := fmt.Sprintf("cb%d", i)
+		e.handle(t, press(8001, id, payload))
+		if txt, _ := e.max.last(id); !strings.Contains(txt, want) {
+			t.Errorf("payload %q: answer %q, want %q", payload, txt, want)
+		}
+	}
+}
+
+func TestJoinClosedOrAlreadyJoinedIssue(t *testing.T) {
+	e := newEnv(t)
+	e.resident(8101, true)
+	e.resident(8102, true)
+	e.handle(t, text(8101, "Лифт не работает"))
+	_, bs := e.max.last("")
+	e.handle(t, press(8101, "cb1", findButton(t, bs, "Отправить").Payload))
+	list, _ := e.store.Issues().ListByHouse(t.Context(), "h-1", 10)
+	id := list[0].ID()
+
+	e.handle(t, press(8101, "cb2", "j:"+id))
+	if txt, _ := e.max.last("cb2"); !strings.Contains(txt, "уже среди сообщивших") {
+		t.Fatalf("second join by reporter = %q", txt)
+	}
+
+	oper := user.User{ID: 8199, Role: user.RoleOperator, OrganizationID: "org-1"}
+	e.store.AddUser(oper)
+	svc := issues.NewService(e.store, issues.Config{Now: time.Now, NewID: func() string { return "unused" }, ConsentVersion: "v1"})
+	for _, st := range []issue.Status{issue.StatusInProgress, issue.StatusDone} {
+		if _, err := svc.ChangeStatus(t.Context(), oper, id, st, "Починили"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	e.handle(t, press(8102, "cb3", "j:"+id))
+	if txt, _ := e.max.last("cb3"); !strings.Contains(txt, "уже закрыта") {
+		t.Fatalf("join closed = %q", txt)
+	}
+}
+
+func TestCommandsAndReportButton(t *testing.T) {
+	e := newEnv(t)
+	e.handle(t, text(8201, "/help"))
+	if txt, _ := e.max.last(""); !strings.Contains(txt, "/new") {
+		t.Fatalf("/help = %q", txt)
+	}
+	e.handle(t, text(8201, "/new"))
+	if _, bs := e.max.last(""); findButton(t, bs, "Отправить геопозицию").Type != "request_geo_location" {
+		t.Fatal("/new without house must ask for location")
+	}
+	e.handle(t, text(8201, "/unknown"))
+	if txt, _ := e.max.last(""); !strings.Contains(txt, "Здравствуйте") {
+		t.Fatalf("unknown command = %q", txt)
+	}
+	sentBefore := len(e.max.sent)
+	e.handle(t, press(8201, "cb1", bot.PayloadReport))
+	if txt, _ := e.max.last("cb1"); !strings.Contains(txt, "Сначала укажите дом") || len(e.max.sent) != sentBefore+1 {
+		t.Fatalf("report without house: answer %q, sent %d", txt, len(e.max.sent)-sentBefore)
+	}
+
+	e.resident(8202, true)
+	e.handle(t, text(8202, "/new"))
+	if txt, _ := e.max.last(""); !strings.Contains(txt, "Опишите проблему") {
+		t.Fatalf("/new with house = %q", txt)
+	}
+	e.handle(t, press(8202, "cb2", bot.PayloadReport))
+	if txt, _ := e.max.last("cb2"); !strings.Contains(txt, "Опишите проблему") {
+		t.Fatalf("report with house = %q", txt)
+	}
+}
+
+func TestEmptyMessageAndLocationWithoutHouses(t *testing.T) {
+	e := newEnv(t)
+	e.handle(t, text(8301, "   "))
+	if len(e.max.sent) != 0 {
+		t.Fatalf("empty text must be ignored, sent %+v", e.max.sent)
+	}
+	delete(e.store.HouseMap, "h-1")
+	loc := text(8301, "")
+	loc.Message.Body.Attachments = []maxapi.IncomingAttachment{{Type: "location", Latitude: 10, Longitude: 10}}
+	e.handle(t, loc)
+	if txt, _ := e.max.last(""); !strings.Contains(txt, "не нашлось") {
+		t.Fatalf("no houses nearby = %q", txt)
+	}
+}
+
+func TestMyCommandListsIssuesAsAppButtons(t *testing.T) {
+	e := newEnv(t)
+	e.resident(8401, true)
+	e.handle(t, text(8401, "Не горит свет на лестнице"))
+	_, bs := e.max.last("")
+	e.handle(t, press(8401, "cb1", findButton(t, bs, "Отправить").Payload))
+	e.handle(t, text(8401, "/my"))
+	txt, bs := e.max.last("")
+	if !strings.Contains(txt, "Ваши заявки") || len(bs) != 1 || bs[0].Type != "open_app" || !strings.HasPrefix(bs[0].Payload, "i_") {
+		t.Fatalf("/my = %q %+v", txt, bs)
 	}
 }
 

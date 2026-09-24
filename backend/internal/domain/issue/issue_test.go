@@ -176,6 +176,47 @@ func TestChangeStatusUpdatesStatusTimeAndComment(t *testing.T) {
 	}
 }
 
+func TestGettersExposeState(t *testing.T) {
+	is := newIssue(t)
+	if is.ID() != "0142" || is.HouseID() != "house-17k2" || is.ObjectID() != "lift-e2" || is.Category() != "lift" ||
+		is.Title() != "Лифт не работает" || is.Description() != "Кабина не приходит" || is.ReporterID() != 1001 ||
+		!is.CreatedAt().Equal(created) || !is.Deadline().Equal(deadline) || is.StatusComment() != "" {
+		t.Fatalf("unexpected state of %+v", is)
+	}
+	// Participants отдаёт копию: изменение снаружи не портит агрегат.
+	ps := is.Participants()
+	ps[0].UserID = 9999
+	if !is.HasParticipant(1001) {
+		t.Fatal("aggregate state leaked through Participants()")
+	}
+}
+
+func TestNewValidatesRequiredFieldsAndDeadline(t *testing.T) {
+	base := issue.NewParams{ID: "1", HouseID: "h", Category: "lift", Title: "Лифт", ReporterID: 1, CreatedAt: created, Deadline: deadline}
+	cases := map[string]func(p *issue.NewParams){
+		"no id":             func(p *issue.NewParams) { p.ID = "" },
+		"no house":          func(p *issue.NewParams) { p.HouseID = "" },
+		"no reporter":       func(p *issue.NewParams) { p.ReporterID = 0 },
+		"blank title":       func(p *issue.NewParams) { p.Title = "   " },
+		"deadline in past":  func(p *issue.NewParams) { p.Deadline = created.Add(-time.Hour) },
+		"deadline = create": func(p *issue.NewParams) { p.Deadline = created },
+	}
+	for name, mutate := range cases {
+		p := base
+		mutate(&p)
+		if _, err := issue.New(p); !errors.Is(err, issue.ErrInvalid) {
+			t.Errorf("%s: err = %v, want ErrInvalid", name, err)
+		}
+	}
+}
+
+func TestEmptyIssueHasNoReporter(t *testing.T) {
+	is := issue.Restore(issue.NewParams{ID: "x"}, issue.State{})
+	if is.ReporterID() != 0 || is.ParticipantCount() != 0 {
+		t.Fatal("restored empty issue must have no reporter")
+	}
+}
+
 func TestOverdue(t *testing.T) {
 	is := newIssue(t)
 	if is.IsOverdue(deadline.Add(-time.Minute)) {

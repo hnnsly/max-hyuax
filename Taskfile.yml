@@ -76,6 +76,13 @@ tasks:
     cmds:
       - go test -tags integration -count=1 ./...
 
+  test:cover:
+    desc: Покрытие (с integration) и порог — всего ≥ 80%, пакеты domain и app ≥ 80% (сначала task db)
+    dir: backend
+    cmds:
+      - go test -tags integration -count=1 -coverpkg=./internal/... -coverprofile=coverage.out ./...
+      - go run ./tools/covercheck -profile coverage.out
+
   test:live:
     desc: Проверка на живом MAX Bot API (нужен MAX_BOT_TOKEN)
     dir: backend
@@ -119,6 +126,12 @@ tasks:
     dir: miniapp
     cmds:
       - npm test
+
+  miniapp:cover:
+    desc: Покрытие логики мини-приложения (порог 90% строк)
+    dir: miniapp
+    cmds:
+      - npm run test:cover
 
   miniapp:typecheck:
     desc: Проверка типов TypeScript
