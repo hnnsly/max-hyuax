@@ -47,7 +47,7 @@ func setup(t *testing.T) fixture {
 	n := 0
 	newID := func() string { n++; return fmt.Sprintf("0190a000-0000-7000-8000-%012d", n) }
 	f.issues = issues.NewService(s, issues.Config{Now: func() time.Time { return now }, NewID: newID, ConsentVersion: "v1"})
-	f.svc = photos.NewService(s, f.files, photos.Config{Now: func() time.Time { return now }, NewID: newID})
+	f.svc = photos.NewService(s, f.files, photos.Config{Now: func() time.Time { return now }, NewID: newID, ConsentVersion: "v1"})
 	is, err := f.issues.Report(t.Context(), f.anna, issues.ReportInput{HouseID: "h-1", Category: "lift"})
 	if err != nil {
 		t.Fatal(err)
@@ -67,9 +67,13 @@ func jpg(t *testing.T) []byte {
 
 func TestParticipantAddsAndViewsPhotos(t *testing.T) {
 	f := setup(t)
-	p, err := f.svc.Add(t.Context(), f.anna, f.is.ID(), jpg(t))
-	if err != nil || p.IssueID != f.is.ID() || p.UploadedBy != f.anna.ID || p.Width != 64 || p.Height != 48 || p.SizeBytes == 0 {
-		t.Fatalf("photo = %+v, err = %v", p, err)
+	added, err := f.svc.Add(t.Context(), f.anna, f.is.ID(), jpg(t))
+	if err != nil || len(added) != 1 {
+		t.Fatalf("added = %+v, err = %v", added, err)
+	}
+	p := added[0]
+	if p.IssueID != f.is.ID() || p.UploadedBy != f.anna.ID || p.Width != 64 || p.Height != 48 || p.SizeBytes == 0 {
+		t.Fatalf("photo = %+v", p)
 	}
 	// УК заявки видит фото и тоже может добавить своё, например после ремонта.
 	if _, err := f.svc.Add(t.Context(), f.oper, f.is.ID(), jpg(t)); err != nil {
@@ -87,10 +91,11 @@ func TestParticipantAddsAndViewsPhotos(t *testing.T) {
 
 func TestPhotoAccessRules(t *testing.T) {
 	f := setup(t)
-	p, err := f.svc.Add(t.Context(), f.anna, f.is.ID(), jpg(t))
+	added, err := f.svc.Add(t.Context(), f.anna, f.is.ID(), jpg(t))
 	if err != nil {
 		t.Fatal(err)
 	}
+	p := added[0]
 	for _, u := range []user.User{f.stranger, f.otherOper} {
 		if _, err := f.svc.Add(t.Context(), u, f.is.ID(), jpg(t)); !errors.Is(err, app.ErrForbidden) {
 			t.Errorf("add by %d: err = %v, want forbidden", u.ID, err)
@@ -134,6 +139,89 @@ func TestNoPhotosForClosedIssue(t *testing.T) {
 	}
 	if _, err := f.svc.Add(t.Context(), f.anna, f.is.ID(), jpg(t)); !errors.Is(err, issue.ErrClosed) {
 		t.Fatalf("closed: err = %v, want ErrClosed", err)
+	}
+}
+
+// Один плохой файл в пачке отклоняет всю пачку: повтор не создаст дублей уже сохранённых.
+func TestAddIsAllOrNothing(t *testing.T) {
+	f := setup(t)
+	if _, err := f.svc.Add(t.Context(), f.anna, f.is.ID(), jpg(t), []byte("not an image")); !errors.Is(err, photos.ErrNotImage) {
+		t.Fatalf("err = %v, want ErrNotImage", err)
+	}
+	if list, _ := f.svc.List(t.Context(), f.anna, f.is.ID()); len(list) != 0 {
+		t.Fatalf("list = %+v, want empty", list)
+	}
+	if n := f.files.Len(); n != 0 {
+		t.Fatalf("files = %d, want 0", n)
+	}
+}
+
+func TestAddRejectsBatchOverLimit(t *testing.T) {
+	f := setup(t)
+	if _, err := f.svc.Add(t.Context(), f.anna, f.is.ID(), jpg(t), jpg(t), jpg(t), jpg(t)); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.svc.Add(t.Context(), f.anna, f.is.ID(), jpg(t), jpg(t), jpg(t)); !errors.Is(err, photos.ErrTooMany) {
+		t.Fatalf("err = %v, want ErrTooMany", err)
+	}
+	if list, _ := f.svc.List(t.Context(), f.anna, f.is.ID()); len(list) != 4 {
+		t.Fatalf("list = %d photos, want 4", len(list))
+	}
+	if n := f.files.Len(); n != 4 {
+		t.Fatalf("files = %d, want 4", n)
+	}
+}
+
+// Житель без согласия на обработку данных фото не прикладывает; сотруднику УК согласие не нужно.
+func TestResidentNeedsConsentToAddPhotos(t *testing.T) {
+	f := setup(t)
+	noConsent := f.anna
+	noConsent.ConsentVersion = ""
+	if _, err := f.svc.Add(t.Context(), noConsent, f.is.ID(), jpg(t)); !errors.Is(err, app.ErrConsentRequired) {
+		t.Fatalf("err = %v, want ErrConsentRequired", err)
+	}
+}
+
+// Автор может убрать своё фото; чужое не может никто, даже УК заявки.
+func TestUploaderRemovesOwnPhoto(t *testing.T) {
+	f := setup(t)
+	added, err := f.svc.Add(t.Context(), f.anna, f.is.ID(), jpg(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	p := added[0]
+	for _, u := range []user.User{f.oper, f.stranger} {
+		if err := f.svc.Remove(t.Context(), u, p.ID); !errors.Is(err, app.ErrForbidden) {
+			t.Errorf("remove by %d: err = %v, want forbidden", u.ID, err)
+		}
+	}
+	if err := f.svc.Remove(t.Context(), f.anna, p.ID); err != nil {
+		t.Fatalf("remove: %v", err)
+	}
+	if _, _, err := f.svc.Open(t.Context(), f.anna, p.ID); !errors.Is(err, app.ErrNotFound) {
+		t.Fatalf("open after remove: err = %v, want not found", err)
+	}
+	if n := f.files.Len(); n != 0 {
+		t.Fatalf("files = %d, want 0", n)
+	}
+}
+
+// При удалении аккаунта уходят все фото пользователя, фото других остаются.
+func TestForgetUserRemovesOnlyTheirPhotos(t *testing.T) {
+	f := setup(t)
+	if _, err := f.svc.Add(t.Context(), f.anna, f.is.ID(), jpg(t), jpg(t)); err != nil {
+		t.Fatal(err)
+	}
+	kept, err := f.svc.Add(t.Context(), f.oper, f.is.ID(), jpg(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := f.svc.ForgetUser(t.Context(), f.anna.ID); err != nil {
+		t.Fatalf("forget: %v", err)
+	}
+	list, _ := f.svc.List(t.Context(), f.oper, f.is.ID())
+	if len(list) != 1 || list[0].ID != kept[0].ID || f.files.Len() != 1 {
+		t.Fatalf("list = %+v, files = %d", list, f.files.Len())
 	}
 }
 

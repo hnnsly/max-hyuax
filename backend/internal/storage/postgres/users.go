@@ -39,6 +39,7 @@ func (r userRepo) Create(ctx context.Context, u user.User) (user.User, error) {
 func (r userRepo) Save(ctx context.Context, u user.User) error {
 	return r.q.UpdateUser(ctx, sqlcdb.UpdateUserParams{
 		ID:             u.ID,
+		MaxUserID:      pgtype.Int8{Int64: u.MaxUserID, Valid: u.MaxUserID != 0},
 		FirstName:      u.FirstName,
 		Phone:          u.Phone,
 		HouseID:        u.HouseID,

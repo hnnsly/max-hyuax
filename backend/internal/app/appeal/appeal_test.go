@@ -132,3 +132,37 @@ func TestLinkIsSignedAndShortLived(t *testing.T) {
 		t.Fatalf("expired link err = %v, want forbidden", err)
 	}
 }
+
+// Ссылка проверяет заявку заново: закрытую за эти 10 минут не выдаёт как просроченную.
+func TestLinkRechecksIssueState(t *testing.T) {
+	f := setup(t)
+	f.after(3 * 24 * time.Hour)
+	link, err := f.svc.Prepare(t.Context(), f.anna, f.is.ID())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, st := range []issue.Status{issue.StatusAccepted, issue.StatusDone} {
+		if _, err := f.issues.ChangeStatus(t.Context(), f.oper, f.is.ID(), st, "Готово"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := f.svc.Document(t.Context(), link.Token); !errors.Is(err, issue.ErrClosed) {
+		t.Fatalf("closed after link err = %v, want ErrClosed", err)
+	}
+}
+
+// Аккаунт удалён после выдачи ссылки: документ по ней больше не выдаётся.
+func TestLinkOfDeletedAccountStopsWorking(t *testing.T) {
+	f := setup(t)
+	f.after(3 * 24 * time.Hour)
+	link, err := f.svc.Prepare(t.Context(), f.anna, f.is.ID())
+	if err != nil {
+		t.Fatal(err)
+	}
+	gone := f.anna
+	gone.Delete(*f.now)
+	f.store.AddUser(gone)
+	if _, err := f.svc.Document(t.Context(), link.Token); !errors.Is(err, app.ErrForbidden) {
+		t.Fatalf("deleted account err = %v, want forbidden", err)
+	}
+}

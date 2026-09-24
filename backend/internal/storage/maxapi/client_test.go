@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 	"time"
 
@@ -273,5 +274,20 @@ func TestDownloadRespectsLimitAndSendsNoToken(t *testing.T) {
 	}
 	if _, err := c.Download(t.Context(), srv.URL+"/missing.jpg", 1024); err == nil {
 		t.Fatal("404 must be an error")
+	}
+}
+
+// Ссылка на фото подписана и ведёт к снимку жителя: в тексте ошибки (а значит, в логе) её быть не должно.
+func TestDownloadErrorHidesFileURL(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {}))
+	secretURL := srv.URL + "/photo.jpg?sig=SECRET-SIGNATURE"
+	srv.Close() // соединение не установится
+	c := maxapi.New("http://unused", "secret-token", http.DefaultClient)
+	_, err := c.Download(t.Context(), secretURL, 1024)
+	if err == nil {
+		t.Fatal("want error")
+	}
+	if strings.Contains(err.Error(), "SECRET-SIGNATURE") || strings.Contains(err.Error(), "photo.jpg") {
+		t.Fatalf("error leaks the file URL: %v", err)
 	}
 }

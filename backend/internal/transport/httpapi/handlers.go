@@ -92,8 +92,14 @@ func (h *handlers) setHouse(c fiber.Ctx) error {
 	return c.JSON(toUserDTO(u, h.ConsentVersion))
 }
 
+// deleteAccount: сначала фото пользователя, потом сам аккаунт. Если фото удалить не вышло,
+// аккаунт остаётся и запрос можно повторить.
 func (h *handlers) deleteAccount(c fiber.Ctx) error {
-	if err := h.Auth.DeleteAccount(c.Context(), currentUser(c)); err != nil {
+	u := currentUser(c)
+	if err := h.Photos.ForgetUser(c.Context(), u.ID); err != nil {
+		return err
+	}
+	if err := h.Auth.DeleteAccount(c.Context(), u); err != nil {
 		return err
 	}
 	return c.SendStatus(fiber.StatusNoContent)
@@ -387,7 +393,8 @@ func (h *handlers) uploadPhotos(c fiber.Ctx) error {
 	if len(files) == 0 || len(files) > maxPhotosPerUpload {
 		return fmt.Errorf("%w: send 1..%d files in the photo field", app.ErrInvalidInput, maxPhotosPerUpload)
 	}
-	out := make([]photoDTO, 0, len(files))
+	// Файлы читаются все сразу: сервис сохраняет пачку целиком или ничего.
+	raws := make([][]byte, 0, len(files))
 	for _, fh := range files {
 		if fh.Size > photos.MaxBytes {
 			return photos.ErrTooLarge
@@ -401,30 +408,41 @@ func (h *handlers) uploadPhotos(c fiber.Ctx) error {
 		if err != nil {
 			return err
 		}
-		p, err := h.Photos.Add(c.Context(), currentUser(c), c.Params("id"), raw)
-		if err != nil {
-			return err
-		}
-		out = append(out, toPhotoDTO(p))
+		raws = append(raws, raw)
 	}
-	return c.Status(fiber.StatusCreated).JSON(out)
-}
-
-func (h *handlers) listPhotos(c fiber.Ctx) error {
-	list, err := h.Photos.List(c.Context(), currentUser(c), c.Params("id"))
+	u := currentUser(c)
+	added, err := h.Photos.Add(c.Context(), u, c.Params("id"), raws...)
 	if err != nil {
 		return err
 	}
-	return c.JSON(mapSlice(list, toPhotoDTO))
+	return c.Status(fiber.StatusCreated).JSON(photoDTOs(added, u.ID))
+}
+
+func (h *handlers) listPhotos(c fiber.Ctx) error {
+	u := currentUser(c)
+	list, err := h.Photos.List(c.Context(), u, c.Params("id"))
+	if err != nil {
+		return err
+	}
+	return c.JSON(photoDTOs(list, u.ID))
 }
 
 // openPhoto отдаёт JPEG: только с сессией, поэтому мини-приложение грузит его через fetch, а не <img src>.
+// Без кэша: после удаления фото или аккаунта снимок не должен оставаться в WebView.
 func (h *handlers) openPhoto(c fiber.Ctx) error {
 	_, data, err := h.Photos.Open(c.Context(), currentUser(c), c.Params("id"))
 	if err != nil {
 		return err
 	}
 	c.Set(fiber.HeaderContentType, "image/jpeg")
-	c.Set(fiber.HeaderCacheControl, "private, max-age=86400")
+	c.Set(fiber.HeaderCacheControl, "private, no-store")
 	return c.Send(data)
+}
+
+// removePhoto убирает фото; может только тот, кто его приложил.
+func (h *handlers) removePhoto(c fiber.Ctx) error {
+	if err := h.Photos.Remove(c.Context(), currentUser(c), c.Params("id")); err != nil {
+		return err
+	}
+	return c.SendStatus(fiber.StatusNoContent)
 }

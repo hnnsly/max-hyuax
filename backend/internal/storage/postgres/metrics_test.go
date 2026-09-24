@@ -3,6 +3,7 @@
 package postgres_test
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -85,5 +86,30 @@ func TestShiftSampleDataKeepsExampleFresh(t *testing.T) {
 	}
 	if days, err := s.ShiftSampleData(t.Context(), later); err != nil || days != 0 {
 		t.Errorf("repeated shift = %d, err = %v", days, err)
+	}
+}
+
+// Два экземпляра api запускают сдвиг одновременно: даты сдвигаются один раз, а не дважды.
+func TestShiftSampleDataRunsOnceConcurrently(t *testing.T) {
+	s := freshStore(t)
+	later := time.Now().Add(5*24*time.Hour + time.Hour)
+	var wg sync.WaitGroup
+	shifted := make([]int, 4)
+	for i := range shifted {
+		wg.Go(func() {
+			days, err := s.ShiftSampleData(t.Context(), later)
+			if err != nil {
+				t.Error(err)
+			}
+			shifted[i] = days
+		})
+	}
+	wg.Wait()
+	total := 0
+	for _, d := range shifted {
+		total += d
+	}
+	if total != 5 {
+		t.Fatalf("shifts = %v, want 5 days in total", shifted)
 	}
 }

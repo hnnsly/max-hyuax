@@ -110,6 +110,8 @@ export interface Photo {
   url: string;
   width: number;
   height: number;
+  /** Фото приложил текущий пользователь: его можно убрать. */
+  mine: boolean;
   created_at: string;
 }
 

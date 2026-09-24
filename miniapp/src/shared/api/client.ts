@@ -82,6 +82,7 @@ export const api = {
   },
   /** Фото отдаются только с токеном, поэтому грузятся через fetch, а не <img src>. */
   photoBlob: async (photoId: string) => (await send('GET', `/photos/${encodeURIComponent(photoId)}`)).blob(),
+  removePhoto: (photoId: string) => request<void>('DELETE', `/photos/${encodeURIComponent(photoId)}`),
   appeal: (issueId: string) =>
     request<AppealLink>('POST', `/issues/${encodeURIComponent(issueId)}/appeal`),
   searchHouses: (query: string) => request<House[]>('GET', `/houses?${q({ query })}`),

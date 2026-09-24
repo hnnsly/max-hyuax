@@ -10,6 +10,7 @@ import (
 	"io/fs"
 
 	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgconn"
 	"github.com/jackc/pgx/v5/pgxpool"
 	_ "github.com/jackc/pgx/v5/stdlib" // драйвер database/sql для goose
 	"github.com/pressly/goose/v3"
@@ -87,9 +88,13 @@ func (s *Store) MarkUpdateProcessed(ctx context.Context, key string) (bool, erro
 	return n == 1, err
 }
 
-// notFound переводит отсутствие строки в ошибку слоя приложения.
+// notFound переводит отсутствие строки в ошибку слоя приложения. Id из адреса, который не является
+// uuid (Postgres: 22P02 invalid_text_representation), тоже означает «такой записи нет», а не сбой.
 func notFound(err error) error {
 	if errors.Is(err, pgx.ErrNoRows) {
+		return app.ErrNotFound
+	}
+	if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok && pgErr.Code == "22P02" {
 		return app.ErrNotFound
 	}
 	return err

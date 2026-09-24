@@ -136,7 +136,10 @@ type PhotoRepo interface {
 	Add(ctx context.Context, p Photo) error
 	// ListByIssue — фото заявки в порядке загрузки.
 	ListByIssue(ctx context.Context, issueID string) ([]Photo, error)
+	// ListByUploader — все фото пользователя: нужны при удалении аккаунта.
+	ListByUploader(ctx context.Context, userID int64) ([]Photo, error)
 	Get(ctx context.Context, id string) (Photo, error)
+	Delete(ctx context.Context, id string) error
 }
 
 // FileStore — хранилище файлов вне базы (фото к заявкам).
@@ -144,6 +147,8 @@ type FileStore interface {
 	Put(ctx context.Context, key string, data []byte) error
 	// Get возвращает ErrNotFound, если файла нет.
 	Get(ctx context.Context, key string) ([]byte, error)
+	// Delete удаляет файл; отсутствие файла не ошибка.
+	Delete(ctx context.Context, key string) error
 }
 
 // Store — доступ к репозиториям; InTx выполняет fn в одной транзакции.

@@ -17,18 +17,23 @@ const MaxPerIssue = 6
 var ErrTooMany = errors.New("photos: too many photos for the issue")
 
 type Config struct {
-	Now   func() time.Time
-	NewID func() string
+	Now            func() time.Time
+	NewID          func() string
+	ConsentVersion string // житель прикладывает фото только с согласием на обработку данных
 }
 
+// decodeSlots — сколько снимков декодируется одновременно (HTTP и бот вместе): до 128 МБ на каждый.
+const decodeSlots = 2
+
 type Service struct {
-	store app.Store
-	files app.FileStore
-	cfg   Config
+	store  app.Store
+	files  app.FileStore
+	cfg    Config
+	decode chan struct{}
 }
 
 func NewService(store app.Store, files app.FileStore, cfg Config) *Service {
-	return &Service{store: store, files: files, cfg: cfg}
+	return &Service{store: store, files: files, cfg: cfg, decode: make(chan struct{}, decodeSlots)}
 }
 
 // canSee: фото видят участники заявки и сотрудники ответственной УК. Соседи-неучастники — нет:
@@ -48,38 +53,127 @@ func (s *Service) issueFor(ctx context.Context, u user.User, issueID string) (*i
 	return is, nil
 }
 
-// Add проверяет и перекодирует фото, записывает файл, затем метаданные.
-// Порядок важен: при сбое записи файла в заявке не появится фото без файла.
-func (s *Service) Add(ctx context.Context, u user.User, issueID string, raw []byte) (app.Photo, error) {
+// Add прикладывает пачку фото целиком или не прикладывает ничего: сначала все файлы проверяются
+// и перекодируются, затем записываются, затем метаданные вносятся одной транзакцией
+// с блокировкой заявки, где лимит пересчитывается. Сбой на любом шаге убирает записанные файлы.
+func (s *Service) Add(ctx context.Context, u user.User, issueID string, raws ...[]byte) ([]app.Photo, error) {
+	if len(raws) == 0 {
+		return nil, app.ErrInvalidInput
+	}
+	if u.Role == user.RoleResident && !u.HasConsent(s.cfg.ConsentVersion) {
+		return nil, app.ErrConsentRequired
+	}
 	is, err := s.issueFor(ctx, u, issueID)
 	if err != nil {
-		return app.Photo{}, err
+		return nil, err
 	}
 	if is.Status().Closed() {
-		return app.Photo{}, issue.ErrClosed
+		return nil, issue.ErrClosed
 	}
+	// Быстрая проверка до тяжёлого декодирования; окончательная — в транзакции.
 	existing, err := s.store.Photos().ListByIssue(ctx, is.ID())
 	if err != nil {
-		return app.Photo{}, err
+		return nil, err
 	}
-	if len(existing) >= MaxPerIssue {
-		return app.Photo{}, ErrTooMany
+	if len(existing)+len(raws) > MaxPerIssue {
+		return nil, ErrTooMany
 	}
-	data, w, h, err := normalize(raw)
+
+	added := make([]app.Photo, 0, len(raws))
+	data := make([][]byte, 0, len(raws))
+	for _, raw := range raws {
+		b, w, h, err := s.normalize(ctx, raw)
+		if err != nil {
+			return nil, err
+		}
+		added = append(added, app.Photo{
+			ID: s.cfg.NewID(), IssueID: is.ID(), UploadedBy: u.ID,
+			Width: w, Height: h, SizeBytes: len(b), CreatedAt: s.cfg.Now(),
+		})
+		data = append(data, b)
+	}
+	for i, p := range added {
+		if err := s.files.Put(ctx, p.ID, data[i]); err != nil {
+			s.dropFiles(ctx, added[:i])
+			return nil, err
+		}
+	}
+	err = s.store.InTx(ctx, func(tx app.Store) error {
+		if _, err := tx.Issues().GetForUpdate(ctx, is.ID()); err != nil {
+			return err
+		}
+		existing, err := tx.Photos().ListByIssue(ctx, is.ID())
+		if err != nil {
+			return err
+		}
+		if len(existing)+len(added) > MaxPerIssue {
+			return ErrTooMany
+		}
+		for _, p := range added {
+			if err := tx.Photos().Add(ctx, p); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
 	if err != nil {
-		return app.Photo{}, err
+		s.dropFiles(ctx, added)
+		return nil, err
 	}
-	p := app.Photo{
-		ID: s.cfg.NewID(), IssueID: is.ID(), UploadedBy: u.ID,
-		Width: w, Height: h, SizeBytes: len(data), CreatedAt: s.cfg.Now(),
+	return added, nil
+}
+
+// normalize ждёт свободный слот: одновременно декодируется не больше decodeSlots снимков.
+func (s *Service) normalize(ctx context.Context, raw []byte) ([]byte, int, int, error) {
+	select {
+	case s.decode <- struct{}{}:
+	case <-ctx.Done():
+		return nil, 0, 0, ctx.Err()
 	}
-	if err := s.files.Put(ctx, p.ID, data); err != nil {
-		return app.Photo{}, err
+	defer func() { <-s.decode }()
+	return normalize(raw)
+}
+
+// dropFiles убирает файлы, для которых не появились метаданные. Ошибку удаления не возвращаем:
+// главное — исходная ошибка, а лишний файл без записи в базе никому не виден.
+func (s *Service) dropFiles(ctx context.Context, list []app.Photo) {
+	for _, p := range list {
+		_ = s.files.Delete(context.WithoutCancel(ctx), p.ID)
 	}
-	if err := s.store.Photos().Add(ctx, p); err != nil {
-		return app.Photo{}, err
+}
+
+// Remove убирает фото; убрать может только тот, кто его приложил.
+func (s *Service) Remove(ctx context.Context, u user.User, photoID string) error {
+	p, err := s.store.Photos().Get(ctx, photoID)
+	if err != nil {
+		return err
 	}
-	return p, nil
+	if p.UploadedBy != u.ID {
+		return app.ErrForbidden
+	}
+	return s.remove(ctx, p)
+}
+
+// ForgetUser удаляет все фото пользователя: часть удаления аккаунта, на снимках бывают люди и двери квартир.
+func (s *Service) ForgetUser(ctx context.Context, userID int64) error {
+	list, err := s.store.Photos().ListByUploader(ctx, userID)
+	if err != nil {
+		return err
+	}
+	for _, p := range list {
+		if err := s.remove(ctx, p); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// remove: сначала запись в базе, потом файл — фото исчезает из заявки, даже если файл удалить не вышло.
+func (s *Service) remove(ctx context.Context, p app.Photo) error {
+	if err := s.store.Photos().Delete(ctx, p.ID); err != nil {
+		return err
+	}
+	return s.files.Delete(ctx, p.ID)
 }
 
 func (s *Service) List(ctx context.Context, u user.User, issueID string) ([]app.Photo, error) {

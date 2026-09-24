@@ -118,7 +118,7 @@ func newEnvWithLLM(t *testing.T, llm hints.LLM) env {
 		Issues:         issues.NewService(s, issues.Config{Now: now, NewID: func() string { n++; return fmt.Sprintf("i-%d", n) }, ConsentVersion: "v1"}),
 		Houses:         houses.NewService(s),
 		Hints:          hints.NewService(llm, time.Second, slog.New(slog.NewTextHandler(io.Discard, nil))),
-		Photos:         photos.NewService(s, &apptest.MemFiles{}, photos.Config{Now: now, NewID: func() string { n++; return fmt.Sprintf("p-%d", n) }}),
+		Photos:         photos.NewService(s, &apptest.MemFiles{}, photos.Config{Now: now, NewID: func() string { n++; return fmt.Sprintf("p-%d", n) }, ConsentVersion: "v1"}),
 		ConsentVersion: "v1",
 		Now:            now,
 	}
@@ -256,6 +256,53 @@ func TestPhotoIsAttachedToLatestIssue(t *testing.T) {
 		t.Fatalf("reply = %q", txt)
 	}
 	findButton(t, bs, "Открыть заявку")
+}
+
+// Альбом из нескольких снимков прикладывается целиком, а не только первое фото.
+func TestAlbumPhotosAreAttachedTogether(t *testing.T) {
+	e := newEnv(t)
+	e.resident(3022, true)
+	e.handle(t, text(3022, "Не горит свет на лестнице"))
+	_, bs := e.max.last("")
+	e.handle(t, press(3022, "cb1", findButton(t, bs, "Отправить").Payload))
+	list, _ := e.store.Issues().ListByHouse(t.Context(), "h-1", 10)
+
+	album := photoMessage(3022, "https://i.oneme.ru/1.jpg")
+	album.Message.Body.Attachments = append(album.Message.Body.Attachments, maxapi.IncomingAttachment{
+		Type: "image", Payload: jsontext.Value(`{"photo_id":8,"token":"t","url":"https://i.oneme.ru/2.jpg"}`),
+	})
+	e.handle(t, album)
+	photos, _ := e.store.Photos().ListByIssue(t.Context(), list[0].ID())
+	if len(photos) != 2 || len(e.max.downloaded) != 2 {
+		t.Fatalf("photos = %d, downloaded = %v", len(photos), e.max.downloaded)
+	}
+	if txt, _ := e.max.last(""); !strings.Contains(txt, fmt.Sprintf("2 фото добавлены к заявке № %d", list[0].Number())) {
+		t.Fatalf("reply = %q", txt)
+	}
+}
+
+// Согласие устарело (новая версия документа): бот просит его, а не прикладывает фото молча.
+func TestPhotoAsksForConsent(t *testing.T) {
+	e := newEnv(t)
+	u := e.resident(3023, true)
+	e.handle(t, text(3023, "Не горит свет на лестнице"))
+	_, bs := e.max.last("")
+	e.handle(t, press(3023, "cb1", findButton(t, bs, "Отправить").Payload))
+	u.ConsentVersion = ""
+	e.store.AddUser(u)
+
+	e.handle(t, photoMessage(3023, "https://i.oneme.ru/photo.jpg"))
+	txt, bs := e.max.last("")
+	if !strings.Contains(txt, "согласие на обработку персональных данных") {
+		t.Fatalf("reply = %q", txt)
+	}
+	e.handle(t, press(3023, "cb2", findButton(t, bs, "Согласен").Payload))
+	if got, _ := e.store.Users().Get(t.Context(), u.ID); !got.HasConsent("v1") {
+		t.Fatalf("consent not saved: %+v", got)
+	}
+	if txt, _ := e.max.last("cb2"); !strings.Contains(txt, "Пришлите фото ещё раз") {
+		t.Fatalf("answer = %q", txt)
+	}
 }
 
 func TestPhotoWithoutIssueOrLink(t *testing.T) {

@@ -12,3 +12,12 @@ ORDER BY created_at, id;
 SELECT id, issue_id, uploaded_by, width, height, size_bytes, created_at
 FROM issue_photos
 WHERE id = @id;
+
+-- name: ListUploaderPhotos :many
+SELECT id, issue_id, uploaded_by, width, height, size_bytes, created_at
+FROM issue_photos
+WHERE uploaded_by = @uploaded_by
+ORDER BY created_at, id;
+
+-- name: DeletePhoto :exec
+DELETE FROM issue_photos WHERE id = @id;

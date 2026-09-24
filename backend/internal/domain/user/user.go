@@ -39,8 +39,11 @@ func (u *User) AcceptConsent(docVersion string, at time.Time) {
 }
 
 // Delete обезличивает аккаунт: ПДн стираются, заявки остаются без имени автора.
+// Связь с MAX и адрес тоже стираются: если человек вернётся, у него будет новый аккаунт
+// без старых заявок.
 func (u *User) Delete(at time.Time) {
-	u.FirstName, u.Phone = "", ""
+	u.FirstName, u.Phone, u.HouseID = "", "", ""
+	u.MaxUserID = 0
 	u.ConsentVersion, u.ConsentAt = "", time.Time{}
 	u.DeletedAt = at
 }

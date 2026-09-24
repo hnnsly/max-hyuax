@@ -122,3 +122,14 @@ func TestWarmUpLoadsModelOnce(t *testing.T) {
 		t.Fatalf("calls = %d, ctx err = %v: warm-up must retry until cancelled", failing.calls, ctx.Err())
 	}
 }
+
+// Модель так и не поднялась (неверный адрес, нет модели): прогрев сдаётся, а не пишет в лог вечно.
+func TestWarmUpGivesUp(t *testing.T) {
+	failing := &fakeLLM{err: errors.New("connection refused")}
+	svc := hints.NewService(failing, time.Millisecond, quiet)
+	hints.SetWarmUpPause(svc, 0)
+	svc.WarmUp(t.Context())
+	if failing.calls != hints.WarmUpAttempts {
+		t.Fatalf("calls = %d, want %d", failing.calls, hints.WarmUpAttempts)
+	}
+}

@@ -243,8 +243,41 @@ func TestUserCreateConsentAndDelete(t *testing.T) {
 		t.Fatal(err)
 	}
 	got, _ = store.Users().Get(t.Context(), u.ID)
-	if !got.Deleted() || got.FirstName != "" {
+	if !got.Deleted() || got.FirstName != "" || got.MaxUserID != 0 || got.HouseID != "" {
 		t.Fatalf("deleted user = %+v", got)
+	}
+	// Связь с MAX снята: тот же человек может завести новый аккаунт.
+	if _, err := store.Users().ByMaxID(t.Context(), 555001); !errors.Is(err, app.ErrNotFound) {
+		t.Fatalf("ByMaxID after delete err = %v, want not found", err)
+	}
+	if _, err := store.Users().Create(t.Context(), user.User{MaxUserID: 555001, Role: user.RoleResident}); err != nil {
+		t.Fatalf("new account for the same MAX user: %v", err)
+	}
+}
+
+func TestPhotosByUploaderAndDelete(t *testing.T) {
+	anna := demoUser(t, "resident_demo_1")
+	is := newIssue(t, anna.ID)
+	if err := store.Issues().Create(t.Context(), is); err != nil {
+		t.Fatal(err)
+	}
+	p := app.Photo{ID: uuid.NewV7().String(), IssueID: is.ID(), UploadedBy: anna.ID, Width: 1, Height: 1, SizeBytes: 1, CreatedAt: time.Now()}
+	if err := store.Photos().Add(t.Context(), p); err != nil {
+		t.Fatal(err)
+	}
+	mine, err := store.Photos().ListByUploader(t.Context(), anna.ID)
+	if err != nil || !slices.ContainsFunc(mine, func(x app.Photo) bool { return x.ID == p.ID }) {
+		t.Fatalf("by uploader = %+v, err = %v", mine, err)
+	}
+	if err := store.Photos().Delete(t.Context(), p.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.Photos().Get(t.Context(), p.ID); !errors.Is(err, app.ErrNotFound) {
+		t.Fatalf("after delete err = %v", err)
+	}
+	// Id не uuid — «не найдено», а не ошибка базы.
+	if _, err := store.Photos().Get(t.Context(), "abc"); !errors.Is(err, app.ErrNotFound) {
+		t.Fatalf("non-uuid id err = %v, want not found", err)
 	}
 }
 

@@ -1,6 +1,7 @@
 package issues_test
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"slices"
@@ -272,6 +273,48 @@ func TestMarkOverdueNotifiesOnce(t *testing.T) {
 	}
 	if n, err := later.MarkOverdue(t.Context()); err != nil || n != 0 {
 		t.Fatalf("second run = %d, %v; want nothing to do", n, err)
+	}
+}
+
+// brokenIssue — хранилище, где одна заявка не читается под блокировкой (сбой базы на ней).
+type brokenIssue struct {
+	*apptest.MemStore
+	id string
+}
+
+func (s brokenIssue) Issues() app.IssueRepo { return brokenRepo{s.MemStore.Issues(), s.id} }
+func (s brokenIssue) InTx(ctx context.Context, fn func(app.Store) error) error {
+	return fn(s)
+}
+
+type brokenRepo struct {
+	app.IssueRepo
+	id string
+}
+
+func (r brokenRepo) GetForUpdate(ctx context.Context, id string) (*issue.Issue, error) {
+	if id == r.id {
+		return nil, errors.New("row is broken")
+	}
+	return r.IssueRepo.GetForUpdate(ctx, id)
+}
+
+// Сбой на одной заявке не мешает отметить остальные: ошибка возвращается, но пакет доходит до конца.
+func TestMarkOverdueSkipsBrokenIssue(t *testing.T) {
+	f := setup(t)
+	report(t, f, f.anna)
+	report(t, f, f.sergey)
+	at := now.Add(72 * time.Hour)
+	// Ломаем ту заявку, которую задача возьмёт первой.
+	list, _ := f.store.Issues().ListOverdueUnmarked(t.Context(), at, 10)
+	store := brokenIssue{f.store, list[0].ID()}
+	later := issues.NewService(store, issues.Config{Now: func() time.Time { return at }, NewID: func() string { return "x" }, ConsentVersion: "v1"})
+	n, err := later.MarkOverdue(t.Context())
+	if err == nil || n != 1 {
+		t.Fatalf("MarkOverdue = %d, %v; want 1 marked and the error", n, err)
+	}
+	if got, _ := f.svc.Get(t.Context(), list[1].ID()); got.OverdueAt().IsZero() {
+		t.Fatal("the healthy issue must be marked")
 	}
 }
 

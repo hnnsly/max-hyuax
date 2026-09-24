@@ -183,7 +183,7 @@ func (s *Service) FindSimilar(ctx context.Context, houseID, category, objectID s
 }
 
 // MarkOverdue отмечает просроченные заявки и ставит участникам уведомления; возвращает, сколько отмечено.
-// Каждая заявка — в своей транзакции: сбой одной не откатывает остальные.
+// Каждая заявка — в своей транзакции: сбой одной не откатывает остальные и не останавливает пакет.
 func (s *Service) MarkOverdue(ctx context.Context) (int, error) {
 	now := s.cfg.Now()
 	list, err := s.store.Issues().ListOverdueUnmarked(ctx, now, queueLimit)
@@ -191,18 +191,19 @@ func (s *Service) MarkOverdue(ctx context.Context) (int, error) {
 		return 0, err
 	}
 	marked := 0
+	var errs []error
 	for _, is := range list {
 		_, err := s.update(ctx, is.ID(), func(is *issue.Issue) error { return is.MarkOverdue(now) })
 		switch {
 		case errors.Is(err, issue.ErrNotOverdue):
 			// Заявку успели закрыть или отметить параллельно: ничего не делаем.
 		case err != nil:
-			return marked, err
+			errs = append(errs, fmt.Errorf("issue %s: %w", is.ID(), err))
 		default:
 			marked++
 		}
 	}
-	return marked, nil
+	return marked, errors.Join(errs...)
 }
 
 // Queue — заявки УК оператора: сначала открытые по сроку (просроченные первыми), затем закрытые.

@@ -80,7 +80,7 @@ func Open(ctx context.Context, cfg config, log *slog.Logger) (*Container, error)
 	c.auth = sync.OnceValue(func() *auth.Service {
 		return auth.NewService(store, auth.Config{
 			BotToken: cfg.BotToken, SessionSecret: cfg.SessionSecret, SessionTTL: sessionTTL,
-			DemoEnabled: cfg.DemoAuth, Now: time.Now,
+			DemoEnabled: cfg.DemoAuth, ConsentVersion: cfg.ConsentVersion, Now: time.Now,
 		})
 	})
 	c.issues = sync.OnceValue(func() *issues.Service {
@@ -90,7 +90,9 @@ func Open(ctx context.Context, cfg config, log *slog.Logger) (*Container, error)
 	})
 	c.houses = sync.OnceValue(func() *houses.Service { return houses.NewService(store) })
 	c.photos = sync.OnceValue(func() *photos.Service {
-		return photos.NewService(store, disk, photos.Config{Now: time.Now, NewID: func() string { return uuid.NewV7().String() }})
+		return photos.NewService(store, disk, photos.Config{
+			Now: time.Now, NewID: func() string { return uuid.NewV7().String() }, ConsentVersion: cfg.ConsentVersion,
+		})
 	})
 	c.hints = sync.OnceValue(func() *hints.Service {
 		// Без OLLAMA_URL подсказка работает на ключевых словах.

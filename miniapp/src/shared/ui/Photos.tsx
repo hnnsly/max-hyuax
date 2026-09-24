@@ -1,3 +1,4 @@
+import { Button } from '@maxhub/max-ui';
 import { Plus, X } from '@phosphor-icons/react';
 import { useEffect, useRef, useState } from 'react';
 import { api, ApiError } from '../api/client';
@@ -110,7 +111,7 @@ export function PhotoSlots({ files, onChange, onError }: { files: File[]; onChan
 }
 
 /** Загруженное фото: файл отдаётся только с токеном, поэтому берём его через fetch. */
-function Thumb({ photo, label, onOpen }: { photo: Photo; label: string; onOpen: (url: string) => void }) {
+function Thumb({ photo, label, onOpen }: { photo: Photo; label: string; onOpen: (url: string, photo: Photo) => void }) {
   const [url, setUrl] = useState('');
   useEffect(() => {
     let alive = true;
@@ -129,7 +130,7 @@ function Thumb({ photo, label, onOpen }: { photo: Photo; label: string; onOpen: 
     };
   }, [photo.id]);
   return (
-    <button type="button" className={s.photoTile} aria-label={label} disabled={!url} onClick={() => onOpen(url)}>
+    <button type="button" className={s.photoTile} aria-label={label} disabled={!url} onClick={() => onOpen(url, photo)}>
       {url && <img src={url} alt="" />}
     </button>
   );
@@ -139,7 +140,8 @@ function Thumb({ photo, label, onOpen }: { photo: Photo; label: string; onOpen: 
 export function IssuePhotos({ issueId, canAdd, onToast }: { issueId: string; canAdd: boolean; onToast: (msg: string) => void }) {
   const res = useResource(() => api.photos(issueId), [issueId]);
   const [busy, setBusy] = useState(false);
-  const [open, setOpen] = useState('');
+  const [open, setOpen] = useState<{ url: string; photo: Photo } | null>(null);
+  const [removing, setRemoving] = useState(false);
   const list = res.data ?? [];
   if (res.error || (!res.data && res.loading) || (list.length === 0 && !canAdd)) return null;
 
@@ -151,13 +153,29 @@ export function IssuePhotos({ issueId, canAdd, onToast }: { issueId: string; can
     if (r.files.length === 0) return;
     setBusy(true);
     try {
+      // Сервер сохраняет пачку целиком или ничего: после ошибки список не меняется.
       await api.uploadPhotos(issueId, r.files);
+      res.reload();
     } catch (err) {
       onToast(err instanceof ApiError ? err.message : 'Не получилось загрузить фото');
     } finally {
-      // Сервер сохраняет по одному: даже при ошибке часть фото могла сохраниться.
       setBusy(false);
+    }
+  };
+
+  // Убрать можно только своё фото: сервер проверяет это же.
+  const remove = async () => {
+    if (!open) return;
+    setRemoving(true);
+    try {
+      await api.removePhoto(open.photo.id);
+      setOpen(null);
+      onToast('Фото убрано');
       res.reload();
+    } catch (err) {
+      onToast(err instanceof ApiError ? err.message : 'Не получилось убрать фото');
+    } finally {
+      setRemoving(false);
     }
   };
 
@@ -166,12 +184,17 @@ export function IssuePhotos({ issueId, canAdd, onToast }: { issueId: string; can
       <h3 className={s.photoTitle}>Фото</h3>
       <div className={s.photoRow}>
         {list.map((p, i) => (
-          <Thumb key={p.id} photo={p} label={`Открыть фото ${i + 1} из ${list.length}`} onOpen={setOpen} />
+          <Thumb key={p.id} photo={p} label={`Открыть фото ${i + 1} из ${list.length}`} onOpen={(url, photo) => setOpen({ url, photo })} />
         ))}
         {canAdd && left > 0 && <AddTile onFiles={upload} disabled={busy} />}
       </div>
-      <Sheet open={open !== ''} title="Фото" onClose={() => setOpen('')}>
-        {open && <img className={s.photoFull} src={open} alt="Фото к заявке" />}
+      <Sheet open={open !== null} title="Фото" onClose={() => setOpen(null)} locked={removing}>
+        {open && <img className={s.photoFull} src={open.url} alt="Фото к заявке" />}
+        {open?.photo.mine && (
+          <Button variant="secondary" size="medium" stretched loading={removing} onClick={remove}>
+            Убрать фото
+          </Button>
+        )}
       </Sheet>
     </section>
   );

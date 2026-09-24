@@ -29,6 +29,15 @@ func (r photoRepo) Get(ctx context.Context, id string) (app.Photo, error) {
 	return toPhoto(row), nil
 }
 
+func (r photoRepo) ListByUploader(ctx context.Context, userID int64) ([]app.Photo, error) {
+	rows, err := r.q.ListUploaderPhotos(ctx, userID)
+	return mapSlice(rows, toPhoto), err
+}
+
+func (r photoRepo) Delete(ctx context.Context, id string) error {
+	return r.q.DeletePhoto(ctx, id)
+}
+
 func toPhoto(p sqlcdb.IssuePhoto) app.Photo {
 	return app.Photo{
 		ID: p.ID, IssueID: p.IssueID, UploadedBy: p.UploadedBy,

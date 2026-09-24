@@ -130,16 +130,18 @@ func (q *Queries) MarkUpdateProcessed(ctx context.Context, key string) (int64, e
 
 const updateUser = `-- name: UpdateUser :exec
 UPDATE users
-SET first_name      = $1,
-    phone           = $2,
-    house_id        = NULLIF($3::text, ''),
-    consent_version = $4,
-    consent_at      = $5,
-    deleted_at      = $6
-WHERE id = $7
+SET max_user_id     = $1,
+    first_name      = $2,
+    phone           = $3,
+    house_id        = NULLIF($4::text, ''),
+    consent_version = $5,
+    consent_at      = $6,
+    deleted_at      = $7
+WHERE id = $8
 `
 
 type UpdateUserParams struct {
+	MaxUserID      pgtype.Int8
 	FirstName      string
 	Phone          string
 	HouseID        string
@@ -151,6 +153,7 @@ type UpdateUserParams struct {
 
 func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) error {
 	_, err := q.db.Exec(ctx, updateUser,
+		arg.MaxUserID,
 		arg.FirstName,
 		arg.Phone,
 		arg.HouseID,

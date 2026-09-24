@@ -36,6 +36,31 @@ func TestDiskPutGet(t *testing.T) {
 	}
 }
 
+func TestDiskDelete(t *testing.T) {
+	d, err := files.NewDisk(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer d.Close()
+	const key = "0190a000-0000-7000-8000-000000000001"
+	if err := d.Put(t.Context(), key, []byte("x")); err != nil {
+		t.Fatal(err)
+	}
+	if err := d.Delete(t.Context(), key); err != nil {
+		t.Fatalf("Delete: %v", err)
+	}
+	if _, err := d.Get(t.Context(), key); !errors.Is(err, app.ErrNotFound) {
+		t.Fatalf("after delete err = %v, want ErrNotFound", err)
+	}
+	// Повторное удаление — не ошибка: файл мог убрать прошлый неудачный запрос.
+	if err := d.Delete(t.Context(), key); err != nil {
+		t.Fatalf("second Delete: %v", err)
+	}
+	if err := d.Delete(t.Context(), "../escape"); err == nil {
+		t.Fatal("Delete with unsafe key succeeded")
+	}
+}
+
 // Ключ — только непрозрачный id: пути, точки и разделители отклоняются.
 func TestDiskRejectsUnsafeKeys(t *testing.T) {
 	d, err := files.NewDisk(t.TempDir())

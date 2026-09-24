@@ -36,13 +36,14 @@ type Hint struct {
 }
 
 type Service struct {
-	llm     LLM // nil — LLM не подключена
-	timeout time.Duration
-	log     *slog.Logger
+	llm         LLM // nil — LLM не подключена
+	timeout     time.Duration
+	log         *slog.Logger
+	warmUpPause time.Duration
 }
 
 func NewService(llm LLM, timeout time.Duration, log *slog.Logger) *Service {
-	return &Service{llm: llm, timeout: timeout, log: log}
+	return &Service{llm: llm, timeout: timeout, log: log, warmUpPause: warmUpRetry}
 }
 
 // Suggest подсказывает категорию; ok=false — ни модель, ни правила её не узнали.
@@ -89,28 +90,32 @@ const (
 	warmUpTimeout = 3 * time.Minute
 	// warmUpRetry — пауза между попытками: модель может ещё скачиваться (ollama-pull).
 	warmUpRetry = 20 * time.Second
+	// warmUpAttempts — после стольких неудач (около 10 минут) прогрев сдаётся: адрес или модель, видимо, неверны.
+	warmUpAttempts = 30
 )
 
 // WarmUp загружает модель заранее, иначе первая подсказка после старта не уложится в таймаут.
-// Повторяет попытки, пока не получится или пока ctx не отменён; до этого работают ключевые слова.
+// Повторяет попытки, пока не получится, пока ctx не отменён или пока не кончатся попытки;
+// всё это время работают ключевые слова.
 func (s *Service) WarmUp(ctx context.Context) {
 	if s.llm == nil {
 		return
 	}
-	for {
+	var err error
+	for range warmUpAttempts {
 		start := time.Now()
 		attempt, cancel := context.WithTimeout(ctx, warmUpTimeout)
-		_, err := s.llm.Category(attempt, "лифт не работает", rules.Categories())
+		_, err = s.llm.Category(attempt, "лифт не работает", rules.Categories())
 		cancel()
 		if err == nil {
 			s.log.InfoContext(ctx, "llm warmed up", "took", time.Since(start).Round(time.Millisecond).String())
 			return
 		}
-		s.log.WarnContext(ctx, "llm warm-up failed, will retry", "err", err)
 		select {
 		case <-ctx.Done():
 			return
-		case <-time.After(warmUpRetry):
+		case <-time.After(s.warmUpPause):
 		}
 	}
+	s.log.WarnContext(ctx, "llm warm-up gave up, hints use keywords until the model answers", "attempts", warmUpAttempts, "err", err)
 }

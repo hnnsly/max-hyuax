@@ -210,14 +210,21 @@ type appealLinkDTO struct {
 }
 
 // photoDTO — фото к заявке; url отдаёт JPEG с тем же токеном сессии.
+// mine — фото приложил текущий пользователь и может его убрать; кто приложил чужое, не раскрывается.
 type photoDTO struct {
 	ID        string    `json:"id"`
 	URL       string    `json:"url"`
 	Width     int       `json:"width"`
 	Height    int       `json:"height"`
+	Mine      bool      `json:"mine"`
 	CreatedAt time.Time `json:"created_at"`
 }
 
-func toPhotoDTO(p app.Photo) photoDTO {
-	return photoDTO{ID: p.ID, URL: "/api/v1/photos/" + p.ID, Width: p.Width, Height: p.Height, CreatedAt: p.CreatedAt}
+func photoDTOs(list []app.Photo, viewerID int64) []photoDTO {
+	return mapSlice(list, func(p app.Photo) photoDTO {
+		return photoDTO{
+			ID: p.ID, URL: "/api/v1/photos/" + p.ID, Width: p.Width, Height: p.Height,
+			Mine: p.UploadedBy == viewerID, CreatedAt: p.CreatedAt,
+		}
+	})
 }

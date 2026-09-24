@@ -82,6 +82,7 @@ func New(d Deps) *fiber.App {
 	api.Post("/issues/:id/photos", h.auth, h.uploadPhotos)
 	api.Get("/issues/:id/photos", h.auth, h.listPhotos)
 	api.Get("/photos/:id", h.auth, h.openPhoto)
+	api.Delete("/photos/:id", h.auth, h.removePhoto)
 	// Без сессии: ссылка подписана и живёт 10 минут, а WebApp.downloadFile не передаёт заголовки.
 	api.Get("/appeal/:token", h.appealPDF)
 
@@ -148,13 +149,17 @@ func classify(err error) (int, string, string) {
 	case errors.Is(err, photos.ErrNotImage):
 		return fiber.StatusUnsupportedMediaType, "unsupported_media", "Нужна фотография в формате JPEG или PNG"
 	case errors.Is(err, photos.ErrTooLarge):
-		return fiber.StatusRequestEntityTooLarge, "photo_too_large", "Фото слишком большое: до 5 МБ"
+		return fiber.StatusRequestEntityTooLarge, "photo_too_large", "Фото слишком большое: нужно до 5 МБ и до 40 мегапикселей"
 	case errors.Is(err, issue.ErrReasonRequired):
 		return fiber.StatusUnprocessableEntity, "reason_required", "Укажите причину отказа"
 	case errors.Is(err, app.ErrInvalidInput), errors.Is(err, issue.ErrInvalid):
 		return fiber.StatusUnprocessableEntity, "invalid_input", "Проверьте введённые данные"
 	}
 	if fe, ok := errors.AsType[*fiber.Error](err); ok {
+		// Тело больше лимита Fiber: так бывает только при загрузке фото.
+		if fe.Code == fiber.StatusRequestEntityTooLarge {
+			return fe.Code, "photo_too_large", "Файлы слишком большие: не больше 5 МБ каждый"
+		}
 		return fe.Code, "http_error", fe.Message
 	}
 	return fiber.StatusInternalServerError, "internal", "Что-то пошло не так. Попробуйте позже"

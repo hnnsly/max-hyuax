@@ -101,13 +101,18 @@ func (h *Handler) onMessage(ctx context.Context, m *maxapi.Message) error {
 		return nil
 	}
 	to := target(m.Recipient.ChatID, m.Sender.UserID)
+	// Альбом приходит одним сообщением с несколькими вложениями: берём все снимки.
+	var urls []string
 	for _, a := range m.Body.Attachments {
 		switch a.Type {
 		case "location":
 			return h.onLocation(ctx, to, m.Sender, a.Latitude, a.Longitude)
 		case "image":
-			return h.onPhoto(ctx, to, m.Sender, a.PhotoURL())
+			urls = append(urls, a.PhotoURL())
 		}
+	}
+	if len(urls) > 0 {
+		return h.onPhotos(ctx, to, m.Sender, urls)
 	}
 	txt := strings.TrimSpace(m.Body.Text)
 	if txt == "" {
@@ -250,9 +255,12 @@ func (h *Handler) myIssues(ctx context.Context, to maxapi.Target, from maxapi.Us
 	return err
 }
 
-// onPhoto прикрепляет присланное фото к последней открытой заявке жителя (FR-BOT-04).
+// maxBotPhotos — сколько снимков из одного сообщения прикладывается за раз, как и в мини-приложении.
+const maxBotPhotos = 3
+
+// onPhotos прикрепляет присланные фото к последней открытой заявке жителя (FR-BOT-04).
 // Ссылку на фото MAX отдаёт не во всех клиентах: тогда предлагаем добавить фото в карточке.
-func (h *Handler) onPhoto(ctx context.Context, to maxapi.Target, from maxapi.User, url string) error {
+func (h *Handler) onPhotos(ctx context.Context, to maxapi.Target, from maxapi.User, urls []string) error {
 	u, err := h.resident(ctx, from)
 	if err != nil {
 		return err
@@ -267,24 +275,37 @@ func (h *Handler) onPhoto(ctx context.Context, to maxapi.Target, from maxapi.Use
 	}
 	is := list[i]
 	open := []maxapi.Button{maxapi.OpenAppButton("Открыть заявку", h.botName, "i_"+is.ID())}
-	if !strings.HasPrefix(url, "https://") {
-		return h.sendKeyboard(ctx, to, "Не получилось получить фото. Добавьте его в карточке заявки.", open)
+	if !u.HasConsent(h.svc.ConsentVersion) {
+		return h.sendKeyboard(ctx, to, "Чтобы приложить фото, нужно ваше согласие на обработку персональных данных. "+
+			"Фото увидят только соседи, которые сообщили о проблеме, и УК. Данные хранятся в России.",
+			[]maxapi.Button{maxapi.CallbackButton("Согласен", pack(cbConsent, ""))})
 	}
-	data, err := h.max.Download(ctx, url, photos.MaxBytes)
-	if err != nil {
-		h.log.WarnContext(ctx, "photo download failed", "err", err)
-		return h.sendKeyboard(ctx, to, "Не получилось получить фото. Добавьте его в карточке заявки.", open)
+	raws := make([][]byte, 0, min(len(urls), maxBotPhotos))
+	for _, url := range urls[:min(len(urls), maxBotPhotos)] {
+		if !strings.HasPrefix(url, "https://") {
+			return h.sendKeyboard(ctx, to, "Не получилось получить фото. Добавьте его в карточке заявки.", open)
+		}
+		data, err := h.max.Download(ctx, url, photos.MaxBytes)
+		if err != nil {
+			h.log.WarnContext(ctx, "photo download failed", "err", err)
+			return h.sendKeyboard(ctx, to, "Не получилось получить фото. Добавьте его в карточке заявки.", open)
+		}
+		raws = append(raws, data)
 	}
-	_, err = h.svc.Photos.Add(ctx, u, is.ID(), data)
+	added, err := h.svc.Photos.Add(ctx, u, is.ID(), raws...)
 	switch {
 	case errors.Is(err, photos.ErrTooMany):
-		return h.sendKeyboard(ctx, to, fmt.Sprintf("К заявке № %d уже приложено %d фото, больше добавить нельзя.", is.Number(), photos.MaxPerIssue), open)
+		return h.sendKeyboard(ctx, to, fmt.Sprintf("К заявке № %d можно приложить не больше %d фото.", is.Number(), photos.MaxPerIssue), open)
 	case errors.Is(err, photos.ErrNotImage), errors.Is(err, photos.ErrTooLarge):
 		return h.sendKeyboard(ctx, to, "Фото не подошло: нужен снимок JPEG или PNG до 5 МБ.", open)
 	case err != nil:
 		return err
 	}
-	return h.sendKeyboard(ctx, to, fmt.Sprintf("Фото добавлено к заявке № %d. Его увидят соседи, которые сообщили о проблеме, и УК.", is.Number()), open)
+	done := fmt.Sprintf("Фото добавлено к заявке № %d. Его увидят соседи, которые сообщили о проблеме, и УК.", is.Number())
+	if len(added) > 1 {
+		done = fmt.Sprintf("%d фото добавлены к заявке № %d. Их увидят соседи, которые сообщили о проблеме, и УК.", len(added), is.Number())
+	}
+	return h.sendKeyboard(ctx, to, done, open)
 }
 
 func (h *Handler) myHouse(ctx context.Context, to maxapi.Target, from maxapi.User) error {
@@ -371,6 +392,10 @@ func (h *Handler) callbackReply(ctx context.Context, cb *maxapi.Callback) (maxap
 	case cbConsent:
 		if _, err := h.svc.Auth.AcceptConsent(ctx, u, h.svc.ConsentVersion); err != nil {
 			return maxapi.CallbackAnswer{}, err
+		}
+		// Согласие перед фото: снимок в кнопку не положить, его нужно прислать снова.
+		if rest == "" {
+			return maxapi.CallbackAnswer{Notification: "Согласие сохранено. Пришлите фото ещё раз."}, nil
 		}
 		return h.callbackReply(ctx, &maxapi.Callback{ID: cb.ID, Payload: rest, User: cb.User})
 

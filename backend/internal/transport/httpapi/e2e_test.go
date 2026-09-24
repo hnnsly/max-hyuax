@@ -78,13 +78,13 @@ func TestMain(m *testing.M) {
 	deps := func(demo bool) httpapi.Deps {
 		return httpapi.Deps{
 			Auth: auth.NewService(store, auth.Config{
-				BotToken: botToken, SessionSecret: "s", SessionTTL: time.Hour, DemoEnabled: demo, Now: time.Now,
+				BotToken: botToken, SessionSecret: "s", SessionTTL: time.Hour, DemoEnabled: demo, ConsentVersion: "v1", Now: time.Now,
 			}),
 			Issues:         issues.NewService(store, issues.Config{Now: time.Now, NewID: func() string { return uuid.NewV7().String() }, ConsentVersion: "v1"}),
 			Houses:         houses.NewService(store),
 			Hints:          hints.NewService(nil, time.Second, log),
 			Appeal:         appeal.NewService(store, appeal.Config{Secret: []byte("s"), TTL: 10 * time.Minute, Now: time.Now}),
-			Photos:         photos.NewService(store, &apptest.MemFiles{}, photos.Config{Now: time.Now, NewID: func() string { return uuid.NewV7().String() }}),
+			Photos:         photos.NewService(store, &apptest.MemFiles{}, photos.Config{Now: time.Now, NewID: func() string { return uuid.NewV7().String() }, ConsentVersion: "v1"}),
 			Webhook:        bot.NewWebhook("hook-secret", webhooks, store, log),
 			Ping:           store.Ping,
 			ConsentVersion: "v1",
@@ -356,12 +356,12 @@ func TestPhotosUploadListAndOpen(t *testing.T) {
 		t.Fatalf("upload = %d %v %v", added.status, added.body, added.list)
 	}
 	first := added.list[0].(map[string]any)
-	if first["width"] != 80.0 || !strings.HasPrefix(first["url"].(string), "/api/v1/photos/") {
+	if first["width"] != 80.0 || !strings.HasPrefix(first["url"].(string), "/api/v1/photos/") || first["mine"] != true {
 		t.Fatalf("photo = %v", first)
 	}
 
 	list := expect(t, call(t, "GET", path, oper, nil), 200, "operator list").list
-	if len(list) != 2 {
+	if len(list) != 2 || list[0].(map[string]any)["mine"] != false {
 		t.Fatalf("list = %v", list)
 	}
 	res, err := api.Test(func() *http.Request {
@@ -400,15 +400,29 @@ func TestPhotosUploadListAndOpen(t *testing.T) {
 			t.Errorf("%s: %d %v, want %d %s", name, r.status, r.body, tc.status, tc.code)
 		}
 	}
-	// Лимит на заявку: 2 уже есть, ещё 4 проходят, седьмое фото — 409.
-	for range 2 {
-		if r := uploadPhotos(t, path, anna, testJPEG(t), testJPEG(t)); r.status != 201 {
-			t.Fatalf("fill up = %d %v", r.status, r.body)
-		}
+	// Пачка с одним плохим файлом не сохраняет и хорошие.
+	if r := uploadPhotos(t, path, anna, testJPEG(t), []byte("%PDF-1.7")); r.status != 415 {
+		t.Fatalf("mixed batch = %d %v", r.status, r.body)
 	}
-	if r := uploadPhotos(t, path, anna, testJPEG(t)); r.status != 409 || r.body["error"].(map[string]any)["code"] != "too_many_photos" {
+	if n := len(expect(t, call(t, "GET", path, anna, nil), 200, "list after mixed batch").list); n != 2 {
+		t.Fatalf("after mixed batch %d photos, want 2", n)
+	}
+	// Лимит на заявку: 2 уже есть, пачка из трёх проходит, следующая пачка из двух — 409 целиком.
+	if r := uploadPhotos(t, path, anna, testJPEG(t), testJPEG(t), testJPEG(t)); r.status != 201 {
+		t.Fatalf("fill up = %d %v", r.status, r.body)
+	}
+	if r := uploadPhotos(t, path, anna, testJPEG(t), testJPEG(t)); r.status != 409 || r.body["error"].(map[string]any)["code"] != "too_many_photos" {
 		t.Fatalf("over limit = %d %v", r.status, r.body)
 	}
+	if n := len(expect(t, call(t, "GET", path, anna, nil), 200, "list after limit").list); n != 5 {
+		t.Fatalf("after over-limit batch %d photos, want 5", n)
+	}
+
+	// Убрать фото может только тот, кто его приложил.
+	photoPath := first["url"].(string)
+	expect(t, call(t, "DELETE", photoPath, oper, nil), 403, "operator removes resident photo")
+	expect(t, call(t, "DELETE", photoPath, anna, nil), 204, "uploader removes photo")
+	expect(t, call(t, "GET", photoPath, anna, nil), 404, "removed photo")
 }
 
 func TestClassifyHint(t *testing.T) {
@@ -424,17 +438,26 @@ func TestClassifyHint(t *testing.T) {
 }
 
 func TestDeleteAccountAndDemoRestore(t *testing.T) {
-	old := login(t, "resident_2")
+	old, oper := login(t, "resident_2"), login(t, "uk_operator")
+	// Фото удалённого аккаунта исчезают из заявки: на снимках бывают люди и двери квартир.
+	id := expect(t, call(t, "POST", "/api/v1/issues", old, map[string]string{"house_id": "h-17k2", "category": "door"}), 201, "report").body["id"].(string)
+	photosPath := "/api/v1/issues/" + id + "/photos"
+	if r := uploadPhotos(t, photosPath, old, testJPEG(t)); r.status != 201 {
+		t.Fatalf("upload = %d %v", r.status, r.body)
+	}
 	expect(t, call(t, "DELETE", "/api/v1/me", old, nil), 204, "delete account")
 	expect(t, call(t, "GET", "/api/v1/me", old, nil), 401, "token of deleted account")
+	if n := len(expect(t, call(t, "GET", photosPath, oper, nil), 200, "photos after delete").list); n != 0 {
+		t.Fatalf("photos after account deletion = %d, want 0", n)
+	}
 
+	// Демо-пользователь возвращается в исходное состояние: проверка по DATA-API после удаления проходит.
 	again := login(t, "resident_2")
 	me := expect(t, call(t, "GET", "/api/v1/me", again, nil), 200, "restored demo user").body
-	if me["first_name"] != "Сергей" || me["has_consent"] != false {
-		t.Fatalf("restored = %v, want name back and consent required", me)
+	if me["first_name"] != "Сергей" || me["has_consent"] != true || me["house_id"] != "h-17k2" {
+		t.Fatalf("restored = %v, want the demo user as seeded", me)
 	}
-	// Согласие возвращаем, чтобы демо-пользователь остался рабочим для остальных тестов.
-	expect(t, call(t, "POST", "/api/v1/me/consent", again, map[string]string{"version": "v1"}), 200, "consent again")
+	expect(t, call(t, "POST", "/api/v1/issues", again, map[string]string{"house_id": "h-17k2", "category": "lift"}), 201, "report after restore")
 }
 
 func TestOperatorListsOwnHouses(t *testing.T) {

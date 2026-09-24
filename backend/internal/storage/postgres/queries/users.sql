@@ -14,7 +14,8 @@ RETURNING *;
 
 -- name: UpdateUser :exec
 UPDATE users
-SET first_name      = @first_name,
+SET max_user_id     = @max_user_id,
+    first_name      = @first_name,
     phone           = @phone,
     house_id        = NULLIF(@house_id::text, ''),
     consent_version = @consent_version,

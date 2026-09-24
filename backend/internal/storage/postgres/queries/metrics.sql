@@ -18,6 +18,10 @@ FROM issues i
 LEFT JOIN LATERAL (SELECT count(*) AS n FROM issue_participants ip WHERE ip.issue_id = i.id) p ON true
 WHERE i.responsible_org_id = @org_id;
 
+-- name: LockSampleShift :exec
+-- Сдвиг примера данных идёт под блокировкой до конца транзакции: два экземпляра api не сдвинут дважды.
+SELECT pg_advisory_xact_lock(7340301);
+
 -- name: SampleLatestAt :one
 -- Самое позднее событие примера данных (срок не в счёт: он может быть в будущем).
 SELECT COALESCE(max(t), @now::timestamptz)::timestamptz AS latest

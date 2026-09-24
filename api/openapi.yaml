@@ -136,7 +136,10 @@ paths:
     delete:
       tags: [me]
       summary: Удалить аккаунт
-      description: Имя, телефон и согласие стираются; заявки остаются без данных автора.
+      description: |
+        Имя, телефон, согласие, дом и связь с аккаунтом MAX стираются, фото пользователя удаляются;
+        заявки остаются без данных автора. Вернувшийся житель получает новый аккаунт без старых заявок.
+        Демо-пользователь при следующем демо-входе возвращается в исходное состояние.
       responses:
         "204": { description: Аккаунт удалён }
         "401": { $ref: "#/components/responses/Error" }
@@ -433,8 +436,10 @@ paths:
       tags: [issues]
       summary: Приложить фото к открытой заявке
       description: |
-        Участник или сотрудник ответственной УК. До 3 файлов за запрос в поле photo, JPEG или PNG до 5 МБ,
-        не больше 6 фото на заявку. Сервер уменьшает снимок до 1600 px по длинной стороне, поворачивает по EXIF
+        Участник или сотрудник ответственной УК; житель — с действующим согласием (иначе 403 consent_required).
+        До 3 файлов за запрос в поле photo, JPEG или PNG до 5 МБ и 40 Мп, не больше 6 фото на заявку.
+        Пачка сохраняется целиком или не сохраняется: один плохой файл отклоняет все.
+        Сервер уменьшает снимок до 1600 px по длинной стороне, поворачивает по EXIF
         и перекодирует в JPEG без EXIF: геометка и данные камеры не сохраняются.
         413 photo_too_large, 415 unsupported_media, 409 too_many_photos или issue_closed.
       parameters:
@@ -471,7 +476,9 @@ paths:
     get:
       tags: [issues]
       summary: Файл фото (JPEG)
-      description: Только с токеном сессии; мини-приложение загружает файл через fetch, а не <img src>.
+      description: |
+        Только с токеном сессии; мини-приложение загружает файл через fetch, а не <img src>.
+        Cache-Control: private, no-store — после удаления снимок не остаётся в WebView.
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
@@ -483,11 +490,25 @@ paths:
         "401": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
         "404": { $ref: "#/components/responses/Error" }
+    delete:
+      tags: [issues]
+      summary: Убрать своё фото
+      description: Только тот, кто приложил фото (в списке у него mine = true); даже УК не убирает чужие.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "204": { description: Фото удалено }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
 
   /appeal/{token}:
     get:
       tags: [issues]
       summary: PDF-обращение по подписанной ссылке
+      description: |
+        Ссылка живёт 10 минут. Условия проверяются заново: заявку за это время закрыли (409 issue_closed)
+        или аккаунт владельца ссылки удалён (403).
       security: []
       parameters:
         - { name: token, in: path, required: true, schema: { type: string } }
@@ -498,6 +519,8 @@ paths:
             application/pdf:
               schema: { type: string, format: binary }
         "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
 
   /uk/issues:
     get:
@@ -693,12 +716,13 @@ components:
 
     Photo:
       type: object
-      required: [id, url, width, height, created_at]
+      required: [id, url, width, height, mine, created_at]
       properties:
         id: { type: string, format: uuid }
         url: { type: string, example: /api/v1/photos/0190a000-0000-7000-8000-000000000001 }
         width: { type: integer, example: 1600 }
         height: { type: integer, example: 1200 }
+        mine: { type: boolean, description: "Фото приложил текущий пользователь и может его убрать; кто приложил чужое, не раскрывается" }
         created_at: { type: string, format: date-time }
 
     Issue:

@@ -11,11 +11,12 @@ import (
 )
 
 type Config struct {
-	BotToken      string
-	SessionSecret string
-	SessionTTL    time.Duration
-	DemoEnabled   bool // POST /auth/demo; включается только на демо-стенде
-	Now           func() time.Time
+	BotToken       string
+	SessionSecret  string
+	SessionTTL     time.Duration
+	DemoEnabled    bool   // POST /auth/demo; включается только на демо-стенде
+	ConsentVersion string // с этой версией согласия восстанавливается удалённый демо-пользователь
+	Now            func() time.Time
 }
 
 type Service struct {
@@ -35,11 +36,11 @@ type Session struct {
 }
 
 // demoKeys — демо-роли для проверяющих; пользователи создаются миграцией с демо-данными.
-// Имя нужно, чтобы вернуть демо-пользователя, если проверяющий удалил аккаунт.
-var demoKeys = map[string]struct{ key, name string }{
-	"resident":    {"resident_demo_1", "Анна"},
-	"resident_2":  {"resident_demo_2", "Сергей"},
-	"uk_operator": {"uk_operator_demo", "Оператор УК"},
+// Имя и дом нужны, чтобы вернуть демо-пользователя, если проверяющий удалил аккаунт.
+var demoKeys = map[string]struct{ key, name, houseID string }{
+	"resident":    {"resident_demo_1", "Анна", "h-17k2"},
+	"resident_2":  {"resident_demo_2", "Сергей", "h-17k2"},
+	"uk_operator": {"uk_operator_demo", "Оператор УК", ""},
 }
 
 // LoginMax проверяет initData и выдаёт сессию; новый пользователь MAX становится жителем.
@@ -62,13 +63,9 @@ func (s *Service) LoginMax(ctx context.Context, initData string) (Session, error
 func (s *Service) EnsureMaxUser(ctx context.Context, maxUserID int64, firstName string) (user.User, error) {
 	users := s.store.Users()
 	u, err := users.ByMaxID(ctx, maxUserID)
-	switch {
-	case errors.Is(err, app.ErrNotFound):
+	// Удалённый аккаунт теряет связь с MAX, поэтому вернувшийся житель попадает сюда как новый.
+	if errors.Is(err, app.ErrNotFound) {
 		return users.Create(ctx, user.User{MaxUserID: maxUserID, FirstName: firstName, Role: user.RoleResident})
-	case err == nil && u.Deleted():
-		// Житель удалил аккаунт и вернулся: начинаем с чистого листа, согласие нужно заново.
-		u.DeletedAt, u.FirstName = time.Time{}, firstName
-		return u, users.Save(ctx, u)
 	}
 	return u, err
 }
@@ -87,8 +84,9 @@ func (s *Service) LoginDemo(ctx context.Context, role string) (Session, error) {
 		return Session{}, err
 	}
 	if u.Deleted() {
-		// Проверяющий удалил демо-аккаунт: возвращаем его, согласие нужно дать заново.
-		u.DeletedAt, u.FirstName = time.Time{}, demo.name
+		// Проверяющий удалил демо-аккаунт: возвращаем его в исходное состояние из демо-данных.
+		u.DeletedAt, u.FirstName, u.HouseID = time.Time{}, demo.name, demo.houseID
+		u.AcceptConsent(s.cfg.ConsentVersion, s.cfg.Now())
 		if err := s.store.Users().Save(ctx, u); err != nil {
 			return Session{}, err
 		}

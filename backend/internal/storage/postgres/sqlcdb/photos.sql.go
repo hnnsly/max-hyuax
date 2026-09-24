@@ -10,6 +10,15 @@ import (
 	"time"
 )
 
+const deletePhoto = `-- name: DeletePhoto :exec
+DELETE FROM issue_photos WHERE id = $1
+`
+
+func (q *Queries) DeletePhoto(ctx context.Context, id string) error {
+	_, err := q.db.Exec(ctx, deletePhoto, id)
+	return err
+}
+
 const getPhoto = `-- name: GetPhoto :one
 SELECT id, issue_id, uploaded_by, width, height, size_bytes, created_at
 FROM issue_photos
@@ -68,6 +77,41 @@ ORDER BY created_at, id
 
 func (q *Queries) ListIssuePhotos(ctx context.Context, issueID string) ([]IssuePhoto, error) {
 	rows, err := q.db.Query(ctx, listIssuePhotos, issueID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []IssuePhoto
+	for rows.Next() {
+		var i IssuePhoto
+		if err := rows.Scan(
+			&i.ID,
+			&i.IssueID,
+			&i.UploadedBy,
+			&i.Width,
+			&i.Height,
+			&i.SizeBytes,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listUploaderPhotos = `-- name: ListUploaderPhotos :many
+SELECT id, issue_id, uploaded_by, width, height, size_bytes, created_at
+FROM issue_photos
+WHERE uploaded_by = $1
+ORDER BY created_at, id
+`
+
+func (q *Queries) ListUploaderPhotos(ctx context.Context, uploadedBy int64) ([]IssuePhoto, error) {
+	rows, err := q.db.Query(ctx, listUploaderPhotos, uploadedBy)
 	if err != nil {
 		return nil, err
 	}

@@ -41,11 +41,12 @@ func TestConsentRequiresCurrentDocVersion(t *testing.T) {
 }
 
 func TestDeleteAnonymizesPersonalData(t *testing.T) {
-	u := user.User{ID: 1, MaxUserID: 1001, FirstName: "Анна", Phone: "+79990000000"}
+	u := user.User{ID: 1, MaxUserID: 1001, FirstName: "Анна", Phone: "+79990000000", HouseID: "h-1"}
 	u.AcceptConsent("v1", now)
 	u.Delete(now)
 
-	if !u.Deleted() || u.FirstName != "" || u.Phone != "" || u.HasConsent("v1") {
+	// Связь с MAX и адрес тоже стираются: вернувшийся человек не увидит старых заявок.
+	if !u.Deleted() || u.FirstName != "" || u.Phone != "" || u.HasConsent("v1") || u.MaxUserID != 0 || u.HouseID != "" {
 		t.Fatalf("deleted user keeps personal data: %+v", u)
 	}
 }

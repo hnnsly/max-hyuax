@@ -48,6 +48,16 @@ func (q *Queries) ListFirstResponses(ctx context.Context, arg ListFirstResponses
 	return items, nil
 }
 
+const lockSampleShift = `-- name: LockSampleShift :exec
+SELECT pg_advisory_xact_lock(7340301)
+`
+
+// Сдвиг примера данных идёт под блокировкой до конца транзакции: два экземпляра api не сдвинут дважды.
+func (q *Queries) LockSampleShift(ctx context.Context) error {
+	_, err := q.db.Exec(ctx, lockSampleShift)
+	return err
+}
+
 const orgMetricCounts = `-- name: OrgMetricCounts :one
 SELECT count(*) FILTER (WHERE i.created_at >= $1)::int AS issues,
        COALESCE(sum(p.n) FILTER (WHERE i.created_at >= $1), 0)::int AS reports,

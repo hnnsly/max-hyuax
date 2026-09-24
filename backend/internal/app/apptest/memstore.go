@@ -419,6 +419,25 @@ func (r photoRepo) Get(_ context.Context, id string) (app.Photo, error) {
 	return app.Photo{}, app.ErrNotFound
 }
 
+func (r photoRepo) ListByUploader(_ context.Context, userID int64) ([]app.Photo, error) {
+	r.s.mu.Lock()
+	defer r.s.mu.Unlock()
+	var out []app.Photo
+	for _, p := range r.s.photos {
+		if p.UploadedBy == userID {
+			out = append(out, p)
+		}
+	}
+	return out, nil
+}
+
+func (r photoRepo) Delete(_ context.Context, id string) error {
+	r.s.mu.Lock()
+	defer r.s.mu.Unlock()
+	r.s.photos = slices.DeleteFunc(r.s.photos, func(p app.Photo) bool { return p.ID == id })
+	return nil
+}
+
 // MemFiles — хранилище файлов в памяти для тестов; Fail заставляет Put вернуть ошибку.
 type MemFiles struct {
 	mu   sync.Mutex
@@ -437,6 +456,20 @@ func (f *MemFiles) Put(_ context.Context, key string, data []byte) error {
 	}
 	f.data[key] = slices.Clone(data)
 	return nil
+}
+
+func (f *MemFiles) Delete(_ context.Context, key string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	delete(f.data, key)
+	return nil
+}
+
+// Len — сколько файлов сейчас лежит в хранилище.
+func (f *MemFiles) Len() int {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return len(f.data)
 }
 
 func (f *MemFiles) Get(_ context.Context, key string) ([]byte, error) {

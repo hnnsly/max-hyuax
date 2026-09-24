@@ -125,6 +125,14 @@ func TestErrorResponses(t *testing.T) {
 		{"coordinates out of range", api, "GET", "/api/v1/houses/nearest?lat=200&lon=37", anna, "", 422, "invalid_input"},
 		{"coordinates not numbers", api, "GET", "/api/v1/houses/nearest?lat=abc&lon=37", anna, "", 422, "invalid_input"},
 		{"empty consent version", api, "POST", "/api/v1/me/consent", anna, `{"version":""}`, 422, "invalid_input"},
+		// Id в адресе не uuid: такой записи нет, это 404, а не сбой сервера.
+		{"issue id not a uuid", api, "GET", "/api/v1/issues/abc", anna, "", 404, "not_found"},
+		{"photos of issue id not a uuid", api, "GET", "/api/v1/issues/abc/photos", anna, "", 404, "not_found"},
+		{"appeal for issue id not a uuid", api, "POST", "/api/v1/issues/abc/appeal", anna, "", 404, "not_found"},
+		{"photo id not a uuid", api, "GET", "/api/v1/photos/abc", anna, "", 404, "not_found"},
+		{"remove photo id not a uuid", api, "DELETE", "/api/v1/photos/abc", anna, "", 404, "not_found"},
+		{"remove unknown photo", api, "DELETE", "/api/v1/photos/" + unknown, anna, "", 404, "not_found"},
+		{"remove photo without token", api, "DELETE", "/api/v1/photos/" + unknown, "", "", 401, "unauthorized"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

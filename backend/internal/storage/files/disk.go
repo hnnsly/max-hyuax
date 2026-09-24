@@ -33,16 +33,41 @@ func NewDisk(dir string) (*Disk, error) {
 func (d *Disk) Close() error { return d.root.Close() }
 
 // Put записывает файл через временное имя и переименование: читатель не увидит половину файла.
+// Перед переименованием данные сбрасываются на диск, иначе после сбоя питания файл может оказаться пустым.
 func (d *Disk) Put(_ context.Context, key string, data []byte) error {
 	if !keyRe.MatchString(key) {
 		return fmt.Errorf("%w: bad file key", app.ErrInvalidInput)
 	}
 	tmp := key + ".tmp-" + rand.Text()
-	if err := d.root.WriteFile(tmp, data, 0o640); err != nil {
+	if err := d.writeSynced(tmp, data); err != nil {
+		_ = d.root.Remove(tmp)
 		return err
 	}
 	if err := d.root.Rename(tmp, key); err != nil {
 		_ = d.root.Remove(tmp)
+		return err
+	}
+	return nil
+}
+
+func (d *Disk) writeSynced(name string, data []byte) error {
+	f, err := d.root.OpenFile(name, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o640)
+	if err != nil {
+		return err
+	}
+	_, err = f.Write(data)
+	if err == nil {
+		err = f.Sync()
+	}
+	return errors.Join(err, f.Close())
+}
+
+// Delete удаляет файл; если его уже нет, это не ошибка.
+func (d *Disk) Delete(_ context.Context, key string) error {
+	if !keyRe.MatchString(key) {
+		return fmt.Errorf("%w: bad file key", app.ErrInvalidInput)
+	}
+	if err := d.root.Remove(key); err != nil && !errors.Is(err, fs.ErrNotExist) {
 		return err
 	}
 	return nil

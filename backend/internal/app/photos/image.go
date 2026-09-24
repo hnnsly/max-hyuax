@@ -18,9 +18,11 @@ const (
 	MaxBytes = 5 << 20
 	// MaxSide — длинная сторона после уменьшения: для заявки деталей хватает.
 	MaxSide = 1600
-	// maxPixels — предел размера до декодирования: защита от «бомб» с огромными размерами.
-	maxPixels = 40_000_000
-	quality   = 82
+	// maxPixels и maxDecodedBytes — пределы до декодирования: защита от «бомб» с огромными размерами.
+	// Байты считаются с глубиной цвета: 16-битный PNG на 40 Мп занял бы 320 МБ.
+	maxPixels       = 40_000_000
+	maxDecodedBytes = 128 << 20
+	quality         = 82
 )
 
 var (
@@ -43,32 +45,60 @@ func normalize(raw []byte) (out []byte, width, height int, err error) {
 	if err != nil {
 		return nil, 0, 0, ErrNotImage
 	}
-	if cfg.Width <= 0 || cfg.Height <= 0 || cfg.Width*cfg.Height > maxPixels {
+	pixels := cfg.Width * cfg.Height
+	if cfg.Width <= 0 || cfg.Height <= 0 || pixels > maxPixels || pixels*bytesPerPixel(cfg.ColorModel) > maxDecodedBytes {
 		return nil, 0, 0, ErrTooLarge
 	}
 	src, _, err := image.Decode(bytes.NewReader(raw))
 	if err != nil {
 		return nil, 0, 0, ErrNotImage
 	}
-	if isJPEG {
-		src = orient(src, exifOrientation(raw))
-	}
 
 	// Холст с белым фоном: прозрачные места PNG не станут чёрными.
 	b := src.Bounds()
 	w, h := b.Dx(), b.Dy()
 	if long := max(w, h); long > MaxSide {
-		w, h = w*MaxSide/long, h*MaxSide/long
+		// Узкая полоска не должна стать картинкой нулевой высоты.
+		w, h = max(1, w*MaxSide/long), max(1, h*MaxSide/long)
 	}
-	dst := image.NewRGBA(image.Rect(0, 0, w, h))
-	stddraw.Draw(dst, dst.Bounds(), image.NewUniform(color.White), image.Point{}, stddraw.Src)
-	draw.ApproxBiLinear.Scale(dst, dst.Bounds(), src, b, draw.Over, nil)
+	var dst image.Image = scaled(src, w, h)
+	// Поворот по EXIF — после уменьшения: крутить 12 Мп попиксельно долго и дорого по памяти.
+	if isJPEG {
+		dst = orient(dst, exifOrientation(raw))
+	}
 
 	var buf bytes.Buffer
 	if err := jpeg.Encode(&buf, dst, &jpeg.Options{Quality: quality}); err != nil {
 		return nil, 0, 0, err
 	}
-	return buf.Bytes(), w, h, nil
+	size := dst.Bounds()
+	return buf.Bytes(), size.Dx(), size.Dy(), nil
+}
+
+// scaled рисует src в холст w×h на белом фоне.
+func scaled(src image.Image, w, h int) *image.RGBA {
+	dst := image.NewRGBA(image.Rect(0, 0, w, h))
+	stddraw.Draw(dst, dst.Bounds(), image.NewUniform(color.White), image.Point{}, stddraw.Src)
+	draw.ApproxBiLinear.Scale(dst, dst.Bounds(), src, src.Bounds(), draw.Over, nil)
+	return dst
+}
+
+// bytesPerPixel — сколько памяти займёт пиксель после декодирования (с запасом для JPEG 4:4:4).
+func bytesPerPixel(m color.Model) int {
+	switch m {
+	case color.RGBA64Model, color.NRGBA64Model:
+		return 8
+	case color.Gray16Model:
+		return 2
+	case color.GrayModel, color.AlphaModel:
+		return 1
+	case color.YCbCrModel:
+		return 3
+	}
+	if _, ok := m.(color.Palette); ok {
+		return 1
+	}
+	return 4
 }
 
 // exifOrientation читает тег Orientation (0x0112) из APP1 JPEG; 1 — если его нет или он битый.

@@ -73,27 +73,42 @@ func (s *Service) Prepare(ctx context.Context, u user.User, issueID string) (Lin
 		return Link{}, err
 	}
 	now := s.cfg.Now()
-	switch {
-	case !is.HasParticipant(u.ID):
-		return Link{}, app.ErrForbidden
-	case is.Status().Closed():
-		return Link{}, issue.ErrClosed
-	case !is.IsOverdue(now):
-		return Link{}, ErrNotOverdue
+	if err := allowed(is, u.ID, now); err != nil {
+		return Link{}, err
 	}
 	exp := now.Add(s.cfg.TTL)
 	payload := fmt.Sprintf("%s|%d|%d", is.ID(), u.ID, exp.Unix())
 	return Link{Token: enc(payload) + "." + enc(string(s.sign(payload))), ExpiresAt: exp}, nil
 }
 
-// Document проверяет подпись и срок ссылки и собирает данные обращения.
+// allowed — обращение готовит только участник открытой заявки с истёкшим сроком.
+func allowed(is *issue.Issue, userID int64, now time.Time) error {
+	switch {
+	case !is.HasParticipant(userID):
+		return app.ErrForbidden
+	case is.Status().Closed():
+		return issue.ErrClosed
+	case !is.IsOverdue(now):
+		return ErrNotOverdue
+	}
+	return nil
+}
+
+// Document проверяет подпись и срок ссылки и собирает данные обращения. Условия выдачи
+// проверяются заново: за время жизни ссылки заявку могли закрыть, а аккаунт удалить.
 func (s *Service) Document(ctx context.Context, token string) (Document, error) {
-	issueID, err := s.verify(token)
+	issueID, userID, err := s.verify(token)
 	if err != nil {
 		return Document{}, err
 	}
+	if u, err := s.store.Users().Get(ctx, userID); err != nil || u.Deleted() {
+		return Document{}, fmt.Errorf("%w: appeal link owner is gone", app.ErrForbidden)
+	}
 	is, err := s.store.Issues().Get(ctx, issueID)
 	if err != nil {
+		return Document{}, err
+	}
+	if err := allowed(is, userID, s.cfg.Now()); err != nil {
 		return Document{}, err
 	}
 	houses := s.store.Houses()
@@ -135,27 +150,31 @@ func (s *Service) sign(payload string) []byte {
 	return m.Sum(nil)
 }
 
-// verify возвращает id заявки из действующей ссылки; любая ошибка — ErrForbidden.
-func (s *Service) verify(token string) (string, error) {
+// verify возвращает id заявки и пользователя из действующей ссылки; любая ошибка — ErrForbidden.
+func (s *Service) verify(token string) (string, int64, error) {
 	bad := fmt.Errorf("%w: invalid or expired appeal link", app.ErrForbidden)
 	rawPayload, rawSig, ok := strings.Cut(token, ".")
 	if !ok {
-		return "", bad
+		return "", 0, bad
 	}
 	payload, err1 := dec(rawPayload)
 	sig, err2 := dec(rawSig)
 	if err1 != nil || err2 != nil || !hmac.Equal([]byte(sig), s.sign(payload)) {
-		return "", bad
+		return "", 0, bad
 	}
 	parts := strings.Split(payload, "|")
 	if len(parts) != 3 {
-		return "", bad
+		return "", 0, bad
+	}
+	userID, err := strconv.ParseInt(parts[1], 10, 64)
+	if err != nil {
+		return "", 0, bad
 	}
 	exp, err := strconv.ParseInt(parts[2], 10, 64)
 	if err != nil || !s.cfg.Now().Before(time.Unix(exp, 0)) {
-		return "", bad
+		return "", 0, bad
 	}
-	return parts[0], nil
+	return parts[0], userID, nil
 }
 
 func enc(s string) string { return base64.RawURLEncoding.EncodeToString([]byte(s)) }

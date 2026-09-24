@@ -20,11 +20,12 @@ func newService(t *testing.T, demo bool) (*auth.Service, *apptest.MemStore) {
 	s.DemoKeys = map[string]int64{"resident_demo_1": 1, "uk_operator_demo": 3}
 	clock := now
 	svc := auth.NewService(s, auth.Config{
-		BotToken:      botToken,
-		SessionSecret: "session-secret",
-		SessionTTL:    12 * time.Hour,
-		DemoEnabled:   demo,
-		Now:           func() time.Time { return clock },
+		BotToken:       botToken,
+		SessionSecret:  "session-secret",
+		SessionTTL:     12 * time.Hour,
+		DemoEnabled:    demo,
+		ConsentVersion: "v1",
+		Now:            func() time.Time { return clock },
 	})
 	return svc, s
 }
@@ -115,8 +116,27 @@ func TestAccountConsentHouseAndDelete(t *testing.T) {
 	if err != nil || s.UserMap[1].HouseID != "h-1" {
 		t.Fatalf("house: %+v, %v", s.UserMap[1], err)
 	}
-	if err := svc.DeleteAccount(t.Context(), u); err != nil || !s.UserMap[1].Deleted() {
+	if err := svc.DeleteAccount(t.Context(), u); err != nil || !s.UserMap[1].Deleted() || s.UserMap[1].HouseID != "" {
 		t.Fatalf("delete: %+v, %v", s.UserMap[1], err)
+	}
+}
+
+// Житель MAX удалил аккаунт и вернулся: это новый аккаунт, старые заявки к нему не привязаны.
+func TestReturningMaxUserStartsFresh(t *testing.T) {
+	svc, s := newService(t, true)
+	first, err := svc.EnsureMaxUser(t.Context(), 777, "Ольга")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := svc.DeleteAccount(t.Context(), first); err != nil {
+		t.Fatal(err)
+	}
+	if s.UserMap[first.ID].MaxUserID != 0 {
+		t.Fatalf("deleted user keeps MAX id: %+v", s.UserMap[first.ID])
+	}
+	again, err := svc.EnsureMaxUser(t.Context(), 777, "Ольга")
+	if err != nil || again.ID == first.ID || again.HasConsent("v1") || again.Deleted() {
+		t.Fatalf("again = %+v, err = %v, want a new account without consent", again, err)
 	}
 }
 
@@ -131,7 +151,8 @@ func TestDeletedUserCannotAuthenticate(t *testing.T) {
 	}
 }
 
-// Проверяющий удалил демо-аккаунт: следующий демо-вход восстанавливает его, иначе демо сломается для всех.
+// Проверяющий удалил демо-аккаунт: следующий демо-вход возвращает его в исходное состояние,
+// иначе демо и проверки DATA-API сломаются для всех.
 func TestDemoLoginRestoresDeletedDemoUser(t *testing.T) {
 	svc, s := newService(t, true)
 	if err := svc.DeleteAccount(t.Context(), s.UserMap[1]); err != nil {
@@ -141,8 +162,8 @@ func TestDemoLoginRestoresDeletedDemoUser(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoginDemo after delete: %v", err)
 	}
-	if sess.User.Deleted() || sess.User.FirstName != "Анна" || sess.User.HasConsent("v1") {
-		t.Fatalf("restored user = %+v, want active, named, without consent", sess.User)
+	if u := sess.User; u.Deleted() || u.FirstName != "Анна" || !u.HasConsent("v1") || u.HouseID != "h-17k2" {
+		t.Fatalf("restored user = %+v, want the demo user as seeded", u)
 	}
 	if _, err := svc.Authenticate(t.Context(), sess.Token); err != nil {
 		t.Fatalf("Authenticate restored demo user: %v", err)

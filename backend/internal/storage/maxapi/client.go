@@ -8,6 +8,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json/v2"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -194,16 +195,22 @@ func (c *Client) do(ctx context.Context, method, path string, q url.Values, body
 	return nil
 }
 
+// downloadTimeout — у клиента общего таймаута нет (long polling), поэтому скачивание ограничено отдельно.
+const downloadTimeout = 30 * time.Second
+
 // Download скачивает файл по ссылке из вложения (CDN MAX) не больше limit байт.
-// Токен бота не передаётся: он нужен только самому Bot API.
+// Токен бота не передаётся: он нужен только самому Bot API. Ссылка подписана и ведёт
+// к фото жителя, поэтому в текст ошибки (и в лог) она не попадает.
 func (c *Client) Download(ctx context.Context, fileURL string, limit int64) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(ctx, downloadTimeout)
+	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, fileURL, nil)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("maxapi: download: %w", withoutURL(err))
 	}
 	resp, err := c.http.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("maxapi: download: %w", err)
+		return nil, fmt.Errorf("maxapi: download: %w", withoutURL(err))
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
@@ -211,10 +218,18 @@ func (c *Client) Download(ctx context.Context, fileURL string, limit int64) ([]b
 	}
 	data, err := io.ReadAll(io.LimitReader(resp.Body, limit+1))
 	if err != nil {
-		return nil, fmt.Errorf("maxapi: download: %w", err)
+		return nil, fmt.Errorf("maxapi: download: %w", withoutURL(err))
 	}
 	if int64(len(data)) > limit {
 		return nil, fmt.Errorf("maxapi: download: file is larger than %d bytes", limit)
 	}
 	return data, nil
+}
+
+// withoutURL снимает с ошибки net/http обёртку *url.Error, в тексте которой есть адрес запроса.
+func withoutURL(err error) error {
+	if ue, ok := errors.AsType[*url.Error](err); ok {
+		return ue.Err
+	}
+	return err
 }

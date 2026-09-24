@@ -127,15 +127,47 @@ func TestNormalizeRejects(t *testing.T) {
 	}
 }
 
+// 16-битный PNG: 40 Мп проходят предел по пикселям, но при декодировании займут 320 МБ.
+func TestNormalizeRejectsDeepColorBomb(t *testing.T) {
+	bomb := pngHeader(image.NewRGBA64(image.Rect(0, 0, 1, 1)), 6400, 6250)
+	if _, _, _, err := normalize(bomb); !errors.Is(err, ErrTooLarge) {
+		t.Fatalf("err = %v, want ErrTooLarge", err)
+	}
+}
+
+// Поворот делается после уменьшения, а размеры в ответе — уже повёрнутые.
+func TestNormalizeRotatesLargeImageAfterDownscale(t *testing.T) {
+	_, w, h, err := normalize(withOrientation(testJPEG(t, 3200, 2400), 6))
+	if err != nil || w != 1200 || h != MaxSide {
+		t.Fatalf("w=%d h=%d err=%v, want 1200x%d", w, h, err, MaxSide)
+	}
+}
+
+// Очень узкая картинка не должна превратиться в JPEG нулевой высоты.
+func TestNormalizeKeepsThinImageVisible(t *testing.T) {
+	var buf bytes.Buffer
+	if err := png.Encode(&buf, image.NewGray(image.Rect(0, 0, 8000, 1))); err != nil {
+		t.Fatal(err)
+	}
+	_, w, h, err := normalize(buf.Bytes())
+	if err != nil || w != MaxSide || h != 1 {
+		t.Fatalf("w=%d h=%d err=%v, want %dx1", w, h, err, MaxSide)
+	}
+}
+
 // bombHeader — PNG с заголовком 20000×20000: декодировать такое нельзя, память кончится.
 func bombHeader() []byte {
-	img := image.NewGray(image.Rect(0, 0, 1, 1))
+	return pngHeader(image.NewGray(image.Rect(0, 0, 1, 1)), 20000, 20000)
+}
+
+// pngHeader кодирует картинку 1×1 и подменяет размеры в заголовке: данных нет, есть только обещание.
+func pngHeader(img image.Image, w, h uint32) []byte {
 	var buf bytes.Buffer
 	_ = png.Encode(&buf, img)
 	b := buf.Bytes()
 	// IHDR начинается с 16-го байта: ширина и высота по 4 байта.
-	binary.BigEndian.PutUint32(b[16:], 20000)
-	binary.BigEndian.PutUint32(b[20:], 20000)
+	binary.BigEndian.PutUint32(b[16:], w)
+	binary.BigEndian.PutUint32(b[20:], h)
 	// CRC чанка считается по типу и данным (байты 12..28), иначе файл отвергнут как битый.
 	binary.BigEndian.PutUint32(b[29:], crc32.ChecksumIEEE(b[12:29]))
 	return b
