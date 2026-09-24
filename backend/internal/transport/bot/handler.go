@@ -13,6 +13,7 @@ import (
 
 	"dommax/internal/app"
 	"dommax/internal/app/auth"
+	"dommax/internal/app/hints"
 	"dommax/internal/app/houses"
 	"dommax/internal/app/issues"
 	"dommax/internal/domain/issue"
@@ -44,6 +45,7 @@ type Services struct {
 	Auth           *auth.Service
 	Issues         *issues.Service
 	Houses         *houses.Service
+	Hints          *hints.Service
 	ConsentVersion string
 	Now            func() time.Time
 }
@@ -133,10 +135,13 @@ func (h *Handler) onProblemText(ctx context.Context, to maxapi.Target, from maxa
 	if u.HouseID == "" {
 		return h.askHouse(ctx, to)
 	}
-	rule, ok := rules.Classify(txt)
-	if !ok || utf8.RuneCountInString(txt) > maxTextRunes {
-		return h.openForm(ctx, to, rule.Code)
+	// Подсказка: модель (если подключена) или ключевые слова; житель подтверждает кнопкой.
+	// Нераспознанный или длинный текст удобнее оформить в форме, категория подставится, если узнана.
+	hint, ok, err := h.svc.Hints.Suggest(ctx, txt)
+	if err != nil || !ok || utf8.RuneCountInString(txt) > maxTextRunes {
+		return h.openForm(ctx, to, hint.Rule.Code)
 	}
+	rule := hint.Rule
 	similar, err := h.svc.Issues.FindSimilar(ctx, u.HouseID, rule.Code, "")
 	if err != nil {
 		return err

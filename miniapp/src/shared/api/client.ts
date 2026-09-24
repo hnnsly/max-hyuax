@@ -1,6 +1,6 @@
 // Клиент API: JSON, токен сессии, единый формат ошибок {"error": {"code", "message"}}.
 import type {
-  Category, House, HouseDetails, Issue, IssueEvent, AssetObject, ReportInput, Session, Status, UkMetrics, User,
+  Category, CategoryHint, House, HouseDetails, Issue, IssueEvent, AssetObject, ReportInput, Session, Status, UkMetrics, User,
 } from './types';
 
 export class ApiError extends Error {
@@ -66,6 +66,7 @@ export const api = {
   deleteAccount: () => request<void>('DELETE', '/me'),
   myIssues: () => request<Issue[]>('GET', '/me/issues'),
   categories: () => request<Category[]>('GET', '/categories'),
+  classify: (text: string) => request<CategoryHint>('POST', '/classify', { text }),
   searchHouses: (query: string) => request<House[]>('GET', `/houses?${q({ query })}`),
   nearestHouses: (lat: number, lon: number) => request<House[]>('GET', `/houses/nearest?${q({ lat: String(lat), lon: String(lon) })}`),
   house: (id: string) => request<HouseDetails>('GET', `/houses/${encodeURIComponent(id)}`),

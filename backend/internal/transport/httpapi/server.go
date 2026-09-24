@@ -14,6 +14,7 @@ import (
 
 	"dommax/internal/app"
 	"dommax/internal/app/auth"
+	"dommax/internal/app/hints"
 	"dommax/internal/app/houses"
 	"dommax/internal/app/issues"
 	"dommax/internal/domain/issue"
@@ -25,6 +26,7 @@ type Deps struct {
 	Auth           *auth.Service
 	Issues         *issues.Service
 	Houses         *houses.Service
+	Hints          *hints.Service
 	Webhook        *bot.Webhook // nil — webhook выключен (BOT_MODE не webhook)
 	Ping           func(context.Context) error
 	ConsentVersion string
@@ -48,6 +50,7 @@ func New(d Deps) *fiber.App {
 	api.Post("/auth/max", h.loginMax)
 	api.Post("/auth/demo", h.loginDemo)
 	api.Get("/categories", h.categories)
+	api.Post("/classify", h.auth, h.classifyText)
 
 	// Остальное — только с сессией: middleware указан у каждого маршрута явно.
 	api.Get("/me", h.auth, h.me)

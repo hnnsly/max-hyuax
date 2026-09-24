@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildRail, buildTimeline, groupQueue, nextStatuses, parseStartParam, shareText, type RailItem } from './model';
+import { buildRail, buildTimeline, groupQueue, hintOffer, nextStatuses, parseStartParam, shareText, worthHint, type RailItem } from './model';
 
 const sym = { done: 'd', left: '-', late: 'x' } as const;
 const tones = (items: RailItem[]) =>
@@ -50,6 +50,26 @@ describe('хронология', () => {
       ['Житель сообщил о проблеме', false],
       ['Срок ответа истёк', true],
     ]);
+  });
+});
+
+describe('подсказка категории', () => {
+  const hint = { category: 'lighting', title: 'Свет в подъезде', source: 'llm' as const };
+
+  it('предлагает категорию, если она отличается от выбранной', () => {
+    expect(hintOffer(hint, '')).toEqual({ code: 'lighting', title: 'Свет в подъезде' });
+    expect(hintOffer(hint, 'lift')).toEqual({ code: 'lighting', title: 'Свет в подъезде' });
+  });
+
+  it('молчит, если категория уже та же или подсказки нет', () => {
+    expect(hintOffer(hint, 'lighting')).toBeNull();
+    expect(hintOffer({ category: null, title: null, source: null }, '')).toBeNull();
+    expect(hintOffer(null, '')).toBeNull();
+  });
+
+  it('спрашивает только про осмысленный текст', () => {
+    expect(worthHint('лифт')).toBe(false);
+    expect(worthHint('  не горит свет  ')).toBe(true);
   });
 });
 

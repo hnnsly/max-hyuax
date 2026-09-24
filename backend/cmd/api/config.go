@@ -24,6 +24,9 @@ type config struct {
 	MaxAPIURL      string
 	MaxCAFile      string
 	MaxInsecureTLS bool
+
+	OllamaURL   string // пусто — LLM не подключена, подсказка по ключевым словам
+	OllamaModel string
 }
 
 func (c config) WebhookURL() string { return "https://" + c.Domain + "/webhook/max" }
@@ -44,6 +47,8 @@ func loadConfig(getenv func(string) string) (config, error) {
 		WebhookSecret:  getenv("MAX_WEBHOOK_SECRET"),
 		MaxAPIURL:      cmp.Or(getenv("MAX_API_URL"), maxapi.DefaultBaseURL),
 		MaxCAFile:      getenv("MAX_API_CA_FILE"),
+		OllamaURL:      getenv("OLLAMA_URL"),
+		OllamaModel:    cmp.Or(getenv("OLLAMA_MODEL"), "qwen3:1.7b"),
 	}
 	var errs []error
 	parseBool := func(name string, dst *bool) {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"sync"
 	"time"
 	"uuid"
@@ -12,8 +13,10 @@ import (
 
 	"dommax/internal/app/auth"
 	"dommax/internal/app/cards"
+	"dommax/internal/app/hints"
 	"dommax/internal/app/houses"
 	"dommax/internal/app/issues"
+	"dommax/internal/storage/llm"
 	"dommax/internal/storage/maxapi"
 	"dommax/internal/storage/postgres"
 	"dommax/internal/transport/bot"
@@ -21,7 +24,11 @@ import (
 	"dommax/internal/transport/jobs"
 )
 
-const sessionTTL = 12 * time.Hour
+const (
+	sessionTTL = 12 * time.Hour
+	// llmTimeout — сколько ждать подсказку модели; дальше работают ключевые слова (ADR-008).
+	llmTimeout = 6 * time.Second
+)
 
 // Container — DI-контейнер сервиса: единственное место, где зависимости собираются вместе
 // (ADR-010). База открывается сразу в Open, остальное создаётся лениво при первом запросе
@@ -35,6 +42,7 @@ type Container struct {
 	auth       func() *auth.Service
 	issues     func() *issues.Service
 	houses     func() *houses.Service
+	hints      func() *hints.Service
 	maxClient  func() (*maxapi.Client, error)
 	botMe      func() (maxapi.User, error)
 	botHandler func() (*bot.Handler, error)
@@ -68,6 +76,15 @@ func Open(ctx context.Context, cfg config, log *slog.Logger) (*Container, error)
 		})
 	})
 	c.houses = sync.OnceValue(func() *houses.Service { return houses.NewService(store) })
+	c.hints = sync.OnceValue(func() *hints.Service {
+		// Без OLLAMA_URL подсказка работает на ключевых словах.
+		var model hints.LLM
+		if cfg.OllamaURL != "" {
+			model = llm.NewOllama(cfg.OllamaURL, cfg.OllamaModel, &http.Client{})
+			log.Info("llm hints enabled", "model", cfg.OllamaModel)
+		}
+		return hints.NewService(model, llmTimeout, log)
+	})
 
 	c.maxClient = sync.OnceValues(func() (*maxapi.Client, error) {
 		if cfg.MaxInsecureTLS {
@@ -96,7 +113,7 @@ func Open(ctx context.Context, cfg config, log *slog.Logger) (*Container, error)
 			return nil, err
 		}
 		return bot.NewHandler(client, me.Username, bot.Services{
-			Auth: c.Auth(), Issues: c.Issues(), Houses: c.Houses(), ConsentVersion: cfg.ConsentVersion, Now: time.Now,
+			Auth: c.Auth(), Issues: c.Issues(), Houses: c.Houses(), Hints: c.Hints(), ConsentVersion: cfg.ConsentVersion, Now: time.Now,
 		}, log), nil
 	})
 	c.webhook = sync.OnceValues(func() (*bot.Webhook, error) {
@@ -138,7 +155,7 @@ func Open(ctx context.Context, cfg config, log *slog.Logger) (*Container, error)
 	})
 	c.http = sync.OnceValues(func() (*fiber.App, error) {
 		deps := httpapi.Deps{
-			Auth: c.Auth(), Issues: c.Issues(), Houses: c.Houses(),
+			Auth: c.Auth(), Issues: c.Issues(), Houses: c.Houses(), Hints: c.Hints(),
 			Ping: store.Ping, ConsentVersion: cfg.ConsentVersion, Now: time.Now, Log: log,
 		}
 		if cfg.BotMode == "webhook" {
@@ -159,6 +176,7 @@ func (c *Container) Store() *postgres.Store  { return c.store }
 func (c *Container) Auth() *auth.Service     { return c.auth() }
 func (c *Container) Issues() *issues.Service { return c.issues() }
 func (c *Container) Houses() *houses.Service { return c.houses() }
+func (c *Container) Hints() *hints.Service   { return c.hints() }
 
 func (c *Container) MaxClient() (*maxapi.Client, error)        { return c.maxClient() }
 func (c *Container) BotIdentity() (maxapi.User, error)         { return c.botMe() }

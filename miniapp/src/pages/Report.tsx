@@ -1,12 +1,13 @@
 import { Button } from '@maxhub/max-ui';
 import { Door, Drop, Elevator, Lightbulb, Thermometer, Trash } from '@phosphor-icons/react';
-import { useState, type ComponentType } from 'react';
+import { useEffect, useState, type ComponentType } from 'react';
 import { useRouter } from '../app/router';
 import { useSession, useUser } from '../app/session';
 import { api, ApiError } from '../shared/api/client';
-import type { AssetObject, Category, HouseDetails, Issue } from '../shared/api/types';
+import type { AssetObject, Category, CategoryHint, HouseDetails, Issue } from '../shared/api/types';
 import { useResource } from '../shared/api/useResource';
 import { capitalize, dayMonth, plural, time } from '../shared/lib/format';
+import { hintOffer, worthHint } from '../shared/lib/model';
 import { EmptyState, ErrorState, Island, Loading, Screen, useToast } from '../shared/ui/Layout';
 import { Stamp } from '../shared/ui/Plate';
 import s from './report.module.css';
@@ -93,6 +94,27 @@ function ReportFlow({ ctx, initialCategory }: { ctx: Context; initialCategory?: 
   const [similar, setSimilar] = useState<Issue[]>([]);
   const [agree, setAgree] = useState(user.has_consent);
   const [busy, setBusy] = useState(false);
+  const [hint, setHint] = useState<CategoryHint | null>(null);
+
+  // Подсказка категории по тексту: спрашиваем после паузы в наборе; по QR категория уже известна.
+  useEffect(() => {
+    if (ctx.fixedObject || !worthHint(text)) {
+      setHint(null);
+      return;
+    }
+    let alive = true;
+    const t = setTimeout(() => {
+      api.classify(text).then(
+        (h) => alive && setHint(h),
+        () => alive && setHint(null),
+      );
+    }, 700);
+    return () => {
+      alive = false;
+      clearTimeout(t);
+    };
+  }, [text, ctx.fixedObject]);
+  const offer = hintOffer(hint, category);
 
   const { house } = ctx;
   const rule = ctx.categories.find((c) => c.code === category);
@@ -311,6 +333,24 @@ function ReportFlow({ ctx, initialCategory }: { ctx: Context; initialCategory?: 
         placeholder="Например: кабина не приходит на вызов, горит индикатор"
       />
       <p className={s.help}>Коротко и как есть. Дальше проверим, не сообщали ли уже соседи.</p>
+      {offer && (
+        <div className={s.hint} role="status">
+          <Lightbulb size={18} className={s.hintIcon} aria-hidden="true" />
+          <p className={s.hintText}>
+            <span className={s.hintLead}>Похоже на «{offer.title}».</span> Категорию можно поправить.
+          </p>
+          <button
+            type="button"
+            className={s.hintButton}
+            onClick={() => {
+              setCategory(offer.code);
+              setObjectId('');
+            }}
+          >
+            Выбрать
+          </button>
+        </div>
+      )}
       {toast}
     </Screen>
   );

@@ -53,8 +53,37 @@ services:
       MAX_BOT_TOKEN: ${MAX_BOT_TOKEN:-}
       MAX_WEBHOOK_SECRET: ${MAX_WEBHOOK_SECRET:-}
       DOMAIN: ${DOMAIN:-}
+      # Подсказка категории через LLM (профиль llm). Пусто — только ключевые слова.
+      OLLAMA_URL: ${OLLAMA_URL:-}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:1.7b}
+
+  ollama:
+    # Self-hosted модель для подсказки категории (ADR-008). Запускается только с профилем llm.
+    image: ollama/ollama:0.34.3
+    profiles: [llm]
+    restart: unless-stopped
+    volumes:
+      - ollama_models:/root/.ollama
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+  ollama-pull:
+    # Скачивает модель один раз при первом запуске, а не при сборке: сборка остаётся быстрой.
+    image: ollama/ollama:0.34.3
+    profiles: [llm]
+    depends_on:
+      ollama:
+        condition: service_healthy
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+    command: ["pull", "${OLLAMA_MODEL:-qwen3:1.7b}"]
+    restart: "no"
 
 volumes:
+  ollama_models:
   caddy_data:
   caddy_config:
   pg_data:

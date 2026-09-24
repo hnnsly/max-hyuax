@@ -94,6 +94,38 @@ paths:
                 type: array
                 items: { $ref: "#/components/schemas/Category" }
 
+  /classify:
+    post:
+      tags: [issues]
+      summary: Подсказка категории по тексту жителя
+      description: |
+        Если подключена self-hosted модель (OLLAMA_URL), она выбирает код из закрытого справочника;
+        при ошибке, таймауте или неизвестном коде работают ключевые слова. Житель подтверждает категорию сам,
+        ответственный и срок задают правила. Все поля null, если категорию не узнали.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text: { type: string, minLength: 1, maxLength: 1000, example: Не горит свет на пятом этаже }
+      responses:
+        "200":
+          description: Подсказка
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [category, title, source]
+                properties:
+                  category: { type: [string, "null"], example: lighting }
+                  title: { type: [string, "null"], example: Свет в подъезде }
+                  source: { type: [string, "null"], enum: [llm, rules, null] }
+        "401": { $ref: "#/components/responses/Error" }
+        "422": { $ref: "#/components/responses/Error" }
+
   /me:
     get:
       tags: [me]

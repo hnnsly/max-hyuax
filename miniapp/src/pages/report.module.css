@@ -52,6 +52,46 @@
   line-height: 1.35;
 }
 
+/* Подсказка категории (холст Report): полоса эмали слева, лампа, кнопка выбора */
+.hint {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  padding: 12px 12px 12px 14px;
+  border-radius: 12px;
+  background: var(--surface-secondary);
+  box-shadow: inset 3px 0 0 var(--enamel);
+}
+.hintIcon {
+  color: var(--enamel-text);
+}
+.hintText {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.35;
+  color: var(--text-2);
+}
+.hintLead {
+  color: var(--text);
+  font-weight: 650;
+}
+.hintButton {
+  border: 0;
+  border-radius: 10px;
+  padding: 8px 12px;
+  background: var(--control);
+  font: inherit;
+  font-size: 14.5px;
+  font-weight: 650;
+  color: var(--enamel-text);
+  cursor: pointer;
+}
+.hintButton:focus-visible {
+  outline: 2px solid var(--enamel);
+  outline-offset: 2px;
+}
+
 .tiles {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

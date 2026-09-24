@@ -11,10 +11,12 @@ import (
 
 	"dommax/internal/app/apptest"
 	"dommax/internal/app/auth"
+	"dommax/internal/app/hints"
 	"dommax/internal/app/houses"
 	"dommax/internal/app/issues"
 	"dommax/internal/domain/house"
 	"dommax/internal/domain/issue"
+	"dommax/internal/domain/rules"
 	"dommax/internal/domain/user"
 	"dommax/internal/storage/maxapi"
 	"dommax/internal/transport/bot"
@@ -87,7 +89,10 @@ type env struct {
 	h     *bot.Handler
 }
 
-func newEnv(t *testing.T) env {
+func newEnv(t *testing.T) env { return newEnvWithLLM(t, nil) }
+
+// newEnvWithLLM — окружение бота с моделью для подсказки категории (nil — только правила).
+func newEnvWithLLM(t *testing.T, llm hints.LLM) env {
 	t.Helper()
 	s := apptest.New()
 	s.Orgs["org-1"] = house.Organization{ID: "org-1", Name: "УК «Ореховый квартал»", PhoneDispatcher: "+7 495 000-17-02"}
@@ -98,6 +103,7 @@ func newEnv(t *testing.T) env {
 		Auth:           auth.NewService(s, auth.Config{Now: now}),
 		Issues:         issues.NewService(s, issues.Config{Now: now, NewID: func() string { n++; return fmt.Sprintf("i-%d", n) }, ConsentVersion: "v1"}),
 		Houses:         houses.NewService(s),
+		Hints:          hints.NewService(llm, time.Second, slog.New(slog.NewTextHandler(io.Discard, nil))),
 		ConsentVersion: "v1",
 		Now:            now,
 	}
@@ -203,6 +209,22 @@ func TestProblemIsConfirmedThenReported(t *testing.T) {
 	}
 	if txt, _ := e.max.last("cb2"); !strings.Contains(txt, fmt.Sprintf("Заявка № %d", list[0].Number())) {
 		t.Fatalf("answer = %q", txt)
+	}
+}
+
+type llmStub string
+
+func (s llmStub) Category(context.Context, string, []rules.Rule) (string, error) {
+	return string(s), nil
+}
+
+// Ключевых слов в тексте нет, но модель узнала протечку: бот предлагает её подтвердить.
+func TestModelHintIsUsedWhenKeywordsMiss(t *testing.T) {
+	e := newEnvWithLLM(t, llmStub("leak"))
+	e.resident(3010, true)
+	e.handle(t, text(3010, "Вода льётся по стене в подъезде"))
+	if txt, _ := e.max.last(""); !strings.Contains(txt, "Поняли так: Протечка") {
+		t.Fatalf("confirm = %q", txt)
 	}
 }
 

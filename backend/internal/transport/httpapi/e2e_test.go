@@ -21,6 +21,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 
 	"dommax/internal/app/auth"
+	"dommax/internal/app/hints"
 	"dommax/internal/app/houses"
 	"dommax/internal/app/issues"
 	"dommax/internal/storage/maxapi"
@@ -73,6 +74,7 @@ func TestMain(m *testing.M) {
 			}),
 			Issues:         issues.NewService(store, issues.Config{Now: time.Now, NewID: func() string { return uuid.NewV7().String() }, ConsentVersion: "v1"}),
 			Houses:         houses.NewService(store),
+			Hints:          hints.NewService(nil, time.Second, log),
 			Webhook:        bot.NewWebhook("hook-secret", webhooks, store, log),
 			Ping:           store.Ping,
 			ConsentVersion: "v1",
@@ -246,6 +248,18 @@ func TestOperatorSeesMetrics(t *testing.T) {
 	}
 	if m["closed_total"].(float64) < m["closed_on_time"].(float64) || m["reports_per_issue"].(float64) < 1 {
 		t.Errorf("inconsistent metrics: %v", m)
+	}
+}
+
+func TestClassifyHint(t *testing.T) {
+	anna := login(t, "resident")
+	got := expect(t, call(t, "POST", "/api/v1/classify", anna, map[string]string{"text": "Не горит свет на пятом этаже"}), 200, "classify").body
+	if got["category"] != "lighting" || got["title"] != "Свет в подъезде" || got["source"] != "rules" {
+		t.Fatalf("hint = %v", got)
+	}
+	none := expect(t, call(t, "POST", "/api/v1/classify", anna, map[string]string{"text": "добрый день"}), 200, "classify nothing").body
+	if v, ok := none["category"]; !ok || v != nil {
+		t.Fatalf("no hint = %v, want category null", none)
 	}
 }
 

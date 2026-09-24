@@ -193,3 +193,10 @@ func toMetricsDTO(m issues.Metrics) metricsDTO {
 	})
 	return d
 }
+
+// hintDTO — подсказка категории; все поля null, если категорию не узнали.
+type hintDTO struct {
+	Category *string `json:"category"`
+	Title    *string `json:"title"`
+	Source   *string `json:"source"` // llm | rules
+}

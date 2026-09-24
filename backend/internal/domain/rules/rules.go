@@ -34,6 +34,9 @@ func (r Rule) Deadline(created time.Time) time.Time {
 
 const basisResponse = "Правила управления МКД (ПП № 416): ответ на обращение в установленный срок"
 
+// CodeOther — категория «Другое общее имущество», когда точнее определить нельзя.
+const CodeOther = "other"
+
 // Справочник пилота. Сроки — модельные значения MVP; перед реальным пилотом
 // их нужно сверить с регламентом управляющей компании.
 var catalog = []Rule{
@@ -49,7 +52,7 @@ var catalog = []Rule{
 		Keywords: []string{"двер", "домофон", "замок", "доводчик"}},
 	{Code: "garbage", Title: "Мусоропровод и уборка", Responsible: ResponsibleManagementCompany, Basis: basisResponse, BusinessDays: 3,
 		Keywords: []string{"мусор", "грязно", "уборк", "запах"}},
-	{Code: "other", Title: "Другое общее имущество", Responsible: ResponsibleManagementCompany, Basis: basisResponse, BusinessDays: 10},
+	{Code: CodeOther, Title: "Другое общее имущество", Responsible: ResponsibleManagementCompany, Basis: basisResponse, BusinessDays: 10},
 }
 
 // Categories возвращает все категории в порядке показа.

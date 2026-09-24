@@ -1,5 +1,5 @@
 // Модели отображения: шкала срока, хронология заявки, разбор параметра запуска.
-import type { IssueEvent, Status } from '../api/types';
+import type { CategoryHint, IssueEvent, Status } from '../api/types';
 import { calendarDaysBetween, plural } from './format';
 
 export type RailItem =
@@ -145,3 +145,12 @@ export function parseStartParam(raw: string): StartTarget | null {
   }
   return null;
 }
+
+/** Что предложить жителю по подсказке: категорию, если она отличается от уже выбранной. */
+export function hintOffer(hint: CategoryHint | null, current: string): { code: string; title: string } | null {
+  if (!hint?.category || hint.category === current) return null;
+  return { code: hint.category, title: hint.title ?? hint.category };
+}
+
+/** Подсказку спрашиваем, когда в тексте уже есть о чём судить. */
+export const worthHint = (text: string) => text.trim().length >= 8;

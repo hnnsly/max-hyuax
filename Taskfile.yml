@@ -89,6 +89,12 @@ tasks:
     cmds:
       - go test -tags live -count=1 -v ./internal/storage/maxapi
 
+  test:llm:
+    desc: Проверка подсказки категории на настоящем Ollama (нужны OLLAMA_URL и скачанная модель)
+    dir: backend
+    cmds:
+      - go test -tags live -count=1 -v ./internal/storage/llm
+
   build:
     desc: Собрать бинарник api в backend/bin
     dir: backend

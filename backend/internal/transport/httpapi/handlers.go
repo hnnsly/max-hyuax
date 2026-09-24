@@ -317,3 +317,22 @@ func (h *handlers) sendOne(c fiber.Ctx, status int, is *issue.Issue) error {
 	}
 	return c.Status(status).JSON(one[0])
 }
+
+// classifyText подсказывает категорию по тексту жителя; null — не узнали, житель выбирает сам.
+func (h *handlers) classifyText(c fiber.Ctx) error {
+	var in struct {
+		Text string `json:"text"`
+	}
+	if err := bind(c, &in); err != nil {
+		return err
+	}
+	hint, ok, err := h.Hints.Suggest(c.Context(), in.Text)
+	if err != nil {
+		return err
+	}
+	out := hintDTO{}
+	if ok {
+		out = hintDTO{Category: &hint.Rule.Code, Title: &hint.Rule.Title, Source: (*string)(&hint.Source)}
+	}
+	return c.JSON(out)
+}

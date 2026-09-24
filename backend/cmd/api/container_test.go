@@ -4,6 +4,7 @@ package main
 
 import (
 	"context"
+	"encoding/json/v2"
 	"io"
 	"log/slog"
 	"net/http"
@@ -86,6 +87,59 @@ func TestContainerGivesSingletonsAndServesHealth(t *testing.T) {
 	res, err := app.Test(httptest.NewRequest(http.MethodGet, "/api/v1/health", http.NoBody))
 	if err != nil || res.StatusCode != http.StatusOK {
 		t.Fatalf("health: %v, %v", res, err)
+	}
+}
+
+// С OLLAMA_URL подсказка категории идёт через модель.
+func TestClassifyUsesOllamaWhenConfigured(t *testing.T) {
+	ollama := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		io.WriteString(w, `{"message":{"role":"assistant","content":"{\"category\":\"leak\"}"},"done":true}`)
+	}))
+	defer ollama.Close()
+	cfg := testConfig(t)
+	cfg.OllamaURL, cfg.OllamaModel = ollama.URL, "test-model"
+	c, err := Open(t.Context(), cfg, quietLog())
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer c.Close()
+	app, _ := c.HTTP()
+
+	res, err := app.Test(jsonRequest(http.MethodPost, "/api/v1/auth/demo", "", `{"role":"resident"}`))
+	if err != nil || res.StatusCode != http.StatusOK {
+		t.Fatalf("demo login: %v, %v", res, err)
+	}
+	var sess struct {
+		Token string `json:"token"`
+	}
+	readJSON(t, res.Body, &sess)
+	res, err = app.Test(jsonRequest(http.MethodPost, "/api/v1/classify", sess.Token, `{"text":"вода льётся по стене"}`))
+	if err != nil || res.StatusCode != http.StatusOK {
+		t.Fatalf("classify: %v, %v", res, err)
+	}
+	var hint struct {
+		Category string `json:"category"`
+		Source   string `json:"source"`
+	}
+	readJSON(t, res.Body, &hint)
+	if hint.Category != "leak" || hint.Source != "llm" {
+		t.Fatalf("hint = %+v", hint)
+	}
+}
+
+func jsonRequest(method, path, token, body string) *http.Request {
+	req := httptest.NewRequest(method, path, strings.NewReader(body))
+	req.Header.Set("Content-Type", "application/json")
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	return req
+}
+
+func readJSON(t *testing.T, r io.Reader, v any) {
+	t.Helper()
+	if err := json.UnmarshalRead(r, v); err != nil {
+		t.Fatal(err)
 	}
 }
 

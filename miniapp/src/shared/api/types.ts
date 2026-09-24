@@ -104,6 +104,13 @@ export interface ReportInput {
 
 export const isClosed = (s: Status) => s === 'done' || s === 'rejected';
 
+/** Подсказка категории по тексту; все поля null, если не узнали. */
+export interface CategoryHint {
+  category: string | null;
+  title: string | null;
+  source: 'llm' | 'rules' | null;
+}
+
 export interface DayMedian {
   date: string; // ГГГГ-ММ-ДД, день подачи по Москве
   median_min: number | null;
