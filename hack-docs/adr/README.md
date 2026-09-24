@@ -25,6 +25,7 @@ tags: [adr, decisions]
 | [007](007-submission-packaging.md) | Сдача из отдельного чистого репозитория без ИИ-меток | accepted | 2026-09-17 |
 | [008](008-llm-self-hosted.md) | Self-hosted LLM (Ollama) только как подсказка с откатом на правила | accepted | 2026-09-17 |
 | [009](009-visual-identity.md) | Визуальная айдентика «Адресная табличка»: нативная база MAX UI + фирменный слой, Sofia Sans, штамп статуса | accepted | 2026-09-17 |
+| [013](013-submission-run-and-data-api.md) | Запуск для жюри одной командой, формат DATA-API.yaml 1.0 и его проверка в CI | accepted | 2026-09-24 |
 
 Статусы: `candidate` — решение нужно, не обсуждалось; `proposed` — предложено; `accepted` — принято; `superseded` — заменено.
 

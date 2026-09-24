@@ -8,10 +8,10 @@ services:
       dockerfile: deploy/web.Dockerfile
     restart: unless-stopped
     ports:
-      - "80:80"
-      - "443:443"
+      - "${HTTP_PORT:-80}:80"
+      - "${HTTPS_PORT:-443}:443"
     environment:
-      DOMAIN: ${DOMAIN:?set DOMAIN in deploy/.env}
+      DOMAIN: ${DOMAIN:?set DOMAIN in deploy/.env or pass --env-file deploy/.env.example}
     volumes:
       - caddy_data:/data
       - caddy_config:/config
@@ -26,7 +26,7 @@ services:
       # На сервере задать свой пароль в deploy/.env. Наружу порт открыт только на 127.0.0.1.
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dommax}
     ports:
-      - "127.0.0.1:5432:5432"
+      - "127.0.0.1:${DB_PORT:-5432}:5432"
     volumes:
       # С Postgres 18 образ хранит данные в /var/lib/postgresql/<версия>, том монтируется на уровень выше.
       - pg_data:/var/lib/postgresql

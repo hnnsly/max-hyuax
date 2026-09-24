@@ -1,0 +1,81 @@
+{
+  "description": "Тестовые данные для проверки. Все записи модельные или синтетические и создаются миграциями при первом запуске api (backend/internal/storage/postgres/migrations, 00002, 00003, 00006).",
+  "base_url": "https://<домен-стенда>/api/v1",
+  "local_base_url": "http://localhost/api/v1",
+  "demo_login": {
+    "method": "POST",
+    "path": "/auth/demo",
+    "body": { "role": "resident" },
+    "note": "Пароля нет: демо-вход включается переменной DEMO_AUTH_ENABLED=true и выдаёт токен роли на 12 часов. В браузере то же самое: ?demo=resident, ?demo=resident_2, ?demo=uk."
+  },
+  "roles": [
+    { "role": "resident", "who": "Анна, житель дома «Ореховый бульвар, 17к2»", "house_id": "h-17k2", "browser": "/?demo=resident" },
+    { "role": "resident_2", "who": "Сергей, сосед из того же дома", "house_id": "h-17k2", "browser": "/?demo=resident_2" },
+    { "role": "uk_operator", "who": "Сотрудник УК «Ореховый квартал»", "organization_id": "org-orekh", "browser": "/?demo=uk" }
+  ],
+  "organization": {
+    "id": "org-orekh",
+    "name": "УК «Ореховый квартал»",
+    "model": true,
+    "phone_dispatcher": "+7 495 000-17-02"
+  },
+  "houses": [
+    { "id": "h-13k1", "address": "Ореховый бульвар, 13к1", "entrances": 3 },
+    { "id": "h-15", "address": "Ореховый бульвар, 15", "entrances": 4 },
+    { "id": "h-17k1", "address": "Ореховый бульвар, 17к1", "entrances": 2 },
+    { "id": "h-17k2", "address": "Ореховый бульвар, 17к2", "entrances": 3 },
+    { "id": "h-19", "address": "Ореховый бульвар, 19", "entrances": 2 },
+    { "id": "h-21k1", "address": "Ореховый бульвар, 21к1", "entrances": 4 }
+  ],
+  "qr_codes": {
+    "pattern": "<дом>-e<подъезд>-lift, <дом>-e<подъезд>-light, <дом>-roof, <дом>-trash",
+    "examples": [
+      { "code": "h-17k2-e2-lift", "object": "подъезд 2, пассажирский лифт", "deeplink": "https://max.ru/t105_hakaton_max_bot?startapp=o_h-17k2-e2-lift" },
+      { "code": "h-17k2-e1-light", "object": "подъезд 1, лестничная клетка", "deeplink": "https://max.ru/t105_hakaton_max_bot?startapp=o_h-17k2-e1-light" },
+      { "code": "h-17k2-roof", "object": "кровля", "deeplink": "https://max.ru/t105_hakaton_max_bot?startapp=o_h-17k2-roof" }
+    ]
+  },
+  "demo_issues": [
+    { "id": "0190a000-0000-7000-8000-000000000001", "title": "Лифт не работает", "status": "in_progress", "house_id": "h-17k2" },
+    { "id": "0190a000-0000-7000-8000-000000000002", "title": "Не горит свет на лестнице", "status": "sent", "house_id": "h-17k2" },
+    { "id": "0190a000-0000-7000-8000-000000000003", "title": "Засор мусоропровода", "status": "done", "house_id": "h-17k2" }
+  ],
+  "sample_issues": {
+    "count": 22,
+    "ids": "0190a000-0000-7000-8000-000000000101 … 0190a000-0000-7000-8000-000000000122",
+    "note": "Синтетическая история за 16 дней для метрик УК (issues.sample = true); при DEMO_AUTH_ENABLED=true даты сдвигаются к текущему дню."
+  },
+  "categories": ["lift", "leak", "heating", "lighting", "door", "garbage", "other"],
+  "requests": {
+    "report_issue": {
+      "method": "POST",
+      "path": "/issues",
+      "role": "resident",
+      "body": { "house_id": "h-17k2", "object_id": "h-17k2-e3-lift", "description": "Кабина не приходит на вызов" }
+    },
+    "report_without_object": {
+      "method": "POST",
+      "path": "/issues",
+      "role": "resident",
+      "body": { "house_id": "h-17k2", "category": "door", "description": "Не работает домофон" }
+    },
+    "join_issue": {
+      "method": "POST",
+      "path": "/issues/0190a000-0000-7000-8000-000000000002/join",
+      "role": "resident"
+    },
+    "change_status": {
+      "method": "POST",
+      "path": "/issues/0190a000-0000-7000-8000-000000000002/status",
+      "role": "uk_operator",
+      "body": { "status": "accepted", "comment": "Электрик придёт завтра до 12:00" }
+    },
+    "reject_without_reason": {
+      "method": "POST",
+      "path": "/issues/<id>/status",
+      "role": "uk_operator",
+      "body": { "status": "rejected", "comment": "" },
+      "expect": { "status": 422, "code": "reason_required" }
+    }
+  }
+}

@@ -8,6 +8,7 @@ require (
 	github.com/gofiber/fiber/v3 v3.5.0
 	github.com/jackc/pgx/v5 v5.11.0
 	github.com/pressly/goose/v3 v3.28.0
+	gopkg.in/yaml.v3 v3.0.1
 )
 
 require (
@@ -67,7 +68,6 @@ require (
 	google.golang.org/grpc v1.83.2 // indirect
 	google.golang.org/protobuf v1.36.12 // indirect
 	gopkg.in/natefinch/lumberjack.v2 v2.2.1 // indirect
-	gopkg.in/yaml.v3 v3.0.1 // indirect
 )
 
 tool github.com/sqlc-dev/sqlc/cmd/sqlc

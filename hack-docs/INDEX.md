@@ -93,6 +93,7 @@ tags: [index, hub]
 | [adr/010-backend-layers.md](adr/010-backend-layers.md) | бэкенд: три слоя (транспорт, приложение, хранилище) + DDD-lite, список YAGNI | accepted | 2026-09-23 |
 | [adr/011-miniapp-typescript.md](adr/011-miniapp-typescript.md) | мини-приложение на TypeScript вместо JS | accepted | 2026-09-23 |
 | [adr/012-taskfile.md](adr/012-taskfile.md) | Taskfile.yml — единая точка команд, `.env` в корне для локального запуска | accepted | 2026-09-24 |
+| [adr/013-submission-run-and-data-api.md](adr/013-submission-run-and-data-api.md) | запуск для жюри одной командой из `deploy/.env.example`, формат `DATA-API.yaml` 1.0 и его проверка в CI | accepted | 2026-09-24 |
 | [HANDOFF.md](HANDOFF.md) | заметка передачи: кто в работе, что сделано, следующий шаг | active | 2026-09-23 |
 | [design/canvas-v2/project/](design/canvas-v2/project/canvas.json) | утверждённый дизайн v2: 12 артбордов (житель, УК, бот, наклейка, тёмная тема, разбор системы) | accepted | 2026-09-23 |
 

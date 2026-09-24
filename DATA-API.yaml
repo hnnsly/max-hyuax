@@ -1,0 +1,232 @@
+# Обязательные проверки собственного API. Полный контракт: api/openapi.yaml (OpenAPI 3.1).
+# Проверки идут по основному сценарию и повторяемы: повторный прогон даёт допустимые коды,
+# перечисленные в expect.status (например, 409 при повторном присоединении).
+version: "1.0"
+
+solution:
+  name: Заявки по дому в MAX
+  team: "105"
+  bot: https://max.ru/t105_hakaton_max_bot
+
+base_url: https://<домен-стенда>/api/v1
+
+auth:
+  type: bearer
+  header: "Authorization: Bearer <token>"
+  # Токен роли выдаёт демо-вход; он действует 12 часов.
+  obtain:
+    method: POST
+    path: /auth/demo
+    headers: { Content-Type: application/json }
+    body: { role: "<роль>" }
+    token_field: token
+  roles:
+    resident: житель дома «Ореховый бульвар, 17к2»
+    resident_2: сосед из того же дома
+    uk_operator: сотрудник УК «Ореховый квартал»
+
+checks:
+  - id: health
+    name: Сервис и база доступны
+    method: GET
+    path: /health
+    role: none
+    expect:
+      status: [200]
+      content_type: application/json
+      body: object
+      required_fields: [status, db]
+
+  - id: login_demo
+    name: Демо-вход жителя
+    method: POST
+    path: /auth/demo
+    role: none
+    params:
+      headers: { Content-Type: application/json }
+      body: { role: resident }
+    expect:
+      status: [200]
+      content_type: application/json
+      body: object
+      required_fields: [token, expires_at, user.id, user.role, user.has_consent]
+
+  - id: me
+    name: Текущий пользователь
+    method: GET
+    path: /me
+    role: resident
+    expect:
+      status: [200]
+      content_type: application/json
+      body: object
+      required_fields: [id, role, has_consent, consent_version]
+
+  - id: search_house
+    name: Поиск дома по адресу
+    method: GET
+    path: /houses
+    role: resident
+    params:
+      query: { query: 17к2 }
+    expect:
+      status: [200]
+      content_type: application/json
+      body: array
+      required_fields: ["[].id", "[].address", "[].organization_id"]
+
+  - id: house_details
+    name: Карточка дома с УК и объектами
+    method: GET
+    path: /houses/{id}
+    role: resident
+    params:
+      path: { id: h-17k2 }
+    expect:
+      status: [200]
+      content_type: application/json
+      body: object
+      required_fields: [id, address, organization.name, entrances, objects]
+
+  - id: object_by_qr
+    name: Объект по коду QR
+    method: GET
+    path: /objects/{code}
+    role: resident
+    params:
+      path: { code: h-17k2-e2-lift }
+    expect:
+      status: [200]
+      content_type: application/json
+      body: object
+      required_fields: [object.id, object.category, object.label, house.id, house.address]
+
+  - id: similar_issues
+    name: Проверка на дубль перед подачей
+    method: GET
+    path: /issues/similar
+    role: resident
+    params:
+      query: { house_id: h-17k2, category: lighting, object_id: h-17k2-e1-light }
+    expect:
+      status: [200]
+      content_type: application/json
+      body: array
+      required_fields: ["[].id", "[].number", "[].status", "[].participant_count"]
+
+  - id: report_issue
+    name: Сообщить о проблеме; ответственный и срок проставляются сами
+    method: POST
+    path: /issues
+    role: resident
+    params:
+      headers: { Content-Type: application/json }
+      body: { house_id: h-17k2, object_id: h-17k2-e3-lift, description: Кабина не приходит на вызов }
+    expect:
+      status: [201]
+      content_type: application/json
+      body: object
+      required_fields: [id, number, category, title, status, deadline, participant_count, joined]
+
+  - id: issue_card
+    name: Карточка заявки
+    method: GET
+    path: /issues/{id}
+    role: resident
+    params:
+      path: { id: 0190a000-0000-7000-8000-000000000002 }
+    expect:
+      status: [200]
+      content_type: application/json
+      body: object
+      required_fields: [id, number, status, deadline, overdue, participant_count, responsible.name, basis]
+
+  - id: join_issue
+    name: «Это и у меня» вместо дубля
+    method: POST
+    path: /issues/{id}/join
+    role: resident
+    params:
+      path: { id: 0190a000-0000-7000-8000-000000000002 }
+    expect:
+      # 200 при первом присоединении, 409 already_joined при повторном прогоне.
+      status: [200, 409]
+      content_type: application/json
+      body: object
+      required_fields_on_200: [id, participant_count, joined]
+      required_fields_on_409: [error.code, error.message]
+
+  - id: timeline
+    name: Хронология заявки без раскрытия участников
+    method: GET
+    path: /issues/{id}/timeline
+    role: resident
+    params:
+      path: { id: 0190a000-0000-7000-8000-000000000001 }
+    expect:
+      status: [200]
+      content_type: application/json
+      body: array
+      required_fields: ["[].kind", "[].status", "[].at"]
+
+  - id: uk_queue
+    name: Очередь заявок УК
+    method: GET
+    path: /uk/issues
+    role: uk_operator
+    expect:
+      status: [200]
+      content_type: application/json
+      body: array
+      required_fields: ["[].id", "[].status", "[].deadline", "[].overdue", "[].address"]
+
+  - id: change_status
+    name: Сотрудник УК принимает заявку
+    method: POST
+    path: /issues/{id}/status
+    role: uk_operator
+    params:
+      path: { id: 0190a000-0000-7000-8000-000000000002 }
+      headers: { Content-Type: application/json }
+      body: { status: accepted, comment: Электрик придёт завтра до 12:00 }
+    expect:
+      # 200 при первом прогоне; 409 invalid_transition, если заявка уже принята.
+      status: [200, 409]
+      content_type: application/json
+      body: object
+      required_fields_on_200: [id, status, status_at, status_comment]
+      required_fields_on_409: [error.code, error.message]
+
+  - id: uk_metrics
+    name: Метрики УК
+    method: GET
+    path: /uk/metrics
+    role: uk_operator
+    expect:
+      status: [200]
+      content_type: application/json
+      body: object
+      required_fields: [first_response_median_min, prev_week_median_min, first_response_by_day, period_days,
+        issues_total, reports_per_issue, closed_total, closed_on_time, open_total, overdue_open, sample_data]
+
+  - id: resident_forbidden_on_uk
+    name: Житель не видит очередь УК
+    method: GET
+    path: /uk/issues
+    role: resident
+    expect:
+      status: [403]
+      content_type: application/json
+      body: object
+      required_fields: [error.code, error.message]
+
+  - id: no_token
+    name: Без токена доступ закрыт
+    method: GET
+    path: /me
+    role: none
+    expect:
+      status: [401]
+      content_type: application/json
+      body: object
+      required_fields: [error.code, error.message]
