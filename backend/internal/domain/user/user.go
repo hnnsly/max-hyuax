@@ -32,6 +32,10 @@ func (u User) CanManageIssues(orgID string) bool {
 	return u.Role == RoleOperator && u.OrganizationID != "" && u.OrganizationID == orgID
 }
 
+// CanTakePart — сообщать о проблемах, присоединяться к заявкам и проверять ремонт может только
+// житель. Сотрудник УК не подтверждает свои ремонты, район только смотрит.
+func (u User) CanTakePart() bool { return u.Role == RoleResident }
+
 // CanViewDistrict — пользователь района видит сравнение УК и просроченные заявки своего района.
 func (u User) CanViewDistrict() bool {
 	return u.Role == RoleDistrict && u.District != ""

@@ -6,10 +6,15 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode/utf8"
 )
 
-// ConfirmWindow — сколько дней после отметки «выполнено» жители могут подтвердить ремонт или вернуть заявку.
-const ConfirmWindow = 7 * 24 * time.Hour
+const (
+	// ConfirmWindow — сколько дней после отметки «выполнено» жители могут подтвердить ремонт или вернуть заявку.
+	ConfirmWindow = 7 * 24 * time.Hour
+	// MaxCommentRunes — предел комментария «не починили»: он уходит в каждую хронологию заявки.
+	MaxCommentRunes = 1000
+)
 
 var (
 	ErrNotDone         = errors.New("issue: repair is not marked done")
@@ -48,6 +53,9 @@ func (is *Issue) Reopen(userID int64, comment string, at, newDeadline time.Time)
 	if comment == "" {
 		return ErrCommentRequired
 	}
+	if utf8.RuneCountInString(comment) > MaxCommentRunes {
+		return fmt.Errorf("%w: comment is longer than %d characters", ErrInvalid, MaxCommentRunes)
+	}
 	if !newDeadline.After(at) {
 		return fmt.Errorf("%w: new deadline must be after reopening", ErrInvalid)
 	}
@@ -59,12 +67,13 @@ func (is *Issue) Reopen(userID int64, comment string, at, newDeadline time.Time)
 	return nil
 }
 
+// canAnswer: сначала участие, потом состояние заявки — чужому незачем знать, выполнена ли она.
 func (is *Issue) canAnswer(userID int64, at time.Time) error {
 	switch {
-	case is.status != StatusDone:
-		return ErrNotDone
 	case !is.HasParticipant(userID):
 		return ErrNotParticipant
+	case is.status != StatusDone:
+		return ErrNotDone
 	case at.After(is.statusAt.Add(ConfirmWindow)):
 		return ErrWindowClosed
 	}

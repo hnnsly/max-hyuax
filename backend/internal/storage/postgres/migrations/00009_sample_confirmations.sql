@@ -36,9 +36,10 @@ SELECT id, created_by, created_at + interval '20 hours', false, created_at + int
 FROM issues WHERE id = '0190a000-0000-7000-8000-000000000119';
 
 -- +goose Down
-DELETE FROM issue_events WHERE issue_id::text LIKE '0190a000-0000-7000-8000-0000000001%' AND kind IN ('confirmed', 'reopened');
+-- Подтверждения стоят и у демо-заявки …003 из 00002 (она тоже sample), поэтому удаляем по признаку sample.
+DELETE FROM issue_events WHERE issue_id IN (SELECT id FROM issues WHERE sample) AND kind IN ('confirmed', 'reopened');
 DELETE FROM issue_events WHERE issue_id = '0190a000-0000-7000-8000-000000000119' AND kind = 'status_changed' AND status = 'done';
-DELETE FROM issue_confirmations WHERE issue_id::text LIKE '0190a000-0000-7000-8000-0000000001%';
+DELETE FROM issue_confirmations WHERE issue_id IN (SELECT id FROM issues WHERE sample);
 UPDATE issues
 SET status_at = created_at + interval '5 hours', status_comment = 'Электрик придёт завтра',
     reopened_at = NULL, deadline_at = created_at + interval '72 hours'

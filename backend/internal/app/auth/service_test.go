@@ -168,6 +168,23 @@ func TestSharePhoneRequiresSignedContact(t *testing.T) {
 	}
 }
 
+// Проверяющий нажал «Не показывать телефон» у демо-Анны: следующий демо-вход возвращает
+// синтетический номер, иначе блок «Контакты жителей» пропадёт из демо для всех.
+func TestDemoLoginRestoresDemoPhone(t *testing.T) {
+	svc, s := newService(t, true)
+	sess, err := svc.LoginDemo(t.Context(), "resident")
+	if err != nil || sess.User.Phone != "+79990000001" {
+		t.Fatalf("first login phone = %q, err = %v", sess.User.Phone, err)
+	}
+	if _, err := svc.HidePhone(t.Context(), sess.User); err != nil {
+		t.Fatal(err)
+	}
+	sess, err = svc.LoginDemo(t.Context(), "resident")
+	if err != nil || sess.User.Phone != "+79990000001" || s.UserMap[1].Phone != "+79990000001" {
+		t.Fatalf("after hide: phone = %q, stored %q, err = %v", sess.User.Phone, s.UserMap[1].Phone, err)
+	}
+}
+
 func TestDeletedUserCannotAuthenticate(t *testing.T) {
 	svc, s := newService(t, true)
 	sess, _ := svc.LoginDemo(t.Context(), "resident")

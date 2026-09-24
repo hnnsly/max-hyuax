@@ -233,7 +233,8 @@ export function IssueCard({ id, flash }: { id: string; flash?: string }) {
 
       <RepairCheck issue={issue} onChanged={() => res.reload()} onToast={showToast} />
       {issue.contacts && issue.contacts.length > 0 && <ResidentContacts contacts={issue.contacts} />}
-      {issue.joined && !closed && user.role === 'resident' && <PhoneForRepair onToast={showToast} />}
+      {/* У закрытой заявки блок остаётся, только чтобы убрать уже оставленный телефон. */}
+      {issue.joined && user.role === 'resident' && (!closed || user.phone_shared) && <PhoneForRepair onToast={showToast} />}
 
       <Island>
         <div className={s.block}>

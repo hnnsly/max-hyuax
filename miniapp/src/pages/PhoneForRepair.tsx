@@ -26,7 +26,7 @@ export function PhoneForRepair({ onToast }: { onToast: (msg: string) => void }) 
       if (!contact) return; // житель отказался в окне MAX: это его выбор, не ошибка
       setUser(await api.sharePhone(contact));
       bridge.hapticSuccess();
-      onToast('Телефон сохранён. Его увидит только УК по вашим заявкам.');
+      onToast('Телефон сохранён. Его увидит только УК по вашим открытым заявкам.');
     } catch (err) {
       onToast(err instanceof ApiError ? err.message : 'Не получилось получить номер. Попробуйте ещё раз');
     } finally {
@@ -52,7 +52,7 @@ export function PhoneForRepair({ onToast }: { onToast: (msg: string) => void }) 
         <h3 className={s.blockTitle}>Телефон для мастера</h3>
         {user.phone_shared ? (
           <>
-            <p className={s.text}>УК видит ваш телефон по вашим заявкам и может позвонить, если нужно попасть в квартиру.</p>
+            <p className={s.text}>УК видит ваш телефон по вашим открытым заявкам и может позвонить, если нужно попасть в квартиру.</p>
             <Button variant="secondary" size="medium" stretched loading={busy} onClick={hide}>
               Не показывать телефон
             </Button>

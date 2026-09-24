@@ -9,6 +9,7 @@ import (
 	"dommax/internal/app/apptest"
 	"dommax/internal/domain/issue"
 	"dommax/internal/domain/rules"
+	"dommax/internal/domain/user"
 )
 
 // done — заявка Анны, к которой присоединился Сергей; УК отметила её выполненной. Очередь outbox пуста.
@@ -41,9 +42,14 @@ func TestConfirmRepair(t *testing.T) {
 	if again, _ := f.svc.Get(t.Context(), is.ID()); again.ConfirmedCount() != 1 {
 		t.Fatal("confirmation must be saved")
 	}
-	// Сотрудник УК не участник: подтверждать ремонт за жителей он не может.
-	if _, err := f.svc.Confirm(t.Context(), f.oper, is.ID()); !errors.Is(err, issue.ErrNotParticipant) {
-		t.Fatalf("operator err = %v, want ErrNotParticipant", err)
+	// Сотрудник УК не подтверждает свои ремонты за жителей.
+	if _, err := f.svc.Confirm(t.Context(), f.oper, is.ID()); !errors.Is(err, app.ErrForbidden) {
+		t.Fatalf("operator err = %v, want ErrForbidden", err)
+	}
+	// Житель не из этой заявки подтвердить не может.
+	stranger := user.User{ID: 40, Role: user.RoleResident, ConsentVersion: "v1"}
+	if _, err := f.svc.Confirm(t.Context(), stranger, is.ID()); !errors.Is(err, issue.ErrNotParticipant) {
+		t.Fatalf("stranger err = %v, want ErrNotParticipant", err)
 	}
 }
 

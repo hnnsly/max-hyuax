@@ -424,9 +424,9 @@ paths:
       tags: [issues]
       summary: Подтвердить, что починили
       description: |
-        Участник выполненной заявки в течение 7 дней после отметки «выполнено» (answer_until), один ответ
-        на каждое «выполнено». Уведомлений не рассылает. 403 не участник; 409 not_done, window_closed,
-        already_answered.
+        Житель, участник выполненной заявки, в течение 7 дней после отметки «выполнено» (answer_until), один ответ
+        на каждое «выполнено». Уведомлений не рассылает. 403 не житель (сотрудник УК, район) или не участник;
+        409 not_done, window_closed, already_answered. Подавать заявки и присоединяться тоже может только житель.
       parameters:
         - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
       responses:
@@ -458,7 +458,7 @@ paths:
               type: object
               required: [comment]
               properties:
-                comment: { type: string, example: На третьем этаже снова темно }
+                comment: { type: string, maxLength: 1000, example: На третьем этаже снова темно }
       responses:
         "200":
           description: Заявка снова в работе

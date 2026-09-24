@@ -65,7 +65,7 @@ func otherOrgHouse(t *testing.T) {
 
 func TestErrorResponses(t *testing.T) {
 	otherOrgHouse(t)
-	anna, oper := login(t, "resident"), login(t, "uk_operator")
+	anna, oper, district := login(t, "resident"), login(t, "uk_operator"), login(t, "district")
 	fresh := maxLogin(t, 990001)
 
 	// Заявка в чужой УК: оператор «Орехового квартала» не может менять её статус.
@@ -141,6 +141,11 @@ func TestErrorResponses(t *testing.T) {
 		{"district metrics without token", api, "GET", "/api/v1/district/metrics", "", "", 401, "unauthorized"},
 		{"district overdue without token", api, "GET", "/api/v1/district/overdue", "", "", 401, "unauthorized"},
 		{"resident on district overdue", api, "GET", "/api/v1/district/overdue", anna, "", 403, "forbidden"},
+		// Сотрудник УК и район не становятся участниками: иначе район увидел бы фото, а УК подтверждала бы свои ремонты.
+		{"district joins an issue", api, "POST", "/api/v1/issues/" + sentID + "/join", district, "", 403, "forbidden"},
+		{"operator joins an issue", api, "POST", "/api/v1/issues/" + sentID + "/join", oper, "", 403, "forbidden"},
+		{"operator reports an issue", api, "POST", "/api/v1/issues", oper, `{"house_id":"h-17k2","category":"lift"}`, 403, "forbidden"},
+		{"district confirms a repair", api, "POST", "/api/v1/issues/" + doneID + "/confirm", district, "", 403, "forbidden"},
 		{"operator on district overdue", api, "GET", "/api/v1/district/overdue", oper, "", 403, "forbidden"},
 		{"confirm unknown issue", api, "POST", "/api/v1/issues/" + unknown + "/confirm", anna, "", 404, "not_found"},
 		{"confirm by a non-participant", api, "POST", "/api/v1/issues/" + doneID + "/confirm", anna, "", 403, "forbidden"},

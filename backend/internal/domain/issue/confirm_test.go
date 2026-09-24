@@ -2,6 +2,7 @@ package issue_test
 
 import (
 	"errors"
+	"strings"
 	"testing"
 	"time"
 
@@ -58,6 +59,10 @@ func TestConfirmRules(t *testing.T) {
 	if err := open.Confirm(1001, created.Add(time.Hour)); !errors.Is(err, issue.ErrNotDone) {
 		t.Fatalf("open issue err = %v, want ErrNotDone", err)
 	}
+	// Чужому жителю отвечаем «не участник», даже если заявка ещё не выполнена: состояние чужой заявки ему не важно.
+	if err := open.Confirm(4242, created.Add(time.Hour)); !errors.Is(err, issue.ErrNotParticipant) {
+		t.Fatalf("stranger on open issue err = %v, want ErrNotParticipant", err)
+	}
 	is, doneAt := doneIssue(t)
 	if err := is.Confirm(4242, doneAt.Add(time.Hour)); !errors.Is(err, issue.ErrNotParticipant) {
 		t.Fatalf("stranger err = %v, want ErrNotParticipant", err)
@@ -87,6 +92,10 @@ func TestParticipantReopensWithComment(t *testing.T) {
 	newDeadline := at.Add(48 * time.Hour)
 	if err := is.Reopen(1001, "  ", at, newDeadline); !errors.Is(err, issue.ErrCommentRequired) {
 		t.Fatalf("empty comment err = %v, want ErrCommentRequired", err)
+	}
+	// Комментарий уходит в каждую хронологию: длиннее предела не принимаем.
+	if err := is.Reopen(1001, strings.Repeat("я", issue.MaxCommentRunes+1), at, newDeadline); !errors.Is(err, issue.ErrInvalid) {
+		t.Fatalf("long comment err = %v, want ErrInvalid", err)
 	}
 	if err := is.Reopen(1001, " Лифт снова стоит на 5 этаже ", at, newDeadline); err != nil {
 		t.Fatalf("Reopen: %v", err)

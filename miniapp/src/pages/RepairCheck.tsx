@@ -113,14 +113,23 @@ function ReopenSheet({ open, issueId, onClose, onDone }: { open: boolean; issueI
           aria-describedby="reopen-hint"
           aria-errormessage="reopen-error"
           onChange={(e) => {
-            // Одни пробелы не комментарий: поле считается пустым.
+            // Одни пробелы не комментарий: поле считается пустым. Читаем validity, а не checkValidity():
+            // тот шлёт событие invalid, и обработчик ниже вернул бы фокус в поле.
             e.currentTarget.setCustomValidity(e.currentTarget.value.trim() ? '' : EMPTY_COMMENT);
-            if (e.currentTarget.checkValidity()) e.currentTarget.removeAttribute('aria-invalid');
+            if (e.currentTarget.validity.valid) e.currentTarget.removeAttribute('aria-invalid');
             setComment(e.target.value);
           }}
-          onBlur={(e) => e.currentTarget.toggleAttribute('aria-invalid', !e.currentTarget.checkValidity())}
+          onBlur={(e) => {
+            // Ошибку объявляем после ввода и ухода с поля, как её показывает :user-invalid.
+            // Значение нужно явное: пустой aria-invalid экранные чтецы считают за false.
+            const field = e.currentTarget;
+            if (field.value === '') return;
+            if (field.validity.valid) field.removeAttribute('aria-invalid');
+            else field.setAttribute('aria-invalid', 'true');
+          }}
           onInvalid={(e) => {
-            // Своя подпись под полем уже есть: всплывающая подсказка браузера её бы закрыла.
+            // Приходит только при отправке формы. Своя подпись под полем уже есть: всплывающая
+            // подсказка браузера её бы закрыла, поэтому гасим её и сами ставим фокус.
             e.preventDefault();
             e.currentTarget.setAttribute('aria-invalid', 'true');
             e.currentTarget.focus();
@@ -130,7 +139,7 @@ function ReopenSheet({ open, issueId, onClose, onDone }: { open: boolean; issueI
           <WarningCircle size={16} weight="bold" aria-hidden="true" /> {EMPTY_COMMENT}
         </p>
         <p id="reopen-hint" className={s.hint}>
-          Заявка вернётся в работу с новым сроком. Комментарий увидят УК и соседи, которые сообщили о проблеме.
+          Заявка вернётся в работу с новым сроком. Комментарий появится в хронологии заявки без вашего имени.
         </p>
         {error && (
           <p className={s.hint} role="alert">

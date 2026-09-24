@@ -79,7 +79,9 @@ export const bridge = {
       const r = await wa()!.requestContact!();
       return { phone: r.phone, auth_date: String(r.authDate), hash: r.hash };
     } catch (err) {
-      if (JSON.stringify(err ?? '').includes('user_refused')) return null;
+      // Отказ приходит объектом {error: {code}} или экземпляром Error: JSON.stringify(Error) даёт «{}».
+      const text = `${JSON.stringify(err ?? '')} ${err instanceof Error ? err.message : ''}`;
+      if (text.includes('user_refused')) return null;
       throw err;
     }
   },

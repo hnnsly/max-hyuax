@@ -85,11 +85,20 @@ func (s *Service) LoginDemo(ctx context.Context, role string) (Session, error) {
 	if err != nil {
 		return Session{}, err
 	}
+	changed := false
 	if u.Deleted() {
 		// Проверяющий удалил демо-аккаунт: возвращаем его в исходное состояние из демо-данных.
 		u.DeletedAt, u.FirstName, u.HouseID = time.Time{}, demo.name, demo.houseID
-		u.SharePhone(demo.phone)
 		u.AcceptConsent(s.cfg.ConsentVersion, s.cfg.Now())
+		changed = true
+	}
+	if u.Phone != demo.phone {
+		// Синтетический телефон демо-жителя возвращается на каждом входе: без MAX его не оставить
+		// заново, а без него у УК в демо пропадёт блок «Контакты жителей».
+		u.SharePhone(demo.phone)
+		changed = true
+	}
+	if changed {
 		if err := s.store.Users().Save(ctx, u); err != nil {
 			return Session{}, err
 		}

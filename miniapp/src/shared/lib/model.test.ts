@@ -82,6 +82,14 @@ describe('хронология', () => {
     ]);
     expect(items[2]?.comment).toBe('На третьем этаже темно');
   });
+
+  it('глагол согласуется с числом соседей', () => {
+    const confirmed = (n: number) =>
+      buildTimeline(Array.from({ length: n }, (_, i) => ({ kind: 'confirmed' as const, status: 'done' as const, at: `2026-09-18T09:${String(i).padStart(2, '0')}:00Z` })))[0]?.text;
+    expect(confirmed(21)).toBe('21 сосед подтвердил, что починили');
+    expect(confirmed(3)).toBe('3 соседа подтвердили, что починили');
+    expect(confirmed(11)).toBe('11 соседей подтвердили, что починили');
+  });
 });
 
 describe('проверка ремонта жителем', () => {

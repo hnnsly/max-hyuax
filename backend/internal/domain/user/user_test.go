@@ -26,6 +26,23 @@ func TestOperatorManagesOnlyOwnOrganization(t *testing.T) {
 	}
 }
 
+// Сообщать о проблемах, присоединяться и проверять ремонт может только житель: иначе УК
+// подтверждала бы свои ремонты, а район получал бы доступ участника к фото.
+func TestOnlyResidentsTakePartInIssues(t *testing.T) {
+	for _, tc := range []struct {
+		u    user.User
+		want bool
+	}{
+		{user.User{Role: user.RoleResident}, true},
+		{user.User{Role: user.RoleOperator, OrganizationID: "org-1"}, false},
+		{user.User{Role: user.RoleDistrict, District: "Зябликово"}, false},
+	} {
+		if got := tc.u.CanTakePart(); got != tc.want {
+			t.Errorf("%s: CanTakePart = %v, want %v", tc.u.Role, got, tc.want)
+		}
+	}
+}
+
 // Район (управа или ГЖИ) только смотрит свой район и не меняет статусы заявок.
 func TestDistrictViewsOnlyOwnDistrict(t *testing.T) {
 	d := user.User{ID: 3, Role: user.RoleDistrict, District: "Зябликово"}

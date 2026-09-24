@@ -52,6 +52,9 @@ type ReportInput struct {
 
 // Report создаёт заявку: ответственный — УК дома, срок — из справочника правил.
 func (s *Service) Report(ctx context.Context, u user.User, in ReportInput) (*issue.Issue, error) {
+	if !u.CanTakePart() {
+		return nil, fmt.Errorf("%w: only residents report issues", app.ErrForbidden)
+	}
 	if !u.HasConsent(s.cfg.ConsentVersion) {
 		return nil, app.ErrConsentRequired
 	}
@@ -113,6 +116,9 @@ func (s *Service) object(ctx context.Context, houseID, objectID string) (house.A
 
 // Join добавляет жителя к существующей заявке вместо создания дубля.
 func (s *Service) Join(ctx context.Context, u user.User, issueID string) (*issue.Issue, error) {
+	if !u.CanTakePart() {
+		return nil, fmt.Errorf("%w: only residents join issues", app.ErrForbidden)
+	}
 	if !u.HasConsent(s.cfg.ConsentVersion) {
 		return nil, app.ErrConsentRequired
 	}
@@ -133,6 +139,9 @@ func (s *Service) ChangeStatus(ctx context.Context, u user.User, issueID string,
 
 // Confirm — участник подтверждает, что после «выполнено» действительно починили.
 func (s *Service) Confirm(ctx context.Context, u user.User, issueID string) (*issue.Issue, error) {
+	if !u.CanTakePart() {
+		return nil, fmt.Errorf("%w: only residents check repairs", app.ErrForbidden)
+	}
 	return s.update(ctx, issueID, func(is *issue.Issue) error {
 		return is.Confirm(u.ID, s.cfg.Now())
 	})
@@ -140,6 +149,9 @@ func (s *Service) Confirm(ctx context.Context, u user.User, issueID string) (*is
 
 // Reopen — участник сообщает, что не починили: заявка снова в работе, срок заново по справочнику.
 func (s *Service) Reopen(ctx context.Context, u user.User, issueID, comment string) (*issue.Issue, error) {
+	if !u.CanTakePart() {
+		return nil, fmt.Errorf("%w: only residents check repairs", app.ErrForbidden)
+	}
 	return s.update(ctx, issueID, func(is *issue.Issue) error {
 		rule, err := rules.Lookup(is.Category())
 		if err != nil {

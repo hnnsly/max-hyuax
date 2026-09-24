@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"dommax/internal/app/issues"
+	"dommax/internal/domain/issue"
 	"dommax/internal/domain/user"
 )
 
@@ -33,6 +34,17 @@ func TestContactsOnlyForResponsibleUK(t *testing.T) {
 	}
 	if want := []issues.Contact{{FirstName: "Анна", Phone: "+79991234567"}}; len(got) != 1 || got[0] != want[0] {
 		t.Fatalf("contacts = %+v, want %+v", got, want)
+	}
+
+	// Закрытая заявка: мастеру больше не нужно звонить, телефоны не показываются даже УК.
+	for _, st := range []issue.Status{issue.StatusInProgress, issue.StatusDone} {
+		if _, err := f.svc.ChangeStatus(t.Context(), f.oper, is.ID(), st, "Готово"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	closed, _ := f.svc.Get(t.Context(), is.ID())
+	if got, err := f.svc.Contacts(t.Context(), f.oper, closed); err != nil || got != nil {
+		t.Fatalf("closed issue contacts = %+v, err = %v", got, err)
 	}
 
 	otherUK := user.User{ID: 9, Role: user.RoleOperator, OrganizationID: "org-2"}
