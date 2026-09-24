@@ -9,6 +9,7 @@ import (
 
 	"dommax/internal/app"
 	"dommax/internal/domain/house"
+	"dommax/internal/domain/user"
 )
 
 type Service struct{ store app.Store }
@@ -65,4 +66,12 @@ func (s *Service) ByQRCode(ctx context.Context, code string) (house.AssetObject,
 	}
 	h, err := s.store.Houses().Get(ctx, obj.HouseID)
 	return obj, h, err
+}
+
+// ForOperator — дома УК оператора по адресу: для наклеек с QR-кодами.
+func (s *Service) ForOperator(ctx context.Context, u user.User) ([]house.House, error) {
+	if u.Role != user.RoleOperator || u.OrganizationID == "" {
+		return nil, app.ErrForbidden
+	}
+	return s.store.Houses().ByOrganization(ctx, u.OrganizationID)
 }

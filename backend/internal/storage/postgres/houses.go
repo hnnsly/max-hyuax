@@ -19,6 +19,11 @@ func (r houseRepo) Nearest(ctx context.Context, lat, lon float64, limit int) ([]
 	return mapSlice(rows, toHouse), err
 }
 
+func (r houseRepo) ByOrganization(ctx context.Context, orgID string) ([]house.House, error) {
+	rows, err := r.q.ListOrganizationHouses(ctx, orgID)
+	return mapSlice(rows, toHouse), err
+}
+
 func (r houseRepo) Get(ctx context.Context, id string) (house.House, error) {
 	row, err := r.q.GetHouse(ctx, id)
 	return toHouse(row), notFound(err)

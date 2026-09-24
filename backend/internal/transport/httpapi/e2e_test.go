@@ -249,6 +249,19 @@ func TestOperatorSeesMetrics(t *testing.T) {
 	}
 }
 
+func TestOperatorListsOwnHouses(t *testing.T) {
+	otherOrgHouse(t)
+	list := expect(t, call(t, "GET", "/api/v1/uk/houses", login(t, "uk_operator"), nil), 200, "uk houses").list
+	if len(list) != 6 {
+		t.Fatalf("houses = %v, want 6 houses of org-orekh", list)
+	}
+	for _, h := range list {
+		if h.(map[string]any)["id"] == "h-other" {
+			t.Fatal("house of another UK must not be listed")
+		}
+	}
+}
+
 func TestWebhookChecksSecret(t *testing.T) {
 	body := map[string]any{"update_type": "bot_started", "timestamp": 1, "chat_id": 7, "user": map[string]any{"user_id": 1}}
 	send := func(secret string) int {

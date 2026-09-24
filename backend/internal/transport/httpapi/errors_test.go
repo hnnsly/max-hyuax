@@ -95,6 +95,7 @@ func TestErrorResponses(t *testing.T) {
 		{"resident on UK queue", api, "GET", "/api/v1/uk/issues", anna, "", 403, "forbidden"},
 		{"resident on UK metrics", api, "GET", "/api/v1/uk/metrics", anna, "", 403, "forbidden"},
 		{"metrics without token", api, "GET", "/api/v1/uk/metrics", "", "", 401, "unauthorized"},
+		{"resident on UK houses", api, "GET", "/api/v1/uk/houses", anna, "", 403, "forbidden"},
 		{"resident changes status", api, "POST", "/api/v1/issues/" + sentID + "/status", anna, `{"status":"accepted"}`, 403, "forbidden"},
 		{"operator of another UK", api, "POST", "/api/v1/issues/" + foreignID + "/status", oper, `{"status":"accepted"}`, 403, "forbidden"},
 		{"report without consent", api, "POST", "/api/v1/issues", fresh, `{"house_id":"h-17k2","category":"lift"}`, 403, "consent_required"},

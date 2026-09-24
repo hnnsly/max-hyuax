@@ -361,6 +361,22 @@ paths:
         "200": { $ref: "#/components/responses/IssueList" }
         "403": { $ref: "#/components/responses/Error" }
 
+  /uk/houses:
+    get:
+      tags: [uk]
+      summary: Дома своей УК
+      description: Только для uk_operator. Нужны для печати наклеек с QR-кодами объектов (объекты — в GET /houses/{id}).
+      responses:
+        "200":
+          description: Дома по адресу
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/House" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+
   /uk/metrics:
     get:
       tags: [uk]

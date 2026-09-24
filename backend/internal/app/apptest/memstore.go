@@ -372,3 +372,14 @@ func (r userRepo) Save(_ context.Context, u user.User) error {
 	r.s.UserMap[u.ID] = u
 	return nil
 }
+
+func (r houseRepo) ByOrganization(_ context.Context, orgID string) ([]house.House, error) {
+	var out []house.House
+	for _, h := range r.s.HouseMap {
+		if h.OrganizationID == orgID {
+			out = append(out, h)
+		}
+	}
+	slices.SortFunc(out, func(a, b house.House) int { return strings.Compare(a.Address, b.Address) })
+	return out, nil
+}

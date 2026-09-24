@@ -8,6 +8,7 @@ import (
 	"dommax/internal/app/apptest"
 	"dommax/internal/app/houses"
 	"dommax/internal/domain/house"
+	"dommax/internal/domain/user"
 )
 
 func setup() (*apptest.MemStore, *houses.Service) {
@@ -71,5 +72,20 @@ func TestSearchValidatesQuery(t *testing.T) {
 	got, err := svc.Search(t.Context(), "17к2")
 	if err != nil || len(got) != 1 {
 		t.Fatalf("got = %v, err = %v", got, err)
+	}
+}
+
+func TestOperatorHousesAreOwnOnly(t *testing.T) {
+	s, svc := setup()
+	s.HouseMap["h-2"] = house.House{ID: "h-2", Address: "Ореховый бульвар, 15", OrganizationID: "org-1"}
+	oper := user.User{ID: 3, Role: user.RoleOperator, OrganizationID: "org-1"}
+	got, err := svc.ForOperator(t.Context(), oper)
+	if err != nil || len(got) != 2 || got[0].ID != "h-2" {
+		t.Fatalf("houses = %+v, err = %v (want both org-1 houses sorted by address)", got, err)
+	}
+	for _, u := range []user.User{{ID: 1, Role: user.RoleResident}, {ID: 4, Role: user.RoleOperator}} {
+		if _, err := svc.ForOperator(t.Context(), u); !errors.Is(err, app.ErrForbidden) {
+			t.Errorf("ForOperator(%+v) err = %v, want forbidden", u, err)
+		}
 	}
 }

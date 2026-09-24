@@ -147,6 +147,41 @@ func (q *Queries) ListHouseObjects(ctx context.Context, houseID string) ([]ListH
 	return items, nil
 }
 
+const listOrganizationHouses = `-- name: ListOrganizationHouses :many
+SELECT id, address, district, year_built, floors, entrances_count, organization_id, lat, lon, source FROM houses WHERE organization_id = $1 ORDER BY address
+`
+
+func (q *Queries) ListOrganizationHouses(ctx context.Context, organizationID string) ([]House, error) {
+	rows, err := q.db.Query(ctx, listOrganizationHouses, organizationID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []House
+	for rows.Next() {
+		var i House
+		if err := rows.Scan(
+			&i.ID,
+			&i.Address,
+			&i.District,
+			&i.YearBuilt,
+			&i.Floors,
+			&i.EntrancesCount,
+			&i.OrganizationID,
+			&i.Lat,
+			&i.Lon,
+			&i.Source,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const nearestHouses = `-- name: NearestHouses :many
 SELECT id, address, district, year_built, floors, entrances_count, organization_id, lat, lon, source FROM houses
 ORDER BY (lat - $1::float8) ^ 2 + ((lon - $2::float8) * cos(radians($1::float8))) ^ 2

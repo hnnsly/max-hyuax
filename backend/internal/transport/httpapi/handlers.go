@@ -102,6 +102,14 @@ func (h *handlers) searchHouses(c fiber.Ctx) error {
 	return c.JSON(mapSlice(list, toHouseDTO))
 }
 
+func (h *handlers) ukHouses(c fiber.Ctx) error {
+	list, err := h.Houses.ForOperator(c.Context(), currentUser(c))
+	if err != nil {
+		return err
+	}
+	return c.JSON(mapSlice(list, toHouseDTO))
+}
+
 func (h *handlers) nearestHouses(c fiber.Ctx) error {
 	lat, errLat := strconv.ParseFloat(c.Query("lat"), 64)
 	lon, errLon := strconv.ParseFloat(c.Query("lon"), 64)

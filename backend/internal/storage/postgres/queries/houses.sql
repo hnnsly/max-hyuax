@@ -29,3 +29,6 @@ ORDER BY id;
 SELECT id, house_id, COALESCE(entrance_id, '')::text AS entrance_id, category, label, qr_code
 FROM asset_objects
 WHERE qr_code = @qr_code;
+
+-- name: ListOrganizationHouses :many
+SELECT * FROM houses WHERE organization_id = @organization_id ORDER BY address;

@@ -14,6 +14,7 @@ import { IssueList } from '../shared/ui/IssueRow';
 import { EmptyState, ErrorState, Island, Loading, Screen, Section, useToast } from '../shared/ui/Layout';
 import { Segmented } from '../shared/ui/Segmented';
 import s from './pages.module.css';
+import { StickersView } from './Stickers';
 import { UkMetricsView } from './UkMetrics';
 
 /** Выбор дома: поиск по адресу или ближайшие по геопозиции браузера. */
@@ -115,15 +116,16 @@ export function MyIssues() {
   );
 }
 
-type UkTab = 'queue' | 'metrics';
+type UkTab = 'queue' | 'metrics' | 'stickers';
 const ukTabs: { id: UkTab; title: string }[] = [
   { id: 'queue', title: 'Заявки' },
   { id: 'metrics', title: 'Метрики' },
+  { id: 'stickers', title: 'Наклейки' },
 ];
 // Вкладка переживает переход в карточку заявки и возврат назад.
 let lastUkTab: UkTab = 'queue';
 
-/** Кабинет УК: очередь заявок и метрики. */
+/** Кабинет УК: очередь заявок, метрики и наклейки с QR-кодами. */
 export function UkQueue() {
   const [tab, setTab] = useState<UkTab>(lastUkTab);
   const choose = (t: UkTab) => {
@@ -133,7 +135,7 @@ export function UkQueue() {
   return (
     <Screen title="Кабинет УК">
       <Segmented label="Раздел кабинета УК" items={ukTabs} value={tab} onChange={choose} />
-      {tab === 'queue' ? <QueueView /> : <UkMetricsView />}
+      {tab === 'queue' ? <QueueView /> : tab === 'metrics' ? <UkMetricsView /> : <StickersView />}
     </Screen>
   );
 }

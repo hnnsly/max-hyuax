@@ -68,6 +68,8 @@ type HouseRepo interface {
 	Entrances(ctx context.Context, houseID string) ([]house.Entrance, error)
 	Objects(ctx context.Context, houseID string) ([]house.AssetObject, error)
 	ObjectByCode(ctx context.Context, code string) (house.AssetObject, error)
+	// ByOrganization — дома организации по адресу.
+	ByOrganization(ctx context.Context, orgID string) ([]house.House, error)
 }
 
 type UserRepo interface {

@@ -80,4 +80,5 @@ export const api = {
     request<Issue>('POST', `/issues/${encodeURIComponent(id)}/status`, { status, comment }),
   ukQueue: () => request<Issue[]>('GET', '/uk/issues'),
   ukMetrics: () => request<UkMetrics>('GET', '/uk/metrics'),
+  ukHouses: () => request<House[]>('GET', '/uk/houses'),
 };
