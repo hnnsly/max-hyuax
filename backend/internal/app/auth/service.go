@@ -35,10 +35,11 @@ type Session struct {
 }
 
 // demoKeys — демо-роли для проверяющих; пользователи создаются миграцией с демо-данными.
-var demoKeys = map[string]string{
-	"resident":    "resident_demo_1",
-	"resident_2":  "resident_demo_2",
-	"uk_operator": "uk_operator_demo",
+// Имя нужно, чтобы вернуть демо-пользователя, если проверяющий удалил аккаунт.
+var demoKeys = map[string]struct{ key, name string }{
+	"resident":    {"resident_demo_1", "Анна"},
+	"resident_2":  {"resident_demo_2", "Сергей"},
+	"uk_operator": {"uk_operator_demo", "Оператор УК"},
 }
 
 // LoginMax проверяет initData и выдаёт сессию; новый пользователь MAX становится жителем.
@@ -77,13 +78,20 @@ func (s *Service) LoginDemo(ctx context.Context, role string) (Session, error) {
 	if !s.cfg.DemoEnabled {
 		return Session{}, app.ErrForbidden
 	}
-	key, ok := demoKeys[role]
+	demo, ok := demoKeys[role]
 	if !ok {
 		return Session{}, fmt.Errorf("%w: unknown demo role %q", app.ErrInvalidInput, role)
 	}
-	u, err := s.store.Users().ByDemoKey(ctx, key)
+	u, err := s.store.Users().ByDemoKey(ctx, demo.key)
 	if err != nil {
 		return Session{}, err
+	}
+	if u.Deleted() {
+		// Проверяющий удалил демо-аккаунт: возвращаем его, согласие нужно дать заново.
+		u.DeletedAt, u.FirstName = time.Time{}, demo.name
+		if err := s.store.Users().Save(ctx, u); err != nil {
+			return Session{}, err
+		}
 	}
 	return s.issue(u), nil
 }

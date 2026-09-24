@@ -15,9 +15,9 @@ import (
 func newService(t *testing.T, demo bool) (*auth.Service, *apptest.MemStore) {
 	t.Helper()
 	s := apptest.New()
-	// В MemStore demo-ключ ищется по FirstName.
-	s.AddUser(user.User{ID: 1, FirstName: "resident_demo_1", Role: user.RoleResident})
-	s.AddUser(user.User{ID: 3, FirstName: "uk_operator_demo", Role: user.RoleOperator, OrganizationID: "org-1"})
+	s.AddUser(user.User{ID: 1, FirstName: "Анна", Role: user.RoleResident, ConsentVersion: "v1", ConsentAt: now})
+	s.AddUser(user.User{ID: 3, FirstName: "Оператор УК", Role: user.RoleOperator, OrganizationID: "org-1"})
+	s.DemoKeys = map[string]int64{"resident_demo_1": 1, "uk_operator_demo": 3}
 	clock := now
 	svc := auth.NewService(s, auth.Config{
 		BotToken:      botToken,
@@ -128,5 +128,23 @@ func TestDeletedUserCannotAuthenticate(t *testing.T) {
 	s.AddUser(u)
 	if _, err := svc.Authenticate(t.Context(), sess.Token); !errors.Is(err, app.ErrUnauthorized) {
 		t.Fatalf("err = %v", err)
+	}
+}
+
+// Проверяющий удалил демо-аккаунт: следующий демо-вход восстанавливает его, иначе демо сломается для всех.
+func TestDemoLoginRestoresDeletedDemoUser(t *testing.T) {
+	svc, s := newService(t, true)
+	if err := svc.DeleteAccount(t.Context(), s.UserMap[1]); err != nil {
+		t.Fatal(err)
+	}
+	sess, err := svc.LoginDemo(t.Context(), "resident")
+	if err != nil {
+		t.Fatalf("LoginDemo after delete: %v", err)
+	}
+	if sess.User.Deleted() || sess.User.FirstName != "Анна" || sess.User.HasConsent("v1") {
+		t.Fatalf("restored user = %+v, want active, named, without consent", sess.User)
+	}
+	if _, err := svc.Authenticate(t.Context(), sess.Token); err != nil {
+		t.Fatalf("Authenticate restored demo user: %v", err)
 	}
 }

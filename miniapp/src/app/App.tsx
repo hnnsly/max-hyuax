@@ -5,7 +5,7 @@ import { parseStartParam } from '../shared/lib/model';
 import { EmptyState, Screen } from '../shared/ui/Layout';
 import { Home } from '../pages/Home';
 import { IssueCard } from '../pages/IssueCard';
-import { Consent, DemoGate, HouseSearch, MyIssues, UkQueue } from '../pages/Other';
+import { AccountDeleted, Consent, DemoGate, HouseSearch, MyIssues, UkQueue } from '../pages/Other';
 import { Report } from '../pages/Report';
 import { ErrorBoundary } from './ErrorBoundary';
 import { RouterProvider, useRouter } from './router';
@@ -73,6 +73,8 @@ function Gate() {
           <Spinner size={32} appearance="themed" />
         </div>
       );
+    case 'deleted':
+      return <AccountDeleted />;
     case 'anon':
       return <DemoGate />;
     case 'error':

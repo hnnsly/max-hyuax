@@ -22,6 +22,7 @@ type MemStore struct {
 	Orgs     map[string]house.Organization
 	Objects  []house.AssetObject
 	UserMap  map[int64]user.User
+	DemoKeys map[string]int64 // демо-ключ → ID пользователя
 	issues   map[string]*issue.Issue
 	Events   []issue.Event
 	nextNum  int64
@@ -342,16 +343,15 @@ func (r userRepo) ByMaxID(_ context.Context, maxUserID int64) (user.User, error)
 	return user.User{}, app.ErrNotFound
 }
 
-// ByDemoKey в памяти ищет по имени: в тестах demo-ключ кладётся в FirstName.
+// ByDemoKey ищет по карте DemoKeys: в домене ключа демо-пользователя нет, он есть только в хранилище.
 func (r userRepo) ByDemoKey(_ context.Context, key string) (user.User, error) {
 	r.s.mu.Lock()
 	defer r.s.mu.Unlock()
-	for _, u := range r.s.UserMap {
-		if u.FirstName == key {
-			return u, nil
-		}
+	u, ok := r.s.UserMap[r.s.DemoKeys[key]]
+	if !ok {
+		return user.User{}, app.ErrNotFound
 	}
-	return user.User{}, app.ErrNotFound
+	return u, nil
 }
 
 func (r userRepo) Create(_ context.Context, u user.User) (user.User, error) {

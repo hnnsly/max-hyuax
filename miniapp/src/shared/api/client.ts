@@ -63,6 +63,7 @@ export const api = {
   me: () => request<User>('GET', '/me'),
   acceptConsent: (version: string) => request<User>('POST', '/me/consent', { version }),
   setHouse: (houseId: string) => request<User>('POST', '/me/house', { house_id: houseId }),
+  deleteAccount: () => request<void>('DELETE', '/me'),
   myIssues: () => request<Issue[]>('GET', '/me/issues'),
   categories: () => request<Category[]>('GET', '/categories'),
   searchHouses: (query: string) => request<House[]>('GET', `/houses?${q({ query })}`),

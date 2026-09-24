@@ -1,8 +1,9 @@
 import { Button, CellList, CellSimple, Counter } from '@maxhub/max-ui';
 import { Phone, Plus, QrCode } from '@phosphor-icons/react';
+import { useState } from 'react';
 import { useRouter } from '../app/router';
-import { useUser } from '../app/session';
-import { api } from '../shared/api/client';
+import { useSession, useUser } from '../app/session';
+import { api, ApiError } from '../shared/api/client';
 import { isClosed } from '../shared/api/types';
 import { useResource } from '../shared/api/useResource';
 import { bridge } from '../shared/bridge/bridge';
@@ -11,12 +12,14 @@ import { parseStartParam } from '../shared/lib/model';
 import { IssueList } from '../shared/ui/IssueRow';
 import { DemoMark, EmptyState, ErrorState, Facts, Island, Loading, Screen, Section } from '../shared/ui/Layout';
 import { HousePlate } from '../shared/ui/Plate';
+import { Sheet } from '../shared/ui/Sheet';
 import s from './pages.module.css';
 
 /** Главный экран жителя: табличка дома, УК, открытые проблемы дома, мои заявки. */
 export function Home() {
   const user = useUser();
   const { push } = useRouter();
+  const [deleting, setDeleting] = useState(false); // открыт лист удаления аккаунта
   const houseId = user.house_id ?? '';
   const res = useResource(async () => {
     const [house, issues, mine] = await Promise.all([api.house(houseId), api.houseIssues(houseId), api.myIssues()]);
@@ -105,6 +108,52 @@ export function Home() {
         <CellSimple title="Мои заявки" showChevron after={mine.length > 0 && <Counter value={mine.length} rounded />} onClick={() => push({ name: 'mine' })} />
         <CellSimple title="Другой дом" showChevron onClick={() => push({ name: 'houseSearch' })} />
       </CellList>
+      <button type="button" className={s.dangerLink} onClick={() => setDeleting(true)}>
+        Удалить аккаунт
+      </button>
+      <DeleteAccountSheet open={deleting} onClose={() => setDeleting(false)} />
     </Screen>
+  );
+}
+
+/** Подтверждение удаления: что сотрётся, что останется. */
+function DeleteAccountSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { accountDeleted } = useSession();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const remove = async () => {
+    setBusy(true);
+    setError('');
+    try {
+      await api.deleteAccount();
+      accountDeleted();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Не удалось удалить аккаунт. Попробуйте позже');
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Sheet open={open} title="Удалить аккаунт?" onClose={onClose}>
+      <div className={s.sheetBody}>
+        <ul className={s.plainList}>
+          <li>Имя, телефон и согласие на обработку данных сотрутся.</li>
+          <li>Ваши заявки останутся в доме без ваших данных: соседи и УК продолжат по ним работать.</li>
+          <li>Уведомления о заявках в чат с ботом больше не придут.</li>
+        </ul>
+        {error && (
+          <p className={s.hint} role="alert">
+            {error}
+          </p>
+        )}
+        <Button variant="destructive" size="large" stretched loading={busy} onClick={remove}>
+          Удалить аккаунт
+        </Button>
+        <Button variant="secondary" size="large" stretched disabled={busy} onClick={onClose}>
+          Отмена
+        </Button>
+      </div>
+    </Sheet>
   );
 }

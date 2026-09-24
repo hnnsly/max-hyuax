@@ -7,6 +7,7 @@ type State =
   | { phase: 'loading' }
   | { phase: 'anon' }
   | { phase: 'error'; message: string }
+  | { phase: 'deleted' }
   | { phase: 'ready'; user: User; startParam: string };
 
 export const demoRoles = {
@@ -48,6 +49,8 @@ interface SessionValue {
   loginDemo(role: DemoRole): void;
   setUser(u: User): void;
   logout(): void;
+  /** Аккаунт удалён на сервере: сессию забываем и показываем экран прощания. */
+  accountDeleted(): void;
 }
 
 const SessionContext = createContext<SessionValue | null>(null);
@@ -95,6 +98,11 @@ export function SessionProvider({ children }: { children: ReactNode }) {
       storage.set(null);
       setToken('');
       setState({ phase: 'anon' });
+    },
+    accountDeleted: () => {
+      storage.set(null);
+      setToken('');
+      setState({ phase: 'deleted' });
     },
   };
   return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;

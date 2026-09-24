@@ -7,7 +7,7 @@ import { api, ApiError } from '../shared/api/client';
 import type { House } from '../shared/api/types';
 import { isClosed } from '../shared/api/types';
 import { useResource } from '../shared/api/useResource';
-import { BOT_NAME } from '../shared/bridge/bridge';
+import { bridge, BOT_NAME } from '../shared/bridge/bridge';
 import { calendarDaysBetween } from '../shared/lib/format';
 import { groupQueue } from '../shared/lib/model';
 import { IssueList } from '../shared/ui/IssueRow';
@@ -251,6 +251,28 @@ export function DemoGate() {
           </Button>
         ))}
       </div>
+    </Screen>
+  );
+}
+
+/** После удаления аккаунта: что стёрто и как вернуться (в MAX — перезапуск, в браузере — демо-вход). */
+export function AccountDeleted() {
+  const { logout } = useSession();
+  return (
+    <Screen title="Аккаунт удалён">
+      <div className={s.intro}>
+        <h2 className={s.introTitle}>Аккаунт удалён</h2>
+        <p className={s.text}>
+          Имя, телефон и согласие на обработку данных стёрты. Заявки остались в доме без ваших данных: соседи и УК продолжат по ним работать.
+        </p>
+      </div>
+      {bridge.inMax() ? (
+        <p className={s.hint}>Чтобы снова сообщать о проблемах, закройте и откройте приложение. Мы попросим согласие заново.</p>
+      ) : (
+        <Button variant="secondary" size="medium" stretched onClick={logout}>
+          Войти снова
+        </Button>
+      )}
     </Screen>
   );
 }

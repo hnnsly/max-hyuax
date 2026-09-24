@@ -249,6 +249,20 @@ func TestOperatorSeesMetrics(t *testing.T) {
 	}
 }
 
+func TestDeleteAccountAndDemoRestore(t *testing.T) {
+	old := login(t, "resident_2")
+	expect(t, call(t, "DELETE", "/api/v1/me", old, nil), 204, "delete account")
+	expect(t, call(t, "GET", "/api/v1/me", old, nil), 401, "token of deleted account")
+
+	again := login(t, "resident_2")
+	me := expect(t, call(t, "GET", "/api/v1/me", again, nil), 200, "restored demo user").body
+	if me["first_name"] != "Сергей" || me["has_consent"] != false {
+		t.Fatalf("restored = %v, want name back and consent required", me)
+	}
+	// Согласие возвращаем, чтобы демо-пользователь остался рабочим для остальных тестов.
+	expect(t, call(t, "POST", "/api/v1/me/consent", again, map[string]string{"version": "v1"}), 200, "consent again")
+}
+
 func TestOperatorListsOwnHouses(t *testing.T) {
 	otherOrgHouse(t)
 	list := expect(t, call(t, "GET", "/api/v1/uk/houses", login(t, "uk_operator"), nil), 200, "uk houses").list
