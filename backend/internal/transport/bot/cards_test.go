@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	"dommax/internal/app"
 	"dommax/internal/app/cards"
 	"dommax/internal/domain/issue"
 	"dommax/internal/storage/maxapi"
@@ -65,6 +66,29 @@ func TestRenderCardOverdueAndClosed(t *testing.T) {
 	}
 }
 
+func TestRenderNotices(t *testing.T) {
+	c := sampleCard()
+	over := bot.RenderNotice(app.NotifyOverdue, c, "b")
+	for _, want := range []string{"Срок ответа по заявке № 142 истёк", "до 19 сентября", "Мосжилинспекц", "УК «Ореховый квартал»"} {
+		if !strings.Contains(over.Text, want) {
+			t.Errorf("overdue text has no %q:\n%s", want, over.Text)
+		}
+	}
+	c.Status, c.Comment = issue.StatusDone, "Лифт запустили"
+	if done := bot.RenderNotice(app.NotifyFinal, c, "b"); !strings.Contains(done.Text, "выполнена") || !strings.Contains(done.Text, "Лифт запустили") {
+		t.Errorf("final text:\n%s", done.Text)
+	}
+	c.Status, c.Comment = issue.StatusRejected, "Не наш участок"
+	if rej := bot.RenderNotice(app.NotifyFinal, c, "b"); !strings.Contains(rej.Text, "отклонена") || !strings.Contains(rej.Text, "Причина: Не наш участок") {
+		t.Errorf("rejected text:\n%s", rej.Text)
+	}
+	for _, m := range []maxapi.NewMessage{over, bot.RenderNotice(app.NotifyFinal, c, "b")} {
+		if strings.ContainsAny(m.Text, "—–") {
+			t.Errorf("no dashes allowed: %s", m.Text)
+		}
+	}
+}
+
 type fakeCardAPI struct {
 	sent   []maxapi.Target
 	edited []string
@@ -91,7 +115,7 @@ func TestCardSenderSendsThenEdits(t *testing.T) {
 	if err != nil || mid != "mid-1" || len(api.edited) != 1 {
 		t.Fatalf("edit: mid=%q err=%v edited=%v", mid, err, api.edited)
 	}
-	if err := s.SendFinal(t.Context(), 5001, sampleCard()); err != nil || len(api.sent) != 2 {
-		t.Fatalf("final: err=%v sent=%v", err, api.sent)
+	if err := s.Notify(t.Context(), 5001, app.NotifyOverdue, sampleCard()); err != nil || len(api.sent) != 2 {
+		t.Fatalf("notice: err=%v sent=%v", err, api.sent)
 	}
 }

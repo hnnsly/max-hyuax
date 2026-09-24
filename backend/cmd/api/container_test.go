@@ -13,6 +13,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/jackc/pgx/v5"
+
 	"dommax/internal/storage/postgres/pgtest"
 )
 
@@ -124,6 +126,53 @@ func TestRunWithPollingBotRegistersCommandsAndStops(t *testing.T) {
 		}
 	case <-time.After(10 * time.Second):
 		t.Fatal("Run did not stop after cancel")
+	}
+}
+
+// Просрочка отмечается даже с выключенным ботом: уведомления ждут в outbox.
+func TestRunMarksOverdueIssuesWithBotOff(t *testing.T) {
+	cfg := testConfig(t)
+	conn, err := pgx.Connect(t.Context(), cfg.DatabaseURL)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close(context.Background())
+	// Демо-заявка «Не горит свет» открыта; сдвигаем её срок в прошлое.
+	const id = "0190a000-0000-7000-8000-000000000002"
+	ctx, cancel := context.WithCancel(t.Context())
+	defer cancel()
+	c, err := Open(ctx, cfg, quietLog())
+	if err != nil {
+		t.Fatalf("Open: %v", err)
+	}
+	defer c.Close()
+	if _, err := conn.Exec(t.Context(), `UPDATE issues SET deadline_at = now() - interval '1 hour' WHERE id = $1`, id); err != nil {
+		t.Fatal(err)
+	}
+	done := make(chan error, 1)
+	go func() { done <- c.Run(ctx) }()
+
+	var marked bool
+	for deadline := time.Now().Add(5 * time.Second); !marked && time.Now().Before(deadline); {
+		time.Sleep(20 * time.Millisecond)
+		err := conn.QueryRow(t.Context(), `SELECT overdue_at IS NOT NULL FROM issues WHERE id = $1`, id).Scan(&marked)
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	if !marked {
+		t.Fatal("overdue issue was not marked")
+	}
+	var queued int
+	if err := conn.QueryRow(t.Context(), `SELECT count(*) FROM outbox WHERE issue_id = $1 AND kind = 'overdue'`, id).Scan(&queued); err != nil {
+		t.Fatal(err)
+	}
+	if queued == 0 {
+		t.Fatal("overdue notice was not queued")
+	}
+	cancel()
+	if err := <-done; err != nil {
+		t.Fatalf("Run after cancel = %v", err)
 	}
 }
 

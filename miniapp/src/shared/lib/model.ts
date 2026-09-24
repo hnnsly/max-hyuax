@@ -37,6 +37,8 @@ export interface TimelineItem {
   at: string;
   text: string;
   comment?: string;
+  /** Событие просрочки: точка на шкале красная. */
+  late?: boolean;
   last: boolean;
 }
 
@@ -67,6 +69,7 @@ export function buildTimeline(events: IssueEvent[]): TimelineItem[] {
     }
     flushJoined(lastJoinAt);
     if (e.kind === 'created') out.push({ at: e.at, text: 'Житель сообщил о проблеме' });
+    else if (e.kind === 'overdue') out.push({ at: e.at, text: 'Срок ответа истёк', late: true });
     else out.push({ at: e.at, text: statusText[e.status], ...(e.comment ? { comment: e.comment } : {}) });
   }
   flushJoined(lastJoinAt);

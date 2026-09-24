@@ -12,7 +12,7 @@ import (
 
 const findSimilarIssues = `-- name: FindSimilarIssues :many
 SELECT id, number, house_id, COALESCE(object_id, '')::text AS object_id, category, title, description,
-       responsible_org_id, status, status_at, status_comment, created_by, created_at, deadline_at
+       responsible_org_id, status, status_at, status_comment, created_by, created_at, deadline_at, overdue_at
 FROM issues
 WHERE house_id = $1
   AND category = $2
@@ -45,6 +45,7 @@ type FindSimilarIssuesRow struct {
 	CreatedBy        int64
 	CreatedAt        time.Time
 	DeadlineAt       time.Time
+	OverdueAt        *time.Time
 }
 
 func (q *Queries) FindSimilarIssues(ctx context.Context, arg FindSimilarIssuesParams) ([]FindSimilarIssuesRow, error) {
@@ -76,6 +77,7 @@ func (q *Queries) FindSimilarIssues(ctx context.Context, arg FindSimilarIssuesPa
 			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.DeadlineAt,
+			&i.OverdueAt,
 		); err != nil {
 			return nil, err
 		}
@@ -89,7 +91,7 @@ func (q *Queries) FindSimilarIssues(ctx context.Context, arg FindSimilarIssuesPa
 
 const getIssue = `-- name: GetIssue :one
 SELECT id, number, house_id, COALESCE(object_id, '')::text AS object_id, category, title, description,
-       responsible_org_id, status, status_at, status_comment, created_by, created_at, deadline_at
+       responsible_org_id, status, status_at, status_comment, created_by, created_at, deadline_at, overdue_at
 FROM issues
 WHERE id = $1
 `
@@ -109,6 +111,7 @@ type GetIssueRow struct {
 	CreatedBy        int64
 	CreatedAt        time.Time
 	DeadlineAt       time.Time
+	OverdueAt        *time.Time
 }
 
 func (q *Queries) GetIssue(ctx context.Context, id string) (GetIssueRow, error) {
@@ -129,6 +132,7 @@ func (q *Queries) GetIssue(ctx context.Context, id string) (GetIssueRow, error) 
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.DeadlineAt,
+		&i.OverdueAt,
 	)
 	return i, err
 }
@@ -223,7 +227,7 @@ func (q *Queries) InsertParticipant(ctx context.Context, arg InsertParticipantPa
 
 const listHouseIssues = `-- name: ListHouseIssues :many
 SELECT id, number, house_id, COALESCE(object_id, '')::text AS object_id, category, title, description,
-       responsible_org_id, status, status_at, status_comment, created_by, created_at, deadline_at
+       responsible_org_id, status, status_at, status_comment, created_by, created_at, deadline_at, overdue_at
 FROM issues
 WHERE house_id = $1
 ORDER BY created_at DESC
@@ -250,6 +254,7 @@ type ListHouseIssuesRow struct {
 	CreatedBy        int64
 	CreatedAt        time.Time
 	DeadlineAt       time.Time
+	OverdueAt        *time.Time
 }
 
 func (q *Queries) ListHouseIssues(ctx context.Context, arg ListHouseIssuesParams) ([]ListHouseIssuesRow, error) {
@@ -276,6 +281,7 @@ func (q *Queries) ListHouseIssues(ctx context.Context, arg ListHouseIssuesParams
 			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.DeadlineAt,
+			&i.OverdueAt,
 		); err != nil {
 			return nil, err
 		}
@@ -330,7 +336,7 @@ func (q *Queries) ListIssueEvents(ctx context.Context, issueID string) ([]ListIs
 
 const listOrgQueue = `-- name: ListOrgQueue :many
 SELECT id, number, house_id, COALESCE(object_id, '')::text AS object_id, category, title, description,
-       responsible_org_id, status, status_at, status_comment, created_by, created_at, deadline_at
+       responsible_org_id, status, status_at, status_comment, created_by, created_at, deadline_at, overdue_at
 FROM issues
 WHERE responsible_org_id = $1
 ORDER BY status IN ('done', 'rejected'), deadline_at
@@ -357,6 +363,7 @@ type ListOrgQueueRow struct {
 	CreatedBy        int64
 	CreatedAt        time.Time
 	DeadlineAt       time.Time
+	OverdueAt        *time.Time
 }
 
 func (q *Queries) ListOrgQueue(ctx context.Context, arg ListOrgQueueParams) ([]ListOrgQueueRow, error) {
@@ -383,6 +390,77 @@ func (q *Queries) ListOrgQueue(ctx context.Context, arg ListOrgQueueParams) ([]L
 			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.DeadlineAt,
+			&i.OverdueAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listOverdueUnmarked = `-- name: ListOverdueUnmarked :many
+SELECT id, number, house_id, COALESCE(object_id, '')::text AS object_id, category, title, description,
+       responsible_org_id, status, status_at, status_comment, created_by, created_at, deadline_at, overdue_at
+FROM issues
+WHERE overdue_at IS NULL
+  AND status NOT IN ('done', 'rejected')
+  AND deadline_at < $1
+ORDER BY deadline_at
+LIMIT $2
+`
+
+type ListOverdueUnmarkedParams struct {
+	Now     time.Time
+	MaxRows int32
+}
+
+type ListOverdueUnmarkedRow struct {
+	ID               string
+	Number           int64
+	HouseID          string
+	ObjectID         string
+	Category         string
+	Title            string
+	Description      string
+	ResponsibleOrgID string
+	Status           string
+	StatusAt         time.Time
+	StatusComment    string
+	CreatedBy        int64
+	CreatedAt        time.Time
+	DeadlineAt       time.Time
+	OverdueAt        *time.Time
+}
+
+func (q *Queries) ListOverdueUnmarked(ctx context.Context, arg ListOverdueUnmarkedParams) ([]ListOverdueUnmarkedRow, error) {
+	rows, err := q.db.Query(ctx, listOverdueUnmarked, arg.Now, arg.MaxRows)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListOverdueUnmarkedRow
+	for rows.Next() {
+		var i ListOverdueUnmarkedRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Number,
+			&i.HouseID,
+			&i.ObjectID,
+			&i.Category,
+			&i.Title,
+			&i.Description,
+			&i.ResponsibleOrgID,
+			&i.Status,
+			&i.StatusAt,
+			&i.StatusComment,
+			&i.CreatedBy,
+			&i.CreatedAt,
+			&i.DeadlineAt,
+			&i.OverdueAt,
 		); err != nil {
 			return nil, err
 		}
@@ -396,7 +474,7 @@ func (q *Queries) ListOrgQueue(ctx context.Context, arg ListOrgQueueParams) ([]L
 
 const listParticipantIssues = `-- name: ListParticipantIssues :many
 SELECT i.id, i.number, i.house_id, COALESCE(i.object_id, '')::text AS object_id, i.category, i.title, i.description,
-       i.responsible_org_id, i.status, i.status_at, i.status_comment, i.created_by, i.created_at, i.deadline_at
+       i.responsible_org_id, i.status, i.status_at, i.status_comment, i.created_by, i.created_at, i.deadline_at, i.overdue_at
 FROM issues i
 JOIN issue_participants p ON p.issue_id = i.id
 WHERE p.user_id = $1
@@ -424,6 +502,7 @@ type ListParticipantIssuesRow struct {
 	CreatedBy        int64
 	CreatedAt        time.Time
 	DeadlineAt       time.Time
+	OverdueAt        *time.Time
 }
 
 func (q *Queries) ListParticipantIssues(ctx context.Context, arg ListParticipantIssuesParams) ([]ListParticipantIssuesRow, error) {
@@ -450,6 +529,7 @@ func (q *Queries) ListParticipantIssues(ctx context.Context, arg ListParticipant
 			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.DeadlineAt,
+			&i.OverdueAt,
 		); err != nil {
 			return nil, err
 		}
@@ -499,14 +579,15 @@ func (q *Queries) LockIssue(ctx context.Context, id string) error {
 
 const updateIssueState = `-- name: UpdateIssueState :exec
 UPDATE issues
-SET status = $1, status_at = $2, status_comment = $3
-WHERE id = $4
+SET status = $1, status_at = $2, status_comment = $3, overdue_at = $4
+WHERE id = $5
 `
 
 type UpdateIssueStateParams struct {
 	Status        string
 	StatusAt      time.Time
 	StatusComment string
+	OverdueAt     *time.Time
 	ID            string
 }
 
@@ -515,6 +596,7 @@ func (q *Queries) UpdateIssueState(ctx context.Context, arg UpdateIssueStatePara
 		arg.Status,
 		arg.StatusAt,
 		arg.StatusComment,
+		arg.OverdueAt,
 		arg.ID,
 	)
 	return err

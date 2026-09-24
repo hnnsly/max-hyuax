@@ -187,6 +187,37 @@ func TestParticipantIssuesAndEvents(t *testing.T) {
 	}
 }
 
+func TestOverdueMarkRoundTrip(t *testing.T) {
+	anna := demoUser(t, "resident_demo_1")
+	is := newIssue(t, anna.ID)
+	if err := store.Issues().Create(t.Context(), is); err != nil {
+		t.Fatal(err)
+	}
+	late := is.Deadline().Add(time.Hour)
+	found, err := store.Issues().ListOverdueUnmarked(t.Context(), late, 500)
+	if err != nil || !slices.ContainsFunc(found, func(x *issue.Issue) bool { return x.ID() == is.ID() }) {
+		t.Fatalf("overdue list = %d, err = %v; want the new issue", len(found), err)
+	}
+	if err := is.MarkOverdue(late); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Issues().Save(t.Context(), is); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := store.Issues().Get(t.Context(), is.ID())
+	if got.OverdueAt().IsZero() {
+		t.Fatal("overdue_at must be saved")
+	}
+	events, _ := store.Issues().Events(t.Context(), is.ID())
+	if events[len(events)-1].Kind != issue.EventOverdue {
+		t.Fatalf("last event = %+v", events[len(events)-1])
+	}
+	found, _ = store.Issues().ListOverdueUnmarked(t.Context(), late, 500)
+	if slices.ContainsFunc(found, func(x *issue.Issue) bool { return x.ID() == is.ID() }) {
+		t.Fatal("marked issue must not be listed again")
+	}
+}
+
 func TestUnknownIssueIsNotFound(t *testing.T) {
 	if _, err := store.Issues().Get(t.Context(), uuid.NewV7().String()); !errors.Is(err, app.ErrNotFound) {
 		t.Fatalf("err = %v", err)

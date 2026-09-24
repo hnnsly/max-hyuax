@@ -45,6 +45,7 @@ func (r issueRepo) Save(ctx context.Context, is *issue.Issue) error {
 			Status:        string(is.Status()),
 			StatusAt:      is.StatusAt(),
 			StatusComment: is.StatusComment(),
+			OverdueAt:     timePtr(is.OverdueAt()),
 		})
 		if err != nil {
 			return err
@@ -123,6 +124,14 @@ func (r issueRepo) ListByParticipant(ctx context.Context, userID int64, limit in
 	return r.restore(ctx, convert(rows))
 }
 
+func (r issueRepo) ListOverdueUnmarked(ctx context.Context, now time.Time, limit int) ([]*issue.Issue, error) {
+	rows, err := r.s.q.ListOverdueUnmarked(ctx, sqlcdb.ListOverdueUnmarkedParams{Now: now, MaxRows: int32(limit)})
+	if err != nil {
+		return nil, err
+	}
+	return r.restore(ctx, convert(rows))
+}
+
 func (r issueRepo) Events(ctx context.Context, issueID string) ([]issue.Event, error) {
 	rows, err := r.s.q.ListIssueEvents(ctx, issueID)
 	return mapSlice(rows, func(e sqlcdb.ListIssueEventsRow) issue.Event {
@@ -132,7 +141,7 @@ func (r issueRepo) Events(ctx context.Context, issueID string) ([]issue.Event, e
 
 // issueRow — строки разных запросов sqlc с одинаковым набором колонок.
 type issueRow interface {
-	sqlcdb.GetIssueRow | sqlcdb.ListHouseIssuesRow | sqlcdb.FindSimilarIssuesRow | sqlcdb.ListOrgQueueRow | sqlcdb.ListParticipantIssuesRow
+	sqlcdb.GetIssueRow | sqlcdb.ListHouseIssuesRow | sqlcdb.FindSimilarIssuesRow | sqlcdb.ListOrgQueueRow | sqlcdb.ListParticipantIssuesRow | sqlcdb.ListOverdueUnmarkedRow
 }
 
 func convert[T issueRow](rows []T) []sqlcdb.GetIssueRow {
@@ -177,6 +186,7 @@ func (r issueRepo) restore(ctx context.Context, rows []sqlcdb.GetIssueRow) ([]*i
 			Status:        issue.Status(row.Status),
 			StatusAt:      row.StatusAt,
 			StatusComment: row.StatusComment,
+			OverdueAt:     timeOrZero(row.OverdueAt),
 			Participants:  byIssue[row.ID],
 		})
 	}

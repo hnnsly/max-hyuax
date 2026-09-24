@@ -88,7 +88,7 @@ export interface Issue {
 }
 
 export interface IssueEvent {
-  kind: 'created' | 'joined' | 'status_changed';
+  kind: 'created' | 'joined' | 'status_changed' | 'overdue';
   status: Status;
   comment?: string;
   at: string;

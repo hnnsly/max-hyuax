@@ -7,12 +7,12 @@ RETURNING number;
 
 -- name: UpdateIssueState :exec
 UPDATE issues
-SET status = @status, status_at = @status_at, status_comment = @status_comment
+SET status = @status, status_at = @status_at, status_comment = @status_comment, overdue_at = @overdue_at
 WHERE id = @id;
 
 -- name: GetIssue :one
 SELECT id, number, house_id, COALESCE(object_id, '')::text AS object_id, category, title, description,
-       responsible_org_id, status, status_at, status_comment, created_by, created_at, deadline_at
+       responsible_org_id, status, status_at, status_comment, created_by, created_at, deadline_at, overdue_at
 FROM issues
 WHERE id = @id;
 
@@ -21,7 +21,7 @@ SELECT 1 FROM issues WHERE id = @id FOR UPDATE;
 
 -- name: ListHouseIssues :many
 SELECT id, number, house_id, COALESCE(object_id, '')::text AS object_id, category, title, description,
-       responsible_org_id, status, status_at, status_comment, created_by, created_at, deadline_at
+       responsible_org_id, status, status_at, status_comment, created_by, created_at, deadline_at, overdue_at
 FROM issues
 WHERE house_id = @house_id
 ORDER BY created_at DESC
@@ -29,7 +29,7 @@ LIMIT @max_rows;
 
 -- name: FindSimilarIssues :many
 SELECT id, number, house_id, COALESCE(object_id, '')::text AS object_id, category, title, description,
-       responsible_org_id, status, status_at, status_comment, created_by, created_at, deadline_at
+       responsible_org_id, status, status_at, status_comment, created_by, created_at, deadline_at, overdue_at
 FROM issues
 WHERE house_id = @house_id
   AND category = @category
@@ -41,7 +41,7 @@ LIMIT 5;
 
 -- name: ListOrgQueue :many
 SELECT id, number, house_id, COALESCE(object_id, '')::text AS object_id, category, title, description,
-       responsible_org_id, status, status_at, status_comment, created_by, created_at, deadline_at
+       responsible_org_id, status, status_at, status_comment, created_by, created_at, deadline_at, overdue_at
 FROM issues
 WHERE responsible_org_id = @org_id
 ORDER BY status IN ('done', 'rejected'), deadline_at
@@ -49,11 +49,21 @@ LIMIT @max_rows;
 
 -- name: ListParticipantIssues :many
 SELECT i.id, i.number, i.house_id, COALESCE(i.object_id, '')::text AS object_id, i.category, i.title, i.description,
-       i.responsible_org_id, i.status, i.status_at, i.status_comment, i.created_by, i.created_at, i.deadline_at
+       i.responsible_org_id, i.status, i.status_at, i.status_comment, i.created_by, i.created_at, i.deadline_at, i.overdue_at
 FROM issues i
 JOIN issue_participants p ON p.issue_id = i.id
 WHERE p.user_id = @user_id
 ORDER BY i.status IN ('done', 'rejected'), i.created_at DESC
+LIMIT @max_rows;
+
+-- name: ListOverdueUnmarked :many
+SELECT id, number, house_id, COALESCE(object_id, '')::text AS object_id, category, title, description,
+       responsible_org_id, status, status_at, status_comment, created_by, created_at, deadline_at, overdue_at
+FROM issues
+WHERE overdue_at IS NULL
+  AND status NOT IN ('done', 'rejected')
+  AND deadline_at < @now
+ORDER BY deadline_at
 LIMIT @max_rows;
 
 -- name: ListIssueEvents :many

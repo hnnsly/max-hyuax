@@ -27,21 +27,28 @@ func Plan(events []issue.Event, participants []issue.Participant) []app.Notifica
 			out = append(out, n)
 		}
 	}
-	var closed bool
+	var closed, overdue bool
 	for _, e := range events {
 		switch e.Kind {
 		case issue.EventCreated:
 			add(app.NotifyCard, e.UserID)
-		case issue.EventJoined, issue.EventStatusChanged:
+		case issue.EventJoined, issue.EventStatusChanged, issue.EventOverdue:
 			for _, p := range participants {
 				add(app.NotifyCard, p.UserID)
 			}
 			closed = closed || (e.Kind == issue.EventStatusChanged && e.Status.Closed())
+			overdue = overdue || e.Kind == issue.EventOverdue
 		}
 	}
-	if closed {
+	for _, notice := range []struct {
+		on   bool
+		kind app.NotificationKind
+	}{{closed, app.NotifyFinal}, {overdue, app.NotifyOverdue}} {
+		if !notice.on {
+			continue
+		}
 		for _, p := range participants {
-			add(app.NotifyFinal, p.UserID)
+			add(notice.kind, p.UserID)
 		}
 	}
 	return out
@@ -67,7 +74,8 @@ type Card struct {
 type Messenger interface {
 	// UpsertCard редактирует сообщение mid или, если mid пуст, отправляет новое; возвращает id сообщения.
 	UpsertCard(ctx context.Context, maxUserID int64, mid string, c Card) (string, error)
-	SendFinal(ctx context.Context, maxUserID int64, c Card) error
+	// Notify отправляет отдельное сообщение: итог по закрытой заявке или уведомление о просрочке.
+	Notify(ctx context.Context, maxUserID int64, kind app.NotificationKind, c Card) error
 }
 
 type Service struct {
@@ -94,8 +102,8 @@ func (s *Service) Deliver(ctx context.Context, n app.Notification) error {
 	if err != nil {
 		return err
 	}
-	if n.Kind == app.NotifyFinal {
-		return s.msg.SendFinal(ctx, u.MaxUserID, c)
+	if n.Kind != app.NotifyCard {
+		return s.msg.Notify(ctx, u.MaxUserID, n.Kind, c)
 	}
 
 	mid, err := s.store.Outbox().CardMID(ctx, n.IssueID, n.UserID)

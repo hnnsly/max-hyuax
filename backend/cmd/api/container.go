@@ -41,6 +41,7 @@ type Container struct {
 	webhook    func() (*bot.Webhook, error)
 	cards      func() (*cards.Service, error)
 	outbox     func() (*jobs.OutboxWorker, error)
+	overdue    func() *jobs.OverdueJob
 	http       func() (*fiber.App, error)
 }
 
@@ -120,6 +121,9 @@ func Open(ctx context.Context, cfg config, log *slog.Logger) (*Container, error)
 		limiter := jobs.NewLimiter(jobs.GlobalInterval, jobs.PerChatInterval, time.Now, jobs.SleepCtx)
 		return jobs.NewOutboxWorker(store.Outbox(), svc.Deliver, limiter, log), nil
 	})
+	c.overdue = sync.OnceValue(func() *jobs.OverdueJob {
+		return jobs.NewOverdueJob(c.Issues().MarkOverdue, jobs.OverdueInterval, log)
+	})
 	c.http = sync.OnceValues(func() (*fiber.App, error) {
 		deps := httpapi.Deps{
 			Auth: c.Auth(), Issues: c.Issues(), Houses: c.Houses(),
@@ -150,6 +154,7 @@ func (c *Container) BotHandler() (*bot.Handler, error)         { return c.botHan
 func (c *Container) Webhook() (*bot.Webhook, error)            { return c.webhook() }
 func (c *Container) Cards() (*cards.Service, error)            { return c.cards() }
 func (c *Container) OutboxWorker() (*jobs.OutboxWorker, error) { return c.outbox() }
+func (c *Container) OverdueJob() *jobs.OverdueJob              { return c.overdue() }
 func (c *Container) HTTP() (*fiber.App, error)                 { return c.http() }
 
 // bot — клиент Bot API и имя бота: нужны и диалогу, и живым карточкам.

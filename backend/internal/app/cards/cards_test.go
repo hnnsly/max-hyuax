@@ -31,6 +31,9 @@ func card(id int64) app.Notification {
 func final(id int64) app.Notification {
 	return app.Notification{Kind: app.NotifyFinal, IssueID: "i1", UserID: id}
 }
+func overdue(id int64) app.Notification {
+	return app.Notification{Kind: app.NotifyOverdue, IssueID: "i1", UserID: id}
+}
 
 func TestPlanNotifiesOnlyParticipants(t *testing.T) {
 	cases := []struct {
@@ -44,6 +47,8 @@ func TestPlanNotifiesOnlyParticipants(t *testing.T) {
 		{"status: cards for all", []issue.Event{{Kind: issue.EventStatusChanged, IssueID: "i1", Status: issue.StatusInProgress}}, parts(1, 2), []app.Notification{card(1), card(2)}},
 		{"done: cards and final messages", []issue.Event{{Kind: issue.EventStatusChanged, IssueID: "i1", Status: issue.StatusDone}}, parts(1, 2),
 			[]app.Notification{card(1), card(2), final(1), final(2)}},
+		{"overdue: cards and overdue messages", []issue.Event{{Kind: issue.EventOverdue, IssueID: "i1", Status: issue.StatusAccepted}}, parts(1, 2),
+			[]app.Notification{card(1), card(2), overdue(1), overdue(2)}},
 		{"several events are deduplicated", []issue.Event{
 			{Kind: issue.EventJoined, IssueID: "i1", UserID: 2},
 			{Kind: issue.EventStatusChanged, IssueID: "i1", Status: issue.StatusAccepted},
@@ -62,7 +67,7 @@ type sent struct {
 	maxUser int64
 	mid     string
 	card    cards.Card
-	final   bool
+	notice  app.NotificationKind // пусто — карточка, иначе отдельное сообщение этого вида
 }
 
 type fakeMessenger struct {
@@ -81,8 +86,8 @@ func (f *fakeMessenger) UpsertCard(_ context.Context, maxUser int64, mid string,
 	return mid, nil
 }
 
-func (f *fakeMessenger) SendFinal(_ context.Context, maxUser int64, c cards.Card) error {
-	f.calls = append(f.calls, sent{maxUser: maxUser, card: c, final: true})
+func (f *fakeMessenger) Notify(_ context.Context, maxUser int64, kind app.NotificationKind, c cards.Card) error {
+	f.calls = append(f.calls, sent{maxUser: maxUser, card: c, notice: kind})
 	return nil
 }
 
@@ -148,12 +153,14 @@ func TestDeliverSkipsUsersWithoutMax(t *testing.T) {
 	}
 }
 
-func TestDeliverFinal(t *testing.T) {
+func TestDeliverNotices(t *testing.T) {
 	_, m, svc, _ := setup(t)
-	if err := svc.Deliver(t.Context(), final(1)); err != nil {
-		t.Fatal(err)
+	for _, n := range []app.Notification{final(1), overdue(1)} {
+		if err := svc.Deliver(t.Context(), n); err != nil {
+			t.Fatal(err)
+		}
 	}
-	if len(m.calls) != 1 || !m.calls[0].final {
+	if len(m.calls) != 2 || m.calls[0].notice != app.NotifyFinal || m.calls[1].notice != app.NotifyOverdue {
 		t.Fatalf("calls = %+v", m.calls)
 	}
 }

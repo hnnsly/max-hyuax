@@ -60,6 +60,7 @@ type Issue struct {
 	CreatedBy        int64
 	CreatedAt        time.Time
 	DeadlineAt       time.Time
+	OverdueAt        *time.Time
 }
 
 type IssueEvent struct {

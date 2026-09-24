@@ -35,6 +35,7 @@ var (
 	ErrClosed         = errors.New("issue: issue is closed")
 	ErrTransition     = errors.New("issue: status transition not allowed")
 	ErrReasonRequired = errors.New("issue: rejection reason required")
+	ErrNotOverdue     = errors.New("issue: not overdue or already marked")
 )
 
 type EventKind string
@@ -43,6 +44,7 @@ const (
 	EventCreated       EventKind = "created"
 	EventJoined        EventKind = "joined"
 	EventStatusChanged EventKind = "status_changed"
+	EventOverdue       EventKind = "overdue"
 )
 
 // Event — доменное событие; слой приложения превращает события в записи outbox.
@@ -72,6 +74,7 @@ type Issue struct {
 	status           Status
 	statusAt         time.Time
 	statusComment    string
+	overdueAt        time.Time
 	createdAt        time.Time
 	deadline         time.Time
 	participants     []Participant
@@ -97,6 +100,7 @@ type State struct {
 	Status        Status
 	StatusAt      time.Time
 	StatusComment string
+	OverdueAt     time.Time // когда отмечена просрочка; ноль — ещё не отмечена
 	Participants  []Participant
 }
 
@@ -155,6 +159,16 @@ func (is *Issue) ChangeStatus(to Status, comment string, at time.Time) error {
 	return nil
 }
 
+// MarkOverdue фиксирует просрочку один раз: участники получают уведомление ровно однажды.
+func (is *Issue) MarkOverdue(now time.Time) error {
+	if !is.IsOverdue(now) || !is.overdueAt.IsZero() {
+		return ErrNotOverdue
+	}
+	is.overdueAt = now
+	is.record(Event{Kind: EventOverdue, Status: is.status, At: now})
+	return nil
+}
+
 // IsOverdue сообщает, что срок ответа прошёл, а заявка всё ещё открыта.
 func (is *Issue) IsOverdue(now time.Time) bool {
 	return !is.status.Closed() && now.After(is.deadline)
@@ -193,6 +207,7 @@ func (is *Issue) ResponsibleOrgID() string    { return is.responsibleOrgID }
 func (is *Issue) Status() Status              { return is.status }
 func (is *Issue) StatusAt() time.Time         { return is.statusAt }
 func (is *Issue) StatusComment() string       { return is.statusComment }
+func (is *Issue) OverdueAt() time.Time        { return is.overdueAt }
 func (is *Issue) CreatedAt() time.Time        { return is.createdAt }
 func (is *Issue) Deadline() time.Time         { return is.deadline }
 func (is *Issue) Participants() []Participant { return slices.Clone(is.participants) }
@@ -222,6 +237,7 @@ func Restore(p NewParams, s State) *Issue {
 		status:           s.Status,
 		statusAt:         s.StatusAt,
 		statusComment:    s.StatusComment,
+		overdueAt:        s.OverdueAt,
 		createdAt:        p.CreatedAt,
 		deadline:         p.Deadline,
 		participants:     slices.Clone(s.Participants),

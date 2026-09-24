@@ -18,6 +18,12 @@ func (c *Container) Run(ctx context.Context) error {
 	if c.cfg.DemoAuth {
 		c.log.Warn("demo login is enabled: use only on the demo stand")
 	}
+	// Просрочка отмечается при любом BOT_MODE: уведомления ждут в outbox, пока бот выключен.
+	go func() {
+		if err := c.OverdueJob().Run(ctx); err != nil && !errors.Is(err, context.Canceled) {
+			c.log.Error("overdue job stopped", "err", err)
+		}
+	}()
 	poll, err := c.startBot(ctx)
 	if err != nil {
 		return err

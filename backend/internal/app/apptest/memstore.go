@@ -116,7 +116,7 @@ func snapshot(is *issue.Issue) *issue.Issue {
 		CreatedAt: is.CreatedAt(), Deadline: is.Deadline(),
 	}, issue.State{
 		Number: is.Number(), Status: is.Status(), StatusAt: is.StatusAt(),
-		StatusComment: is.StatusComment(), Participants: is.Participants(),
+		StatusComment: is.StatusComment(), OverdueAt: is.OverdueAt(), Participants: is.Participants(),
 	})
 }
 
@@ -191,6 +191,10 @@ func (r issueRepo) Queue(_ context.Context, orgID string, limit int) ([]*issue.I
 
 func (r issueRepo) ListByParticipant(_ context.Context, userID int64, limit int) ([]*issue.Issue, error) {
 	return r.filter(func(is *issue.Issue) bool { return is.HasParticipant(userID) }, newestFirst, limit), nil
+}
+
+func (r issueRepo) ListOverdueUnmarked(_ context.Context, now time.Time, limit int) ([]*issue.Issue, error) {
+	return r.filter(func(is *issue.Issue) bool { return is.IsOverdue(now) && is.OverdueAt().IsZero() }, newestFirst, limit), nil
 }
 
 func (r issueRepo) Events(_ context.Context, issueID string) ([]issue.Event, error) {

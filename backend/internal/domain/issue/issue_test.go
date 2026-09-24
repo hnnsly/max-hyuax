@@ -176,6 +176,44 @@ func TestChangeStatusUpdatesStatusTimeAndComment(t *testing.T) {
 	}
 }
 
+func TestMarkOverdueOnceAfterDeadline(t *testing.T) {
+	is := newIssue(t)
+	is.PullEvents()
+	if err := is.MarkOverdue(deadline.Add(-time.Minute)); !errors.Is(err, issue.ErrNotOverdue) {
+		t.Fatalf("before deadline err = %v, want ErrNotOverdue", err)
+	}
+	late := deadline.Add(time.Hour)
+	if err := is.MarkOverdue(late); err != nil {
+		t.Fatalf("MarkOverdue: %v", err)
+	}
+	if !is.OverdueAt().Equal(late) {
+		t.Fatalf("overdue at = %v", is.OverdueAt())
+	}
+	ev := is.PullEvents()
+	if len(ev) != 1 || ev[0].Kind != issue.EventOverdue || ev[0].Status != issue.StatusSent {
+		t.Fatalf("events = %+v", ev)
+	}
+	if err := is.MarkOverdue(late.Add(time.Hour)); !errors.Is(err, issue.ErrNotOverdue) {
+		t.Fatalf("second mark err = %v, want ErrNotOverdue", err)
+	}
+}
+
+func TestClosedIssueIsNeverMarkedOverdue(t *testing.T) {
+	is := newIssue(t)
+	_ = is.ChangeStatus(issue.StatusRejected, "Не наш участок", created)
+	if err := is.MarkOverdue(deadline.Add(time.Hour)); !errors.Is(err, issue.ErrNotOverdue) {
+		t.Fatalf("err = %v, want ErrNotOverdue", err)
+	}
+}
+
+func TestRestoreKeepsOverdueMark(t *testing.T) {
+	at := deadline.Add(time.Hour)
+	is := issue.Restore(issue.NewParams{ID: "x", Deadline: deadline}, issue.State{Status: issue.StatusSent, OverdueAt: at})
+	if !is.OverdueAt().Equal(at) {
+		t.Fatalf("overdue at = %v", is.OverdueAt())
+	}
+}
+
 func TestGettersExposeState(t *testing.T) {
 	is := newIssue(t)
 	if is.ID() != "0142" || is.HouseID() != "house-17k2" || is.ObjectID() != "lift-e2" || is.Category() != "lift" ||

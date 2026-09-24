@@ -197,7 +197,7 @@ export function IssueCard({ id, flash }: { id: string; flash?: string }) {
               {timeline.map((t) => (
                 <li key={t.at + t.text} className={s.tlItem}>
                   <span className={s.tlWhen}>{dotDateTime(t.at).replace(' ', '\n')}</span>
-                  <span className={`${s.tlDot} ${t.last ? s.tlDotLast : ''}`} aria-hidden="true" />
+                  <span className={`${s.tlDot} ${t.last ? s.tlDotLast : ''} ${t.late ? s.tlDotLate : ''}`} aria-hidden="true" />
                   <span className={s.tlText}>
                     {t.text}
                     {t.comment && <span className={s.quote}>«{t.comment}»</span>}

@@ -35,6 +35,8 @@ type IssueRepo interface {
 	ListByParticipant(ctx context.Context, userID int64, limit int) ([]*issue.Issue, error)
 	// Events — журнал событий заявки по времени.
 	Events(ctx context.Context, issueID string) ([]issue.Event, error)
+	// ListOverdueUnmarked — открытые заявки с прошедшим сроком, по которым просрочка ещё не отмечена.
+	ListOverdueUnmarked(ctx context.Context, now time.Time, limit int) ([]*issue.Issue, error)
 }
 
 type HouseRepo interface {
@@ -62,6 +64,8 @@ const (
 	NotifyCard NotificationKind = "card"
 	// NotifyFinal — отдельное сообщение участнику, когда заявка закрыта.
 	NotifyFinal NotificationKind = "final"
+	// NotifyOverdue — отдельное сообщение участнику, когда истёк срок ответа.
+	NotifyOverdue NotificationKind = "overdue"
 )
 
 // Notification — намерение уведомить участника. Текст собирается при отправке

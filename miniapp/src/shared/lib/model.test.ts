@@ -40,6 +40,17 @@ describe('хронология', () => {
     expect(items[2]?.comment).toBe('Мастер приедет завтра');
     expect(items.map((i) => i.last)).toEqual([false, false, false, true]);
   });
+
+  it('отмечает истёкший срок отдельной строкой', () => {
+    const items = buildTimeline([
+      { kind: 'created', status: 'sent', at: '2026-09-17T05:10:00Z' },
+      { kind: 'overdue', status: 'sent', at: '2026-09-20T21:00:00Z' },
+    ]);
+    expect(items.map((i) => [i.text, i.late ?? false])).toEqual([
+      ['Житель сообщил о проблеме', false],
+      ['Срок ответа истёк', true],
+    ]);
+  });
 });
 
 describe('переходы статуса', () => {

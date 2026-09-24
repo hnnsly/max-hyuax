@@ -1,12 +1,14 @@
 package bot
 
 import (
+	"cmp"
 	"context"
 	"fmt"
 	"net/url"
 	"strings"
 	"time"
 
+	"dommax/internal/app"
 	"dommax/internal/app/cards"
 	"dommax/internal/domain/issue"
 	"dommax/internal/storage/maxapi"
@@ -85,15 +87,20 @@ func shareURL(c cards.Card, botName string) string {
 	return "https://max.ru/:share?text=" + url.QueryEscape(text)
 }
 
-// renderFinal — отдельное сообщение участникам, когда заявка закрыта.
-func renderFinal(c cards.Card, botName string) maxapi.NewMessage {
+// RenderNotice — отдельное сообщение участникам: итог по закрытой заявке или просрочка.
+func RenderNotice(kind app.NotificationKind, c cards.Card, botName string) maxapi.NewMessage {
 	var b strings.Builder
-	if c.Status == issue.StatusRejected {
+	switch {
+	case kind == app.NotifyOverdue:
+		fmt.Fprintf(&b, "**Срок ответа по заявке № %d истёк.** %s\n", c.Number, plain(c.Title))
+		fmt.Fprintf(&b, "%s должна была ответить до %s.\n", cmp.Or(c.Responsible, "Управляющая компания"), dayMonth(c.Deadline))
+		b.WriteString("Если ответа не будет, соседи могут обратиться в Мосжилинспекцию: даты, комментарии УК и число сообщивших уже собраны в заявке.")
+	case c.Status == issue.StatusRejected:
 		fmt.Fprintf(&b, "**Заявка № %d отклонена.** %s\n", c.Number, plain(c.Title))
 		if c.Comment != "" {
 			fmt.Fprintf(&b, "Причина: %s\n", plain(c.Comment))
 		}
-	} else {
+	default:
 		fmt.Fprintf(&b, "**Заявка № %d выполнена.** %s\n", c.Number, plain(c.Title))
 		if c.Comment != "" {
 			fmt.Fprintf(&b, "Комментарий УК: %s\n", plain(c.Comment))
@@ -134,7 +141,7 @@ func (s *CardSender) UpsertCard(ctx context.Context, maxUserID int64, mid string
 	return msg.Body.MID, err
 }
 
-func (s *CardSender) SendFinal(ctx context.Context, maxUserID int64, c cards.Card) error {
-	_, err := s.api.Send(ctx, maxapi.ToUser(maxUserID), renderFinal(c, s.botName))
+func (s *CardSender) Notify(ctx context.Context, maxUserID int64, kind app.NotificationKind, c cards.Card) error {
+	_, err := s.api.Send(ctx, maxapi.ToUser(maxUserID), RenderNotice(kind, c, s.botName))
 	return err
 }

@@ -212,6 +212,30 @@ func TestChangesEnqueueLiveCardNotifications(t *testing.T) {
 	}
 }
 
+func TestMarkOverdueNotifiesOnce(t *testing.T) {
+	f := setup(t)
+	is := report(t, f, f.anna)
+	f.store.Outbox().(*apptest.MemOutbox).Pending = nil
+
+	// Лифт — 1 рабочий день: через трое суток срок точно прошёл.
+	later := issues.NewService(f.store, issues.Config{Now: func() time.Time { return now.Add(72 * time.Hour) }, NewID: func() string { return "x" }, ConsentVersion: "v1"})
+	n, err := later.MarkOverdue(t.Context())
+	if err != nil || n != 1 {
+		t.Fatalf("MarkOverdue = %d, %v", n, err)
+	}
+	got, _ := f.svc.Get(t.Context(), is.ID())
+	if got.OverdueAt().IsZero() {
+		t.Fatal("overdue mark must be saved")
+	}
+	pending := f.store.Outbox().(*apptest.MemOutbox).Pending
+	if !slices.Contains(pending, app.Notification{Kind: app.NotifyOverdue, IssueID: is.ID(), UserID: f.anna.ID}) {
+		t.Fatalf("pending = %+v", pending)
+	}
+	if n, err := later.MarkOverdue(t.Context()); err != nil || n != 0 {
+		t.Fatalf("second run = %d, %v; want nothing to do", n, err)
+	}
+}
+
 func TestGetUnknownIssue(t *testing.T) {
 	f := setup(t)
 	if _, err := f.svc.Get(t.Context(), "nope"); !errors.Is(err, app.ErrNotFound) {

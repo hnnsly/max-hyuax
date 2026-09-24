@@ -298,7 +298,7 @@ paths:
                 items:
                   type: object
                   properties:
-                    kind: { type: string, enum: [created, joined, status_changed] }
+                    kind: { type: string, enum: [created, joined, status_changed, overdue] }
                     status: { $ref: "#/components/schemas/Status" }
                     comment: { type: string }
                     at: { type: string, format: date-time }
