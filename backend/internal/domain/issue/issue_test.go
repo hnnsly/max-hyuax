@@ -182,15 +182,17 @@ func TestMarkOverdueOnceAfterDeadline(t *testing.T) {
 	if err := is.MarkOverdue(deadline.Add(-time.Minute)); !errors.Is(err, issue.ErrNotOverdue) {
 		t.Fatalf("before deadline err = %v, want ErrNotOverdue", err)
 	}
-	late := deadline.Add(time.Hour)
+	// Задача могла пройти через несколько дней после срока (простой сервера, пример данных),
+	// а в хронологии просрочка всё равно стоит на моменте истечения срока.
+	late := deadline.Add(96 * time.Hour)
 	if err := is.MarkOverdue(late); err != nil {
 		t.Fatalf("MarkOverdue: %v", err)
 	}
-	if !is.OverdueAt().Equal(late) {
-		t.Fatalf("overdue at = %v", is.OverdueAt())
+	if !is.OverdueAt().Equal(deadline) {
+		t.Fatalf("overdue at = %v, want deadline %v", is.OverdueAt(), deadline)
 	}
 	ev := is.PullEvents()
-	if len(ev) != 1 || ev[0].Kind != issue.EventOverdue || ev[0].Status != issue.StatusSent {
+	if len(ev) != 1 || ev[0].Kind != issue.EventOverdue || ev[0].Status != issue.StatusSent || !ev[0].At.Equal(deadline) {
 		t.Fatalf("events = %+v", ev)
 	}
 	if err := is.MarkOverdue(late.Add(time.Hour)); !errors.Is(err, issue.ErrNotOverdue) {

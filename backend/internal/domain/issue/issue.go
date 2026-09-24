@@ -160,12 +160,13 @@ func (is *Issue) ChangeStatus(to Status, comment string, at time.Time) error {
 }
 
 // MarkOverdue фиксирует просрочку один раз: участники получают уведомление ровно однажды.
+// Момент просрочки — сам срок, даже если задача заметила её позже.
 func (is *Issue) MarkOverdue(now time.Time) error {
 	if !is.IsOverdue(now) || !is.overdueAt.IsZero() {
 		return ErrNotOverdue
 	}
-	is.overdueAt = now
-	is.record(Event{Kind: EventOverdue, Status: is.status, At: now})
+	is.overdueAt = is.deadline
+	is.record(Event{Kind: EventOverdue, Status: is.status, At: is.deadline})
 	return nil
 }
 
