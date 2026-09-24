@@ -4,6 +4,7 @@
 # фронтенд
 node_modules/
 miniapp/dist/
+miniapp/coverage/
 
 # бэкенд
 backend/bin/
