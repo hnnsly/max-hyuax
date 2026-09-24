@@ -85,10 +85,18 @@ export interface Issue {
   joined: boolean;
   responsible?: Organization;
   basis?: string;
+  /** Проверка ремонта: сколько участников подтвердили текущее «выполнено». */
+  confirmed_count: number;
+  /** Ответ текущего пользователя на текущее «выполнено». */
+  my_answer: 'fixed' | null;
+  /** До какого момента можно подтвердить или вернуть; null, если заявка не выполнена. */
+  answer_until: string | null;
+  /** Когда жители в последний раз вернули заявку в работу. */
+  reopened_at?: string;
 }
 
 export interface IssueEvent {
-  kind: 'created' | 'joined' | 'status_changed' | 'overdue';
+  kind: 'created' | 'joined' | 'status_changed' | 'overdue' | 'confirmed' | 'reopened';
   status: Status;
   comment?: string;
   at: string;
@@ -144,6 +152,10 @@ export interface UkMetrics {
   reports_per_issue: number;
   closed_total: number;
   closed_on_time: number;
+  /** Из выполненных за период жители подтвердили ремонт. */
+  confirmed_by_residents: number;
+  /** Жители вернули в работу за период. */
+  reopened_by_residents: number;
   open_total: number;
   overdue_open: number;
   sample_data: boolean;
