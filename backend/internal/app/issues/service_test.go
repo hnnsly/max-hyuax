@@ -165,6 +165,45 @@ func TestQueueIsForOperatorsOnly(t *testing.T) {
 	}
 }
 
+func TestMetricsCountOwnOrganization(t *testing.T) {
+	f := setup(t)
+	a := report(t, f, f.anna)
+	if _, err := f.svc.Join(t.Context(), f.sergey, a.ID()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.svc.ChangeStatus(t.Context(), f.oper, a.ID(), issue.StatusAccepted, ""); err != nil {
+		t.Fatal(err)
+	}
+	b := report(t, f, f.sergey)
+	for _, st := range []issue.Status{issue.StatusAccepted, issue.StatusDone} {
+		if _, err := f.svc.ChangeStatus(t.Context(), f.oper, b.ID(), st, "Готово"); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	m, err := f.svc.Metrics(t.Context(), f.oper)
+	if err != nil {
+		t.Fatalf("Metrics: %v", err)
+	}
+	want := app.OrgCounts{Issues: 2, Reports: 3, ClosedTotal: 1, ClosedOnTime: 1, OpenTotal: 1}
+	if m.OrgCounts != want {
+		t.Errorf("counts = %+v, want %+v", m.OrgCounts, want)
+	}
+	if m.Week == nil || *m.Week != 0 || m.PrevWeek != nil || len(m.ByDay) != 7 || m.ByDay[6].Median == nil {
+		t.Errorf("first response: week=%v prev=%v days=%+v", m.Week, m.PrevWeek, m.ByDay)
+	}
+
+	other := user.User{ID: 9, Role: user.RoleOperator, OrganizationID: "org-2"}
+	if m, err := f.svc.Metrics(t.Context(), other); err != nil || m.Issues != 0 || m.Week != nil {
+		t.Errorf("other org metrics = %+v, err = %v", m, err)
+	}
+	for _, u := range []user.User{f.anna, {ID: 10, Role: user.RoleOperator}} {
+		if _, err := f.svc.Metrics(t.Context(), u); !errors.Is(err, app.ErrForbidden) {
+			t.Errorf("Metrics(%+v) err = %v, want forbidden", u, err)
+		}
+	}
+}
+
 func TestMineAndTimeline(t *testing.T) {
 	f := setup(t)
 	is := report(t, f, f.anna)

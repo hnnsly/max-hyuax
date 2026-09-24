@@ -228,6 +228,27 @@ func TestResidentReportsNeighbourJoinsOperatorWorks(t *testing.T) {
 	}
 }
 
+func TestOperatorSeesMetrics(t *testing.T) {
+	oper := login(t, "uk_operator")
+	m := expect(t, call(t, "GET", "/api/v1/uk/metrics", oper, nil), 200, "uk metrics").body
+	for _, key := range []string{"first_response_median_min", "prev_week_median_min", "reports_per_issue",
+		"issues_total", "closed_total", "closed_on_time", "open_total", "overdue_open", "period_days"} {
+		if _, ok := m[key]; !ok {
+			t.Errorf("metrics have no %q: %v", key, m)
+		}
+	}
+	days, _ := m["first_response_by_day"].([]any)
+	if len(days) != 7 || m["sample_data"] != true || m["period_days"] != float64(30) {
+		t.Fatalf("metrics = %v", m)
+	}
+	if day := days[6].(map[string]any); len(day["date"].(string)) != len("2026-09-17") {
+		t.Errorf("day = %v", day)
+	}
+	if m["closed_total"].(float64) < m["closed_on_time"].(float64) || m["reports_per_issue"].(float64) < 1 {
+		t.Errorf("inconsistent metrics: %v", m)
+	}
+}
+
 func TestWebhookChecksSecret(t *testing.T) {
 	body := map[string]any{"update_type": "bot_started", "timestamp": 1, "chat_id": 7, "user": map[string]any{"user_id": 1}}
 	send := func(secret string) int {

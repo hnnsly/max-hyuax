@@ -197,6 +197,52 @@ func (r issueRepo) ListOverdueUnmarked(_ context.Context, now time.Time, limit i
 	return r.filter(func(is *issue.Issue) bool { return is.IsOverdue(now) && is.OverdueAt().IsZero() }, newestFirst, limit), nil
 }
 
+func (r issueRepo) FirstResponses(_ context.Context, orgID string, since time.Time) ([]app.FirstResponse, error) {
+	r.s.mu.Lock()
+	defer r.s.mu.Unlock()
+	var out []app.FirstResponse
+	for _, is := range r.s.issues {
+		if is.ResponsibleOrgID() != orgID || is.CreatedAt().Before(since) {
+			continue
+		}
+		for _, e := range r.s.Events {
+			if e.IssueID == is.ID() && e.Kind == issue.EventStatusChanged {
+				out = append(out, app.FirstResponse{CreatedAt: is.CreatedAt(), RespondedAt: e.At})
+				break
+			}
+		}
+	}
+	return out, nil
+}
+
+func (r issueRepo) OrgCounts(_ context.Context, orgID string, since, now time.Time) (app.OrgCounts, error) {
+	r.s.mu.Lock()
+	defer r.s.mu.Unlock()
+	var c app.OrgCounts
+	for _, is := range r.s.issues {
+		if is.ResponsibleOrgID() != orgID {
+			continue
+		}
+		if !is.CreatedAt().Before(since) {
+			c.Issues++
+			c.Reports += len(is.Participants())
+		}
+		switch {
+		case !is.Status().Closed():
+			c.OpenTotal++
+			if is.IsOverdue(now) {
+				c.OverdueOpen++
+			}
+		case !is.StatusAt().Before(since):
+			c.ClosedTotal++
+			if !is.StatusAt().After(is.Deadline()) {
+				c.ClosedOnTime++
+			}
+		}
+	}
+	return c, nil
+}
+
 func (r issueRepo) Events(_ context.Context, issueID string) ([]issue.Event, error) {
 	r.s.mu.Lock()
 	defer r.s.mu.Unlock()

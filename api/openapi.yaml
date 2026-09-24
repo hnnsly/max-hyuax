@@ -361,6 +361,47 @@ paths:
         "200": { $ref: "#/components/responses/IssueList" }
         "403": { $ref: "#/components/responses/Error" }
 
+  /uk/metrics:
+    get:
+      tags: [uk]
+      summary: Метрики своей УК
+      description: |
+        Только для uk_operator. Первый ответ — время от подачи до первой смены статуса,
+        медиана по заявкам, поданным за последние 7 дней (по Москве), и за 7 дней до них.
+        Счётчики — за последние period_days дней. Длительности в минутах; null — нет данных.
+      responses:
+        "200":
+          description: Метрики
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [first_response_median_min, prev_week_median_min, first_response_by_day, period_days,
+                  issues_total, reports_per_issue, closed_total, closed_on_time, open_total, overdue_open, sample_data]
+                properties:
+                  first_response_median_min: { type: [integer, "null"] }
+                  prev_week_median_min: { type: [integer, "null"] }
+                  first_response_by_day:
+                    type: array
+                    minItems: 7
+                    maxItems: 7
+                    items:
+                      type: object
+                      required: [date, median_min]
+                      properties:
+                        date: { type: string, format: date }
+                        median_min: { type: [integer, "null"] }
+                  period_days: { type: integer, example: 30 }
+                  issues_total: { type: integer, description: Подано заявок за период }
+                  reports_per_issue: { type: number, description: Сколько жителей в среднем сообщили об одной проблеме }
+                  closed_total: { type: integer }
+                  closed_on_time: { type: integer }
+                  open_total: { type: integer }
+                  overdue_open: { type: integer }
+                  sample_data: { type: boolean, description: Среди заявок есть синтетический пример данных }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+
 security:
   - bearer: []
 

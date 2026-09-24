@@ -394,3 +394,35 @@
 @starting-style {
   .toast { opacity: 0; }
 }
+
+/* --- Переключатель разделов --- */
+.segmented {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(0, 1fr);
+  gap: 3px;
+  padding: 3px;
+  border-radius: var(--radius-control);
+  background: var(--control);
+}
+.segment {
+  border: 0;
+  border-radius: 9px;
+  padding: 8px 8px 9px;
+  background: transparent;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.segment[aria-selected='true'] {
+  background: var(--surface-card);
+  color: var(--text);
+  font-weight: 650;
+  box-shadow: 0 1px 2px rgb(10 11 13 / 0.12);
+}
+.segment:focus-visible {
+  outline: 2px solid var(--enamel);
+  outline-offset: 1px;
+}

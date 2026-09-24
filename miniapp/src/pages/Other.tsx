@@ -12,7 +12,9 @@ import { calendarDaysBetween } from '../shared/lib/format';
 import { groupQueue } from '../shared/lib/model';
 import { IssueList } from '../shared/ui/IssueRow';
 import { EmptyState, ErrorState, Island, Loading, Screen, Section, useToast } from '../shared/ui/Layout';
+import { Segmented } from '../shared/ui/Segmented';
 import s from './pages.module.css';
+import { UkMetricsView } from './UkMetrics';
 
 /** Выбор дома: поиск по адресу или ближайшие по геопозиции браузера. */
 export function HouseSearch() {
@@ -113,13 +115,36 @@ export function MyIssues() {
   );
 }
 
-/** Очередь УК: сводка и заявки по срочности; статус меняется в карточке заявки. */
+type UkTab = 'queue' | 'metrics';
+const ukTabs: { id: UkTab; title: string }[] = [
+  { id: 'queue', title: 'Заявки' },
+  { id: 'metrics', title: 'Метрики' },
+];
+// Вкладка переживает переход в карточку заявки и возврат назад.
+let lastUkTab: UkTab = 'queue';
+
+/** Кабинет УК: очередь заявок и метрики. */
 export function UkQueue() {
+  const [tab, setTab] = useState<UkTab>(lastUkTab);
+  const choose = (t: UkTab) => {
+    lastUkTab = t;
+    setTab(t);
+  };
+  return (
+    <Screen title="Кабинет УК">
+      <Segmented label="Раздел кабинета УК" items={ukTabs} value={tab} onChange={choose} />
+      {tab === 'queue' ? <QueueView /> : <UkMetricsView />}
+    </Screen>
+  );
+}
+
+/** Очередь УК: сводка и заявки по срочности; статус меняется в карточке заявки. */
+function QueueView() {
   const { push } = useRouter();
   const res = useResource(() => api.ukQueue(), []);
   const now = new Date();
   return (
-    <Screen title="Очередь УК">
+    <>
       {res.loading && !res.data ? (
         <Loading />
       ) : res.error || !res.data ? (
@@ -161,7 +186,7 @@ export function UkQueue() {
           );
         })()
       )}
-    </Screen>
+    </>
   );
 }
 

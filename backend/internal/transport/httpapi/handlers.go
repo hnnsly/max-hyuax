@@ -231,6 +231,14 @@ func (h *handlers) ukQueue(c fiber.Ctx) error {
 	return h.sendList(c, list)
 }
 
+func (h *handlers) ukMetrics(c fiber.Ctx) error {
+	m, err := h.Issues.Metrics(c.Context(), currentUser(c))
+	if err != nil {
+		return err
+	}
+	return c.JSON(toMetricsDTO(m))
+}
+
 func (h *handlers) myIssues(c fiber.Ctx) error {
 	list, err := h.Issues.Mine(c.Context(), currentUser(c))
 	if err != nil {

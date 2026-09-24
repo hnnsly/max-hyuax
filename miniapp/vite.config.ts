@@ -1,13 +1,13 @@
 /// <reference types="vitest/config" />
 import react from '@vitejs/plugin-react';
-import { defineConfig } from 'vite';
+import { defineConfig, loadEnv } from 'vite';
 
-export default defineConfig({
+export default defineConfig(({ mode }) => ({
   plugins: [react()],
   server: {
     port: 5173,
-    // В разработке API идёт через прокси, как за Caddy на сервере.
-    proxy: { '/api': 'http://localhost:8080' },
+    // В разработке API идёт через прокси, как за Caddy на сервере; адрес API можно сменить через API_PROXY.
+    proxy: { '/api': loadEnv(mode, '.', 'API_').API_PROXY ?? 'http://localhost:8080' },
   },
   test: {
     environment: 'node',
@@ -20,4 +20,4 @@ export default defineConfig({
       thresholds: { lines: 90, functions: 90, branches: 85, statements: 90 },
     },
   },
-});
+}));

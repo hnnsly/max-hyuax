@@ -1,0 +1,222 @@
+/* Экран метрик УК: холст UkMetrics. */
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 16px 14px;
+}
+.head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+}
+.headMain,
+.compare {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.compare { text-align: right; }
+.label {
+  font-size: 14.5px;
+  color: var(--text-2);
+}
+.figure {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.bigNum,
+.midNum {
+  font-family: var(--font-plate);
+  font-weight: 900;
+  line-height: 0.85;
+  color: var(--enamel-text);
+  font-variant-numeric: tabular-nums;
+}
+.bigNum { font-size: 54px; }
+.midNum { font-size: 40px; }
+.ink { color: var(--text); }
+.bigUnit,
+.compareText {
+  font-family: var(--font-cond);
+  font-size: 17px;
+  font-weight: 650;
+  color: var(--text-2);
+}
+.compareText { font-size: 15px; }
+.good { color: var(--stencil-green); }
+.bad { color: var(--surik); }
+.same { color: var(--text-2); }
+.hint {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-3);
+}
+.empty {
+  font-size: 15px;
+  color: var(--text-2);
+}
+
+/* График первого ответа */
+.chart {
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr);
+  gap: 8px;
+  height: 128px;
+}
+.axis {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: flex-end;
+  padding-bottom: 14px;
+  font-family: var(--font-cond);
+  font-size: 11px;
+  color: var(--text-3);
+}
+.plot {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) 14px;
+}
+.bars {
+  position: relative;
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+  align-items: end;
+  border-bottom: 1px solid var(--chevron);
+}
+.grid {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1px;
+  background: var(--separator);
+}
+.gridTop { top: 0; }
+.gridMid { top: 50%; }
+.bar {
+  position: relative;
+  min-height: 2px;
+  border-radius: 4px 4px 0 0;
+  background: var(--enamel);
+}
+.barToday { background: var(--enamel-edge); }
+.barNone {
+  height: 2px;
+  background: var(--rail-empty);
+}
+.median {
+  position: absolute;
+  left: 0;
+  right: 0;
+  height: 1.5px;
+  background: color-mix(in srgb, var(--enamel) 35%, transparent);
+}
+.median span {
+  position: absolute;
+  right: 0;
+  bottom: 3px;
+  font-family: var(--font-cond);
+  font-size: 10.5px;
+  color: var(--enamel-text);
+}
+.days {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  gap: 6px;
+  align-items: end;
+  font-family: var(--font-cond);
+  font-size: 11px;
+  line-height: 1;
+  color: var(--text-3);
+  text-align: center;
+}
+.today {
+  color: var(--text);
+  font-weight: 650;
+}
+
+/* Сообщений на одну проблему */
+.line {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.text {
+  font-size: 16px;
+  line-height: 1.25;
+}
+.compareRows {
+  display: grid;
+  grid-template-columns: 92px minmax(0, 1fr);
+  gap: 8px 10px;
+  align-items: center;
+}
+.rowLabel {
+  font-family: var(--font-cond);
+  font-size: 13px;
+  color: var(--text-2);
+}
+.squares {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.square {
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  background: var(--enamel);
+}
+.squareLate { background: var(--surik); }
+.single { flex-wrap: nowrap; }
+.single .square { flex: none; }
+.rowText {
+  min-width: 0;
+  margin-left: 4px;
+  font-size: 13px;
+  line-height: 1.25;
+  color: var(--text-2);
+}
+
+/* Закрыто в срок */
+.cells {
+  display: grid;
+  grid-template-columns: repeat(18, minmax(0, 1fr));
+  gap: 3px;
+}
+.cell {
+  aspect-ratio: 1;
+  border-radius: 2px;
+  background: var(--enamel);
+}
+.cellLate { background: var(--surik); }
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  font-size: 12.5px;
+  color: var(--text-2);
+}
+.legend span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: var(--enamel);
+}
+.dotLate { background: var(--surik); }
+
+.note {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-3);
+}

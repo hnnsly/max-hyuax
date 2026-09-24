@@ -122,7 +122,19 @@ func Open(ctx context.Context, cfg config, log *slog.Logger) (*Container, error)
 		return jobs.NewOutboxWorker(store.Outbox(), svc.Deliver, limiter, log), nil
 	})
 	c.overdue = sync.OnceValue(func() *jobs.OverdueJob {
-		return jobs.NewOverdueJob(c.Issues().MarkOverdue, jobs.OverdueInterval, log)
+		mark := c.Issues().MarkOverdue
+		if cfg.DemoAuth {
+			// На демо-стенде пример данных сдвигается к текущей дате до проверки сроков.
+			mark = func(ctx context.Context) (int, error) {
+				if days, err := store.ShiftSampleData(ctx, time.Now()); err != nil {
+					log.WarnContext(ctx, "shift sample data failed", "err", err)
+				} else if days > 0 {
+					log.InfoContext(ctx, "sample data shifted", "days", days)
+				}
+				return c.Issues().MarkOverdue(ctx)
+			}
+		}
+		return jobs.NewOverdueJob(mark, jobs.OverdueInterval, log)
 	})
 	c.http = sync.OnceValues(func() (*fiber.App, error) {
 		deps := httpapi.Deps{

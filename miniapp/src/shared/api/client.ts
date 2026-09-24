@@ -1,6 +1,6 @@
 // Клиент API: JSON, токен сессии, единый формат ошибок {"error": {"code", "message"}}.
 import type {
-  Category, House, HouseDetails, Issue, IssueEvent, AssetObject, ReportInput, Session, Status, User,
+  Category, House, HouseDetails, Issue, IssueEvent, AssetObject, ReportInput, Session, Status, UkMetrics, User,
 } from './types';
 
 export class ApiError extends Error {
@@ -79,4 +79,5 @@ export const api = {
   changeStatus: (id: string, status: Status, comment: string) =>
     request<Issue>('POST', `/issues/${encodeURIComponent(id)}/status`, { status, comment }),
   ukQueue: () => request<Issue[]>('GET', '/uk/issues'),
+  ukMetrics: () => request<UkMetrics>('GET', '/uk/metrics'),
 };

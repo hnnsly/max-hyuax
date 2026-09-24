@@ -103,3 +103,23 @@ export interface ReportInput {
 }
 
 export const isClosed = (s: Status) => s === 'done' || s === 'rejected';
+
+export interface DayMedian {
+  date: string; // ГГГГ-ММ-ДД, день подачи по Москве
+  median_min: number | null;
+}
+
+/** Метрики УК; длительности в минутах, null — нет данных. */
+export interface UkMetrics {
+  first_response_median_min: number | null;
+  prev_week_median_min: number | null;
+  first_response_by_day: DayMedian[];
+  period_days: number;
+  issues_total: number;
+  reports_per_issue: number;
+  closed_total: number;
+  closed_on_time: number;
+  open_total: number;
+  overdue_open: number;
+  sample_data: boolean;
+}

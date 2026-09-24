@@ -61,6 +61,7 @@ type Issue struct {
 	CreatedAt        time.Time
 	DeadlineAt       time.Time
 	OverdueAt        *time.Time
+	Sample           bool
 }
 
 type IssueEvent struct {

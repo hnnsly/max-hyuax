@@ -1,8 +1,10 @@
 package httpapi
 
 import (
+	"math"
 	"time"
 
+	"dommax/internal/app/issues"
 	"dommax/internal/domain/house"
 	"dommax/internal/domain/issue"
 	"dommax/internal/domain/rules"
@@ -145,5 +147,49 @@ func toIssueDTO(is *issue.Issue, viewer user.User, now time.Time) issueDTO {
 	if r, err := rules.Lookup(is.Category()); err == nil {
 		d.CategoryTitle = r.Title
 	}
+	return d
+}
+
+// metricsDTO — показатели УК. Длительности в минутах; null — за период нет данных.
+type metricsDTO struct {
+	FirstResponseMin *int           `json:"first_response_median_min"`
+	PrevWeekMin      *int           `json:"prev_week_median_min"`
+	ByDay            []dayMedianDTO `json:"first_response_by_day"`
+	PeriodDays       int            `json:"period_days"`
+	IssuesTotal      int            `json:"issues_total"`
+	ReportsPerIssue  float64        `json:"reports_per_issue"`
+	ClosedTotal      int            `json:"closed_total"`
+	ClosedOnTime     int            `json:"closed_on_time"`
+	OpenTotal        int            `json:"open_total"`
+	OverdueOpen      int            `json:"overdue_open"`
+	SampleData       bool           `json:"sample_data"`
+}
+
+type dayMedianDTO struct {
+	Date      string `json:"date"` // день подачи по Москве, ГГГГ-ММ-ДД
+	MedianMin *int   `json:"median_min"`
+}
+
+func minutes(d *time.Duration) *int {
+	if d == nil {
+		return nil
+	}
+	m := int(d.Round(time.Minute) / time.Minute)
+	return &m
+}
+
+func toMetricsDTO(m issues.Metrics) metricsDTO {
+	d := metricsDTO{
+		FirstResponseMin: minutes(m.Week), PrevWeekMin: minutes(m.PrevWeek),
+		PeriodDays: issues.MetricsPeriodDays, IssuesTotal: m.Issues,
+		ClosedTotal: m.ClosedTotal, ClosedOnTime: m.ClosedOnTime, OpenTotal: m.OpenTotal, OverdueOpen: m.OverdueOpen,
+		SampleData: m.SampleData,
+	}
+	if m.Issues > 0 {
+		d.ReportsPerIssue = math.Round(float64(m.Reports)/float64(m.Issues)*10) / 10
+	}
+	d.ByDay = mapSlice(m.ByDay, func(day issues.DayMedian) dayMedianDTO {
+		return dayMedianDTO{Date: day.Day.Format(time.DateOnly), MedianMin: minutes(day.Median)}
+	})
 	return d
 }

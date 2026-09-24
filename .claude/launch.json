@@ -18,6 +18,18 @@
       "runtimeExecutable": "task",
       "runtimeArgs": ["miniapp:dev"],
       "port": 5173
+    },
+    {
+      "name": "api-8081",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "set HTTP_ADDR=:8081&& task run"],
+      "port": 8081
+    },
+    {
+      "name": "miniapp-8081",
+      "runtimeExecutable": "cmd",
+      "runtimeArgs": ["/c", "set API_PROXY=http://localhost:8081&& task miniapp:dev"],
+      "port": 5173
     }
   ]
 }

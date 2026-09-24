@@ -93,6 +93,8 @@ func TestErrorResponses(t *testing.T) {
 		{"unknown demo role", api, "POST", "/api/v1/auth/demo", "", `{"role":"admin"}`, 422, "invalid_input"},
 		{"forged initData", api, "POST", "/api/v1/auth/max", "", `{"init_data":"user=%7B%22id%22%3A1%7D&hash=00"}`, 401, "unauthorized"},
 		{"resident on UK queue", api, "GET", "/api/v1/uk/issues", anna, "", 403, "forbidden"},
+		{"resident on UK metrics", api, "GET", "/api/v1/uk/metrics", anna, "", 403, "forbidden"},
+		{"metrics without token", api, "GET", "/api/v1/uk/metrics", "", "", 401, "unauthorized"},
 		{"resident changes status", api, "POST", "/api/v1/issues/" + sentID + "/status", anna, `{"status":"accepted"}`, 403, "forbidden"},
 		{"operator of another UK", api, "POST", "/api/v1/issues/" + foreignID + "/status", oper, `{"status":"accepted"}`, 403, "forbidden"},
 		{"report without consent", api, "POST", "/api/v1/issues", fresh, `{"house_id":"h-17k2","category":"lift"}`, 403, "consent_required"},

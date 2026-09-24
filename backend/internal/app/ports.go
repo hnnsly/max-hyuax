@@ -37,6 +37,27 @@ type IssueRepo interface {
 	Events(ctx context.Context, issueID string) ([]issue.Event, error)
 	// ListOverdueUnmarked — открытые заявки с прошедшим сроком, по которым просрочка ещё не отмечена.
 	ListOverdueUnmarked(ctx context.Context, now time.Time, limit int) ([]*issue.Issue, error)
+	// FirstResponses — заявки УК, поданные не раньше since, на которые УК уже ответила.
+	FirstResponses(ctx context.Context, orgID string, since time.Time) ([]FirstResponse, error)
+	// OrgCounts — счётчики заявок УК: поданные и закрытые не раньше since, открытые на момент now.
+	OrgCounts(ctx context.Context, orgID string, since, now time.Time) (OrgCounts, error)
+}
+
+// FirstResponse — когда заявку подали и когда УК впервые сменила её статус.
+type FirstResponse struct {
+	CreatedAt   time.Time
+	RespondedAt time.Time
+}
+
+// OrgCounts — счётчики для метрик УК.
+type OrgCounts struct {
+	Issues       int  // подано заявок за период
+	Reports      int  // сколько жителей о них сообщили: авторы и присоединившиеся
+	ClosedTotal  int  // закрыто за период
+	ClosedOnTime int  // из них не позже срока
+	OpenTotal    int  // открыто сейчас
+	OverdueOpen  int  // из открытых срок уже прошёл
+	SampleData   bool // среди заявок УК есть синтетические (пример данных)
 }
 
 type HouseRepo interface {
