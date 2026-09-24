@@ -200,3 +200,10 @@ type hintDTO struct {
 	Title    *string `json:"title"`
 	Source   *string `json:"source"` // llm | rules
 }
+
+// appealLinkDTO — ссылка на PDF-обращение: относительный путь, срок действия и имя файла.
+type appealLinkDTO struct {
+	URL       string    `json:"url"`
+	ExpiresAt time.Time `json:"expires_at"`
+	FileName  string    `json:"file_name"`
+}

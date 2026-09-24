@@ -384,6 +384,48 @@ paths:
         "409": { $ref: "#/components/responses/Error" }
         "422": { $ref: "#/components/responses/Error" }
 
+  /issues/{id}/appeal:
+    post:
+      tags: [issues]
+      summary: Ссылка на черновик обращения в жилинспекцию (PDF)
+      description: |
+        Только участнику открытой заявки, у которой истёк срок ответа. Ссылка подписана и действует 10 минут;
+        по ней PDF скачивается без заголовка авторизации (в MAX — через WebApp.downloadFile).
+        409 not_overdue — срок ещё не истёк; 409 issue_closed — заявка закрыта; 403 — не участник.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Ссылка на PDF
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [url, expires_at, file_name]
+                properties:
+                  url: { type: string, example: /api/v1/appeal/aWQ.c2ln }
+                  expires_at: { type: string, format: date-time }
+                  file_name: { type: string, example: obrashchenie-142.pdf }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+
+  /appeal/{token}:
+    get:
+      tags: [issues]
+      summary: PDF-обращение по подписанной ссылке
+      security: []
+      parameters:
+        - { name: token, in: path, required: true, schema: { type: string } }
+      responses:
+        "200":
+          description: Черновик обращения
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+        "403": { $ref: "#/components/responses/Error" }
+
   /uk/issues:
     get:
       tags: [uk]

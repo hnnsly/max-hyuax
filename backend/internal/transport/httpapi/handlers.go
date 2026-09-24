@@ -2,6 +2,7 @@ package httpapi
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 
 	"github.com/gofiber/fiber/v3"
@@ -13,6 +14,7 @@ import (
 	"dommax/internal/domain/issue"
 	"dommax/internal/domain/rules"
 	"dommax/internal/domain/user"
+	"dommax/internal/transport/pdf"
 )
 
 func (h *handlers) session(c fiber.Ctx, s auth.Session) error {
@@ -335,4 +337,36 @@ func (h *handlers) classifyText(c fiber.Ctx) error {
 		out = hintDTO{Category: &hint.Rule.Code, Title: &hint.Rule.Title, Source: (*string)(&hint.Source)}
 	}
 	return c.JSON(out)
+}
+
+// prepareAppeal выдаёт участнику просроченной заявки ссылку на черновик обращения в жилинспекцию.
+func (h *handlers) prepareAppeal(c fiber.Ctx) error {
+	is, err := h.Issues.Get(c.Context(), c.Params("id"))
+	if err != nil {
+		return err
+	}
+	link, err := h.Appeal.Prepare(c.Context(), currentUser(c), is.ID())
+	if err != nil {
+		return err
+	}
+	return c.JSON(appealLinkDTO{
+		URL: "/api/v1/appeal/" + link.Token, ExpiresAt: link.ExpiresAt,
+		FileName: fmt.Sprintf("obrashchenie-%d.pdf", is.Number()),
+	})
+}
+
+// appealPDF отдаёт PDF по подписанной ссылке; заголовок авторизации не нужен.
+func (h *handlers) appealPDF(c fiber.Ctx) error {
+	doc, err := h.Appeal.Document(c.Context(), c.Params("token"))
+	if err != nil {
+		return err
+	}
+	out, err := pdf.Appeal(doc)
+	if err != nil {
+		return err
+	}
+	c.Set(fiber.HeaderContentType, "application/pdf")
+	c.Set(fiber.HeaderContentDisposition, fmt.Sprintf(`attachment; filename="obrashchenie-%d.pdf"`, doc.Number))
+	c.Set(fiber.HeaderCacheControl, "no-store")
+	return c.Send(out)
 }

@@ -1,5 +1,5 @@
 import { Button } from '@maxhub/max-ui';
-import { CheckCircle, ShareNetwork } from '@phosphor-icons/react';
+import { CheckCircle, FilePdf, ShareNetwork } from '@phosphor-icons/react';
 import { useEffect, useState } from 'react';
 import { useRouter } from '../app/router';
 import { useUser } from '../app/session';
@@ -22,6 +22,7 @@ export function IssueCard({ id, flash }: { id: string; flash?: string }) {
   const [busy, setBusy] = useState(false);
   const [sheet, setSheet] = useState(false);
   const [landed, setLanded] = useState(false);
+  const [appealBusy, setAppealBusy] = useState(false);
   const res = useResource(async () => {
     const [issue, events] = await Promise.all([api.issue(id), api.timeline(id)]);
     return { issue, events };
@@ -79,6 +80,20 @@ export function IssueCard({ id, flash }: { id: string; flash?: string }) {
 
   const share = () => {
     bridge.share(shareText(issue), appLink(`i_${issue.id}`)).catch(() => showToast('Не получилось поделиться'));
+  };
+
+  // Черновик обращения в жилинспекцию: сервер выдаёт ссылку на 10 минут, файл скачивается сразу.
+  const appeal = async () => {
+    setAppealBusy(true);
+    try {
+      const link = await api.appeal(issue.id);
+      await bridge.download(link.url, link.file_name);
+      showToast('Черновик обращения скачивается. Проверьте его, впишите ФИО и подпишите.');
+    } catch (err) {
+      showToast(err instanceof ApiError ? err.message : 'Не получилось подготовить обращение');
+    } finally {
+      setAppealBusy(false);
+    }
   };
 
   const canJoin = !closed && !issue.joined && user.role === 'resident';
@@ -173,6 +188,11 @@ export function IssueCard({ id, flash }: { id: string; flash?: string }) {
           <div className={s.escalate}>
             <h3 className={s.escalateTitle}>УК не уложилась в срок</h3>
             <p className={s.text}>Если ответа не будет, соседи могут обратиться в Мосжилинспекцию. Даты, комментарии УК и число сообщивших уже собраны в заявке.</p>
+            {issue.joined && !closed && (
+              <Button variant="secondary" size="medium" stretched iconBefore={<FilePdf size={18} />} loading={appealBusy} onClick={appeal}>
+                Подготовить обращение
+              </Button>
+            )}
           </div>
         </Island>
       )}

@@ -11,6 +11,7 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 
+	"dommax/internal/app/appeal"
 	"dommax/internal/app/auth"
 	"dommax/internal/app/cards"
 	"dommax/internal/app/hints"
@@ -28,6 +29,8 @@ const (
 	sessionTTL = 12 * time.Hour
 	// llmTimeout — сколько ждать подсказку модели; дальше работают ключевые слова (ADR-008).
 	llmTimeout = 8 * time.Second
+	// appealLinkTTL — сколько действует ссылка на PDF-обращение.
+	appealLinkTTL = 10 * time.Minute
 )
 
 // Container — DI-контейнер сервиса: единственное место, где зависимости собираются вместе
@@ -156,7 +159,8 @@ func Open(ctx context.Context, cfg config, log *slog.Logger) (*Container, error)
 	c.http = sync.OnceValues(func() (*fiber.App, error) {
 		deps := httpapi.Deps{
 			Auth: c.Auth(), Issues: c.Issues(), Houses: c.Houses(), Hints: c.Hints(),
-			Ping: store.Ping, ConsentVersion: cfg.ConsentVersion, Now: time.Now, Log: log,
+			Appeal: appeal.NewService(store, appeal.Config{Secret: []byte(cfg.SessionSecret), TTL: appealLinkTTL, Now: time.Now}),
+			Ping:   store.Ping, ConsentVersion: cfg.ConsentVersion, Now: time.Now, Log: log,
 		}
 		if cfg.BotMode == "webhook" {
 			wh, err := c.webhook()

@@ -48,6 +48,7 @@ curl -X POST https://<домен>/api/v1/auth/demo -H "Content-Type: application
 | 409 | `already_joined` | житель уже участвует в заявке |
 | 409 | `issue_closed` | заявка закрыта |
 | 409 | `invalid_transition` | недопустимый переход статуса |
+| 409 | `not_overdue` | обращение в жилинспекцию раньше, чем истёк срок ответа |
 | 422 | `reason_required` | отказ без причины |
 | 422 | `invalid_input` | некорректные данные запроса |
 

@@ -89,7 +89,7 @@ docker compose -f deploy/compose.yaml --env-file deploy/.env.example up -d --bui
 
 ## Зависимости
 
-- **Бэкенд:** [`backend/go.mod`](backend/go.mod) и `go.sum`. Основные: Fiber v3.5, pgx v5.11, goose v3.28; код запросов генерирует sqlc 1.31.
+- **Бэкенд:** [`backend/go.mod`](backend/go.mod) и `go.sum`. Основные: Fiber v3.5, pgx v5.11, goose v3.28, gopdf 0.38 (PDF-обращение), шрифт Go из `golang.org/x/image`; код запросов генерирует sqlc 1.31.
 - **Мини-приложение:** [`miniapp/package.json`](miniapp/package.json) и `package-lock.json`, версии зафиксированы точно. Основные: React 19.2.8, `@maxhub/max-ui` 0.5.0, `uqr` 0.1.3 (QR-коды), шрифты Sofia Sans.
 - **Образы:** `golang:1.27-alpine`, `node:24-alpine`, `alpine:3.22`, `caddy:2.10-alpine`, `postgres:18.6`.
 
@@ -152,6 +152,7 @@ docker compose -f deploy/compose.yaml --env-file deploy/.env.example up -d --bui
 | УК отклоняет заявку без причины | `422 reason_required`, кнопка сохранения неактивна |
 | УК меняет статус | карточка у участников в чате с ботом обновляется на месте |
 | Истёк срок ответа | отметка «Срок ответа истёк» в хронологии, сообщение участникам, заявка в группе «Просрочено» у УК |
+| Участник нажимает «Подготовить обращение» у просроченной заявки | скачивается PDF-черновик обращения в Мосжилинспекцию: адрес, УК, даты, основание срока, число сообщивших, хронология без имён |
 | `GET /api/v1/health` | `{"status":"ok","db":"ok"}` |
 
 ## Известные ограничения

@@ -19,6 +19,7 @@ interface WebApp {
   openLink?(url: string): void;
   openMaxLink?(url: string): void;
   openCodeReader?(fileSelect?: boolean): Promise<{ value: string }>;
+  downloadFile?(url: string, fileName: string): Promise<{ status: 'downloading' | 'cancelled' }>;
   HapticFeedback?: { notificationOccurred(type: 'success' | 'error' | 'warning'): unknown };
 }
 
@@ -81,6 +82,23 @@ export const bridge = {
     }
     const url = `https://max.ru/:share?text=${encodeURIComponent(`${text}\n${link}`)}`;
     window.open(url, '_blank', 'noopener');
+  },
+
+  /**
+   * Скачать файл. В MAX ссылки href не скачиваются, нужен downloadFile с абсолютным https-адресом
+   * (dev-max/docs/webapps/bridge.md); в браузере — обычная ссылка с атрибутом download.
+   */
+  async download(path: string, fileName: string): Promise<void> {
+    const url = new URL(path, window.location.origin).href;
+    const w = wa();
+    if (w?.initData && w.downloadFile) {
+      await w.downloadFile(url, fileName);
+      return;
+    }
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    a.click();
   },
 
   /** Тактильный отклик есть только на телефонах; в остальных местах молча пропускаем. */

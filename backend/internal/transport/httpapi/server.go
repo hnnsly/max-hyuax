@@ -13,6 +13,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 
 	"dommax/internal/app"
+	"dommax/internal/app/appeal"
 	"dommax/internal/app/auth"
 	"dommax/internal/app/hints"
 	"dommax/internal/app/houses"
@@ -27,6 +28,7 @@ type Deps struct {
 	Issues         *issues.Service
 	Houses         *houses.Service
 	Hints          *hints.Service
+	Appeal         *appeal.Service
 	Webhook        *bot.Webhook // nil — webhook выключен (BOT_MODE не webhook)
 	Ping           func(context.Context) error
 	ConsentVersion string
@@ -71,6 +73,9 @@ func New(d Deps) *fiber.App {
 	api.Get("/issues/:id/timeline", h.auth, h.timeline)
 	api.Post("/issues/:id/join", h.auth, h.joinIssue)
 	api.Post("/issues/:id/status", h.auth, h.changeStatus)
+	api.Post("/issues/:id/appeal", h.auth, h.prepareAppeal)
+	// Без сессии: ссылка подписана и живёт 10 минут, а WebApp.downloadFile не передаёт заголовки.
+	api.Get("/appeal/:token", h.appealPDF)
 
 	api.Get("/uk/issues", h.auth, h.ukQueue)
 	api.Get("/uk/metrics", h.auth, h.ukMetrics)
@@ -128,6 +133,8 @@ func classify(err error) (int, string, string) {
 		return fiber.StatusConflict, "issue_closed", "Заявка уже закрыта"
 	case errors.Is(err, issue.ErrTransition):
 		return fiber.StatusConflict, "invalid_transition", "Такой переход статуса невозможен"
+	case errors.Is(err, appeal.ErrNotOverdue):
+		return fiber.StatusConflict, "not_overdue", "Срок ответа ещё не истёк"
 	case errors.Is(err, issue.ErrReasonRequired):
 		return fiber.StatusUnprocessableEntity, "reason_required", "Укажите причину отказа"
 	case errors.Is(err, app.ErrInvalidInput), errors.Is(err, issue.ErrInvalid):

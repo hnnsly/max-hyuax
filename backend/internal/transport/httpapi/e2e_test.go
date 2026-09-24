@@ -13,13 +13,16 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 	"uuid"
 
 	"github.com/gofiber/fiber/v3"
+	"github.com/jackc/pgx/v5"
 
+	"dommax/internal/app/appeal"
 	"dommax/internal/app/auth"
 	"dommax/internal/app/hints"
 	"dommax/internal/app/houses"
@@ -75,6 +78,7 @@ func TestMain(m *testing.M) {
 			Issues:         issues.NewService(store, issues.Config{Now: time.Now, NewID: func() string { return uuid.NewV7().String() }, ConsentVersion: "v1"}),
 			Houses:         houses.NewService(store),
 			Hints:          hints.NewService(nil, time.Second, log),
+			Appeal:         appeal.NewService(store, appeal.Config{Secret: []byte("s"), TTL: 10 * time.Minute, Now: time.Now}),
 			Webhook:        bot.NewWebhook("hook-secret", webhooks, store, log),
 			Ping:           store.Ping,
 			ConsentVersion: "v1",
@@ -248,6 +252,51 @@ func TestOperatorSeesMetrics(t *testing.T) {
 	}
 	if m["closed_total"].(float64) < m["closed_on_time"].(float64) || m["reports_per_issue"].(float64) < 1 {
 		t.Errorf("inconsistent metrics: %v", m)
+	}
+}
+
+func TestAppealPDFForOverdueIssue(t *testing.T) {
+	anna, sergey := login(t, "resident"), login(t, "resident_2")
+	created := expect(t, call(t, "POST", "/api/v1/issues", anna, map[string]string{
+		"house_id": "h-17k2", "object_id": "h-17k2-e1-lift", "description": "Кабина не приходит",
+	}), 201, "report").body
+	id := created["id"].(string)
+	path := "/api/v1/issues/" + id + "/appeal"
+
+	early := expect(t, call(t, "POST", path, anna, nil), 409, "appeal before deadline").body
+	if early["error"].(map[string]any)["code"] != "not_overdue" {
+		t.Fatalf("early = %v", early)
+	}
+	conn, err := pgx.Connect(t.Context(), testDSN)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close(t.Context())
+	if _, err := conn.Exec(t.Context(), `UPDATE issues SET deadline_at = now() - interval '1 hour' WHERE id = $1`, id); err != nil {
+		t.Fatal(err)
+	}
+
+	expect(t, call(t, "POST", path, sergey, nil), 403, "not a participant")
+	link := expect(t, call(t, "POST", path, anna, nil), 200, "appeal link").body
+	url, _ := link["url"].(string)
+	if !strings.HasPrefix(url, "/api/v1/appeal/") || link["expires_at"] == nil || link["file_name"] == nil {
+		t.Fatalf("link = %v", link)
+	}
+
+	// Ссылка открывается без заголовка авторизации: так скачивает WebApp.downloadFile в MAX.
+	res, err := api.Test(httptest.NewRequest("GET", url, http.NoBody))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	body, _ := io.ReadAll(res.Body)
+	if res.StatusCode != 200 || res.Header.Get("Content-Type") != "application/pdf" ||
+		!strings.Contains(res.Header.Get("Content-Disposition"), "attachment") || !bytes.HasPrefix(body, []byte("%PDF-")) {
+		t.Fatalf("pdf: %d %q %q %q", res.StatusCode, res.Header.Get("Content-Type"), res.Header.Get("Content-Disposition"), body[:min(len(body), 8)])
+	}
+	bad := callRaw(t, api, "GET", "/api/v1/appeal/forged.token", "", nil)
+	if bad.status != 403 || bad.body["error"].(map[string]any)["code"] != "forbidden" {
+		t.Fatalf("forged link = %d %v", bad.status, bad.body)
 	}
 }
 

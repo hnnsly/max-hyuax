@@ -67,6 +67,8 @@ export const api = {
   myIssues: () => request<Issue[]>('GET', '/me/issues'),
   categories: () => request<Category[]>('GET', '/categories'),
   classify: (text: string) => request<CategoryHint>('POST', '/classify', { text }),
+  appeal: (issueId: string) =>
+    request<{ url: string; expires_at: string; file_name: string }>('POST', `/issues/${encodeURIComponent(issueId)}/appeal`),
   searchHouses: (query: string) => request<House[]>('GET', `/houses?${q({ query })}`),
   nearestHouses: (lat: number, lon: number) => request<House[]>('GET', `/houses/nearest?${q({ lat: String(lat), lon: String(lon) })}`),
   house: (id: string) => request<HouseDetails>('GET', `/houses/${encodeURIComponent(id)}`),
