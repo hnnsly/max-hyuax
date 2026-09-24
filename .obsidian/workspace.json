@@ -11,9 +11,14 @@
             "id": "88409cdb66fbe9df",
             "type": "leaf",
             "state": {
-              "type": "beautitab-react-view",
-              "state": {},
-              "title": "New tab"
+              "type": "markdown",
+              "state": {
+                "file": "hack-docs/GEN_V2_PLAN.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "GEN_V2_PLAN"
             }
           }
         ]
@@ -207,26 +212,30 @@
   },
   "active": "88409cdb66fbe9df",
   "lastOpenFiles": [
+    "hack-docs/GEN_V2_PLAN.md.tmp.13916.da6baa07971c",
+    "CLAUDE.md.tmp.13916.bdab7ff8e5ad",
+    "CLAUDE.md.tmp.13916.cd7d9cadaf58",
+    "CLAUDE.md.tmp.13916.42f24732878e",
+    "CLAUDE.md.tmp.13916.9ad239d429ba",
+    "CLAUDE.md.tmp.13916.fd2bd07ad708",
+    "hack-docs/INDEX.md.tmp.13916.6118739b2d30",
+    "hack-docs/INDEX.md.tmp.13916.41f3078ba7df",
+    "hack-docs/INDEX.md.tmp.13916.d5513212950b",
+    "hack-docs/INDEX.md.tmp.13916.9939e857bec2",
+    "hack-docs/HANDOFF.md.tmp.13916.2bbdf60fb5b8",
+    "miniapp/coverage/sort-arrow-sprite.png",
+    "miniapp/coverage/favicon.png",
+    "hack-docs/adr/017-district-and-chairman-roles.md",
     "tmp/plans/phased-implementation-plan.md",
     "CLAUDE.md",
-    "Без названия",
     "CLAUDE.md",
     "conflict-files-obsidian-git.md",
-    "tmp/plans",
-    "tmp",
     "hack-docs/GENERAL_PLAN.md",
     "hack-docs/research/competitors.md",
     "hack-docs/requirements/data-model.md",
     "hack-docs/interview/BLOCK-A.md",
     "hack-docs/design/DESIGN-SYSTEM.md",
-    "CLAUDE.md.tmp.31256.dd4633738012",
-    "hack-docs/GENERAL_PLAN.md.tmp.31256.ed64beb45075",
     "hack-docs/adr/009-visual-identity.md",
-    "hack-docs/design/DESIGN-SYSTEM.md.tmp.31256.c1542694cb4b",
-    "hack-docs/design/prototype/index.html",
-    "hack-docs/design/prototype",
-    "hack-docs/design/tokens.css",
-    "hack-docs/design",
     "hack-docs/ROADMAP.md",
     "hack-docs/requirements/nfr.md",
     "hack-docs/requirements/ux-flows.md",
@@ -241,8 +250,6 @@
     "hack-docs/interview/BLOCK-G.md",
     "hack-docs/interview/BLOCK-V.md",
     "hack-docs/interview/BLOCK-B.md",
-    "hack-docs/dev-max/index.md",
-    "hack-docs/INDEX.md",
     "Без названия.canvas"
   ]
 }
