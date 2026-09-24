@@ -28,7 +28,10 @@ tags: [handoff, status]
   - мини-приложение: `Segmented` (tablist), кабинет УК «Заявки | Метрики», `pages/UkMetrics.tsx`, функции в `lib/metrics.ts` с тестами;
   - покрытие 91,1%.
 - **Превью:** если `:8080` занят осиротевшим `go run` (убить нельзя, `Stop-Process` запрещён), запускать `api-8081` и `miniapp-8081` из `.claude/launch.json` (прокси через `API_PROXY`).
-- **Дальше:** часть C (QR-наклейки).
+- **Часть C готова (`10c01ea`):** `GET /uk/houses` (`houses.ForOperator`); вкладка «Наклейки» в кабинете УК (`pages/Stickers.tsx`): дом и объект чипами, наклейка A6 по холсту, QR через `uqr` 0.1.3 (`lib/sticker.ts`: `objectStartParam`, `qrPath`, `stickerCopy`), печать `window.print()` с `@page A6`. Внизу наклейки `max.ru/<бот>` вместо ‹Название› (название продукта не выбрано).
+- **Часть D готова (`5f2dea3`):** «Удалить аккаунт» на «Моём доме» → лист подтверждения → `DELETE /me` → фаза сессии `deleted` и экран `AccountDeleted`. `LoginDemo` восстанавливает удалённого демо-пользователя (имя из `demoKeys`, без согласия), иначе жюри сломало бы демо; MemStore ищет демо по `DemoKeys`.
+- **Грабли:** `sed -i` по файлам `miniapp/src` Vite на Windows не замечает, модуль остаётся старым. Править через Edit.
+- **Дальше:** часть E (материалы к сдаче: README из 15 пунктов, `DATA-API.yaml`, `deploy/.env.example`, запуск одной командой Docker, `docs/deployment.md`, `testing.md`, `limitations.md`, `deploy/seed/test-data.json`).
 
 ## Было (25.09, ночь) — спайк «мини-приложение, живая карточка, диалог бота»
 - **Сделано:**
