@@ -9,6 +9,8 @@ tags: [plan, timeline, resources]
 
 # General Plan v1: 17.09 → 30.09.2026
 
+> **Следующий план — [GEN_V2_PLAN](GEN_V2_PLAN.md).** Строки v1 до 28.09 выполнены раньше срока.
+
 > Точный дедлайн неизвестен → планируем по худшему случаю: **code freeze 29.09 днём**. Токена бота нет → Спайк 0 разделён на две части.
 > Вехи и эпики — в [ROADMAP](ROADMAP.md); задачи — в GitHub Issues/Projects.
 

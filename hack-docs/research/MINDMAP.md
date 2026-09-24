@@ -2,7 +2,7 @@
 title: Интеллект-карта домена и смысловая архитектура
 type: research
 status: draft
-updated: 2026-09-17
+updated: 2026-09-24
 tags: [mindmap, as-is, to-be, core, scale, hub]
 ---
 
@@ -11,7 +11,7 @@ tags: [mindmap, as-is, to-be, core, scale, hub]
 Хаб исследования. Детали — в атомарных заметках:
 [max-platform-capabilities](max-platform-capabilities.md) · [legal-framework](legal-framework.md) · [competitors](competitors.md) · [problems](problems.md) · [product-hypotheses](product-hypotheses.md) · [platform-bonus](platform-bonus.md) · [judging-criteria](judging-criteria.md) · [risks](risks.md)
 
-> Статус: **фокус принят** (17.09) — ядро H1 + H2 + шеринг из H5, пилот Москва, модель B2G → SaaS ([ADR-002](../adr/002-product-scope.md)).
+> Статус: **фокус принят** (17.09) — ядро H1 + H2 + шеринг из H5, пилот Москва, модель B2G → SaaS ([ADR-002](../adr/002-product-scope.md)). **To-Be из §2 собрано в коде к 24.09** (см. §7), дальше — [GEN_V2_PLAN](../GEN_V2_PLAN.md).
 
 ---
 
@@ -246,5 +246,21 @@ sequenceDiagram
 ## 6. Что решено на интервью (17.09)
 1. **Фокус и сегмент** — ядро H1 + H2 + шеринг; жители панельного фонда 70–90-х; пилот Москва; экосистема за воротами 22.09 → [Блок А](../interview/BLOCK-A.md), [ADR-002](../adr/002-product-scope.md).
 2. **UX** — бот и мини-приложение равнозначны; простое решается в боте, сложное — через LLM и форму; хаб «Мой дом»; УК — список + дашборд → [Блок Б](../interview/BLOCK-B.md), [ux-flows](../requirements/ux-flows.md).
-3. **Данные и стек** — открытые данные района Москвы; Go + Fiber v3 + PostgreSQL + MinIO; React JS + MAX UI; Ollama → [Блок В](../interview/BLOCK-V.md), [ADR-003](../adr/003-backend-architecture.md), [ADR-008](../adr/008-llm-self-hosted.md).
+3. **Данные и стек** — открытые данные района Москвы; Go + Fiber v3 + PostgreSQL + MinIO (позже заменён томом, [ADR-015](../adr/015-photo-storage.md)); React JS (позже TypeScript, [ADR-011](../adr/011-miniapp-typescript.md)) + MAX UI; Ollama → [Блок В](../interview/BLOCK-V.md), [ADR-003](../adr/003-backend-architecture.md), [ADR-008](../adr/008-llm-self-hosted.md).
 4. **Команда** — фулстек-пары; GitHub Issues + PR + CI; сдача из чистого репозитория → [Блок Г](../interview/BLOCK-G.md), [ADR-007](../adr/007-submission-packaging.md).
+
+---
+
+## 7. To-Be в коде (24.09)
+| Шаг To-Be из §2 | Состояние |
+|---|---|
+| QR в лифте или команда боту | есть: наклейки с QR (`startapp=o_<код>`), диалог бота, геопозиция |
+| Объект, ответственный и срок определены | есть: справочник `rules`, подсказка категории (правила + Ollama) |
+| «Это и у меня» | есть: форма, карточка, бот |
+| Новая заявка за 3 шага с фото | есть: форма в 3 шага, фото без EXIF |
+| Живая карточка с таймером срока | есть: карточка в боте редактируется, шкала срока в мини-приложении |
+| Шеринг в домовой чат без ПДн | есть: `shareMaxContent`, в браузере ссылка `max.ru/:share` |
+| УК видит масштаб и меняет статус | есть: очередь по срочности, метрики УК |
+| PDF для эскалации в ГЖИ | есть: черновик обращения по подписанной ссылке |
+| Роли председателя совета и района, проверка ремонта жителями | в работе по [GEN_V2_PLAN](../GEN_V2_PLAN.md) |
+| `requestContact` из цепочки бонуса (§5) | в работе по [GEN_V2_PLAN](../GEN_V2_PLAN.md) |
