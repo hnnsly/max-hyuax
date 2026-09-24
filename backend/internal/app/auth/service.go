@@ -42,6 +42,7 @@ var demoKeys = map[string]struct{ key, name, houseID, phone string }{
 	"resident":    {"resident_demo_1", "Анна", "h-17k2", "+79990000001"},
 	"resident_2":  {"resident_demo_2", "Сергей", "h-17k2", ""},
 	"uk_operator": {"uk_operator_demo", "Оператор УК", "", ""},
+	"district":    {"district_demo", "Управа района Зябликово", "", ""},
 }
 
 // LoginMax проверяет initData и выдаёт сессию; новый пользователь MAX становится жителем.

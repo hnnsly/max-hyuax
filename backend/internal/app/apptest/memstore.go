@@ -392,6 +392,29 @@ func (r houseRepo) ByOrganization(_ context.Context, orgID string) ([]house.Hous
 	return out, nil
 }
 
+func (r houseRepo) OrganizationsInDistrict(_ context.Context, district string) ([]house.Organization, error) {
+	seen := map[string]bool{}
+	var out []house.Organization
+	for _, h := range r.s.HouseMap {
+		if h.District != district || seen[h.OrganizationID] {
+			continue
+		}
+		seen[h.OrganizationID] = true
+		if o, ok := r.s.Orgs[h.OrganizationID]; ok {
+			out = append(out, o)
+		}
+	}
+	slices.SortFunc(out, func(a, b house.Organization) int { return strings.Compare(a.Name, b.Name) })
+	return out, nil
+}
+
+func (r issueRepo) OverdueInDistrict(_ context.Context, district string, now time.Time, limit int) ([]*issue.Issue, error) {
+	houses := r.s.HouseMap
+	return r.filter(func(is *issue.Issue) bool {
+		return houses[is.HouseID()].District == district && is.IsOverdue(now)
+	}, func(a, b *issue.Issue) int { return a.Deadline().Compare(b.Deadline()) }, limit), nil
+}
+
 func (s *MemStore) Photos() app.PhotoRepo { return photoRepo{s} }
 
 type photoRepo struct{ s *MemStore }

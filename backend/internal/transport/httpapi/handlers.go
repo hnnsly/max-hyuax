@@ -313,6 +313,24 @@ func (h *handlers) ukMetrics(c fiber.Ctx) error {
 	return c.JSON(toMetricsDTO(m))
 }
 
+// districtMetrics — сравнение УК района для управы или жилинспекции.
+func (h *handlers) districtMetrics(c fiber.Ctx) error {
+	m, err := h.Issues.DistrictMetrics(c.Context(), currentUser(c))
+	if err != nil {
+		return err
+	}
+	return c.JSON(toDistrictMetricsDTO(m))
+}
+
+// districtOverdue — просроченные заявки района с адресами домов.
+func (h *handlers) districtOverdue(c fiber.Ctx) error {
+	list, err := h.Issues.DistrictOverdue(c.Context(), currentUser(c))
+	if err != nil {
+		return err
+	}
+	return h.sendList(c, list)
+}
+
 func (h *handlers) myIssues(c fiber.Ctx) error {
 	list, err := h.Issues.Mine(c.Context(), currentUser(c))
 	if err != nil {

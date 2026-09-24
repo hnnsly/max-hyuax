@@ -14,6 +14,7 @@ export const demoRoles = {
   resident: 'Житель',
   resident_2: 'Сосед',
   uk_operator: 'Сотрудник УК',
+  district: 'Управа района',
 } as const;
 export type DemoRole = keyof typeof demoRoles;
 

@@ -11,7 +11,8 @@
   "roles": [
     { "role": "resident", "who": "Анна, житель дома «Ореховый бульвар, 17к2»", "house_id": "h-17k2", "browser": "/?demo=resident" },
     { "role": "resident_2", "who": "Сергей, сосед из того же дома", "house_id": "h-17k2", "browser": "/?demo=resident_2" },
-    { "role": "uk_operator", "who": "Сотрудник УК «Ореховый квартал»", "organization_id": "org-orekh", "browser": "/?demo=uk" }
+    { "role": "uk_operator", "who": "Сотрудник УК «Ореховый квартал»", "organization_id": "org-orekh", "browser": "/?demo=uk" },
+    { "role": "district", "who": "Управа района Зябликово, только чтение", "district": "Зябликово", "browser": "/?demo=district" }
   ],
   "organization": {
     "id": "org-orekh",

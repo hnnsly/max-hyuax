@@ -37,6 +37,8 @@ type IssueRepo interface {
 	Events(ctx context.Context, issueID string) ([]issue.Event, error)
 	// ListOverdueUnmarked — открытые заявки с прошедшим сроком, по которым просрочка ещё не отмечена.
 	ListOverdueUnmarked(ctx context.Context, now time.Time, limit int) ([]*issue.Issue, error)
+	// OverdueInDistrict — открытые заявки домов района с прошедшим сроком, самые давние первыми.
+	OverdueInDistrict(ctx context.Context, district string, now time.Time, limit int) ([]*issue.Issue, error)
 	// FirstResponses — заявки УК, поданные не раньше since, на которые УК уже ответила.
 	FirstResponses(ctx context.Context, orgID string, since time.Time) ([]FirstResponse, error)
 	// OrgCounts — счётчики заявок УК: поданные и закрытые не раньше since, открытые на момент now.
@@ -72,6 +74,8 @@ type HouseRepo interface {
 	ObjectByCode(ctx context.Context, code string) (house.AssetObject, error)
 	// ByOrganization — дома организации по адресу.
 	ByOrganization(ctx context.Context, orgID string) ([]house.House, error)
+	// OrganizationsInDistrict — организации, у которых есть дома в районе, по названию.
+	OrganizationsInDistrict(ctx context.Context, district string) ([]house.Organization, error)
 }
 
 type UserRepo interface {

@@ -299,6 +299,80 @@ func (q *Queries) ListCurrentAnswers(ctx context.Context, issueIds []string) ([]
 	return items, nil
 }
 
+const listDistrictOverdue = `-- name: ListDistrictOverdue :many
+SELECT i.id, i.number, i.house_id, COALESCE(i.object_id, '')::text AS object_id, i.category, i.title, i.description,
+       i.responsible_org_id, i.status, i.status_at, i.status_comment, i.created_by, i.created_at, i.deadline_at, i.overdue_at, i.reopened_at
+FROM issues i
+JOIN houses h ON h.id = i.house_id
+WHERE h.district = $1
+  AND i.status NOT IN ('done', 'rejected')
+  AND i.deadline_at < $2
+ORDER BY i.deadline_at
+LIMIT $3
+`
+
+type ListDistrictOverdueParams struct {
+	District string
+	Now      time.Time
+	MaxRows  int32
+}
+
+type ListDistrictOverdueRow struct {
+	ID               string
+	Number           int64
+	HouseID          string
+	ObjectID         string
+	Category         string
+	Title            string
+	Description      string
+	ResponsibleOrgID string
+	Status           string
+	StatusAt         time.Time
+	StatusComment    string
+	CreatedBy        int64
+	CreatedAt        time.Time
+	DeadlineAt       time.Time
+	OverdueAt        *time.Time
+	ReopenedAt       *time.Time
+}
+
+func (q *Queries) ListDistrictOverdue(ctx context.Context, arg ListDistrictOverdueParams) ([]ListDistrictOverdueRow, error) {
+	rows, err := q.db.Query(ctx, listDistrictOverdue, arg.District, arg.Now, arg.MaxRows)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListDistrictOverdueRow
+	for rows.Next() {
+		var i ListDistrictOverdueRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Number,
+			&i.HouseID,
+			&i.ObjectID,
+			&i.Category,
+			&i.Title,
+			&i.Description,
+			&i.ResponsibleOrgID,
+			&i.Status,
+			&i.StatusAt,
+			&i.StatusComment,
+			&i.CreatedBy,
+			&i.CreatedAt,
+			&i.DeadlineAt,
+			&i.OverdueAt,
+			&i.ReopenedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listHouseIssues = `-- name: ListHouseIssues :many
 SELECT id, number, house_id, COALESCE(object_id, '')::text AS object_id, category, title, description,
        responsible_org_id, status, status_at, status_comment, created_by, created_at, deadline_at, overdue_at, reopened_at

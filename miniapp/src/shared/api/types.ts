@@ -1,7 +1,7 @@
 // Типы ответов API. Источник истины — api/openapi.yaml; при правке контракта меняются здесь же.
 
 export type Status = 'sent' | 'accepted' | 'in_progress' | 'done' | 'rejected';
-export type Role = 'resident' | 'uk_operator';
+export type Role = 'resident' | 'uk_operator' | 'district';
 
 export interface User {
   id: number;
@@ -9,6 +9,8 @@ export interface User {
   role: Role;
   house_id?: string;
   organization_id?: string;
+  /** Для роли района: какой район он смотрит. */
+  district?: string;
   has_consent: boolean;
   consent_version: string;
   /** Житель оставил телефон для мастера; сам номер не приходит. */
@@ -150,6 +152,29 @@ export interface CategoryHint {
 export interface DayMedian {
   date: string; // ГГГГ-ММ-ДД, день подачи по Москве
   median_min: number | null;
+}
+
+/** УК в сравнении по району; длительности в минутах, null — нет данных. */
+export interface DistrictOrg {
+  id: string;
+  name: string;
+  first_response_median_min: number | null;
+  issues_total: number;
+  open_total: number;
+  overdue_open: number;
+  closed_total: number;
+  closed_on_time: number;
+  confirmed_by_residents: number;
+  reopened_by_residents: number;
+  sample_data: boolean;
+}
+
+/** Кабинет района: УК района за период. */
+export interface DistrictMetrics {
+  district: string;
+  period_days: number;
+  sample_data: boolean;
+  organizations: DistrictOrg[];
 }
 
 /** Метрики УК; длительности в минутах, null — нет данных. */

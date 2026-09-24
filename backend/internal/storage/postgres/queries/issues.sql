@@ -68,6 +68,17 @@ WHERE overdue_at IS NULL
 ORDER BY deadline_at
 LIMIT @max_rows;
 
+-- name: ListDistrictOverdue :many
+SELECT i.id, i.number, i.house_id, COALESCE(i.object_id, '')::text AS object_id, i.category, i.title, i.description,
+       i.responsible_org_id, i.status, i.status_at, i.status_comment, i.created_by, i.created_at, i.deadline_at, i.overdue_at, i.reopened_at
+FROM issues i
+JOIN houses h ON h.id = i.house_id
+WHERE h.district = @district
+  AND i.status NOT IN ('done', 'rejected')
+  AND i.deadline_at < @now
+ORDER BY i.deadline_at
+LIMIT @max_rows;
+
 -- name: ListIssueEvents :many
 SELECT kind, COALESCE(user_id, 0)::bigint AS user_id, status, comment, at
 FROM issue_events

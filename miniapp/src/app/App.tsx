@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import type { User } from '../shared/api/types';
 import { parseStartParam } from '../shared/lib/model';
 import { ErrorState, Screen } from '../shared/ui/Layout';
+import { District } from '../pages/District';
 import { Home } from '../pages/Home';
 import { IssueCard } from '../pages/IssueCard';
 import { AccountDeleted, Consent, DemoGate, HouseSearch, MyIssues, UkQueue } from '../pages/Other';
@@ -28,11 +29,20 @@ function useColorScheme(): Scheme {
   return dark ? 'dark' : 'light';
 }
 
-/** Стартовый стек: оператор УК — очередь; житель без дома — выбор дома; диплинк — сразу нужный экран. */
+/**
+ * Стартовый стек: оператор УК — очередь; район — сравнение УК района; житель без дома — выбор дома;
+ * диплинк — сразу нужный экран.
+ */
 function initialStack(user: User, startParam: string): Route[] {
   const target = parseStartParam(startParam);
   const root: Route =
-    user.role === 'uk_operator' ? { name: 'uk' } : user.house_id ? { name: 'home' } : { name: 'houseSearch' };
+    user.role === 'uk_operator'
+      ? { name: 'uk' }
+      : user.role === 'district'
+        ? { name: 'district' }
+        : user.house_id
+          ? { name: 'home' }
+          : { name: 'houseSearch' };
   switch (target?.kind) {
     case 'issue':
       return [root, { name: 'issue', id: target.id }];
@@ -61,6 +71,8 @@ function Pages() {
       return <Consent />;
     case 'uk':
       return <UkQueue />;
+    case 'district':
+      return <District />;
   }
 }
 

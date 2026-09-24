@@ -31,6 +31,15 @@ func (r houseRepo) Get(ctx context.Context, id string) (house.House, error) {
 
 func (r houseRepo) Organization(ctx context.Context, id string) (house.Organization, error) {
 	o, err := r.q.GetOrganization(ctx, id)
+	return toOrganization(o), notFound(err)
+}
+
+func (r houseRepo) OrganizationsInDistrict(ctx context.Context, district string) ([]house.Organization, error) {
+	rows, err := r.q.ListDistrictOrganizations(ctx, district)
+	return mapSlice(rows, toOrganization), err
+}
+
+func toOrganization(o sqlcdb.Organization) house.Organization {
 	return house.Organization{
 		ID:              o.ID,
 		Type:            house.OrgType(o.Type),
@@ -39,7 +48,7 @@ func (r houseRepo) Organization(ctx context.Context, id string) (house.Organizat
 		PhoneDispatcher: o.PhoneDispatcher,
 		PhoneEmergency:  o.PhoneEmergency,
 		Schedule:        o.Schedule,
-	}, notFound(err)
+	}
 }
 
 func (r houseRepo) Entrances(ctx context.Context, houseID string) ([]house.Entrance, error) {

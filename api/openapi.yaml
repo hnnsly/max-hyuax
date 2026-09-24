@@ -19,6 +19,7 @@ tags:
   - name: houses
   - name: issues
   - name: uk
+  - name: district
 
 paths:
   /health:
@@ -73,7 +74,7 @@ paths:
               properties:
                 role:
                   type: string
-                  enum: [resident, resident_2, uk_operator]
+                  enum: [resident, resident_2, uk_operator, district]
                   description: resident и resident_2 — два соседа из одного дома, uk_operator — сотрудник УК
       responses:
         "200": { $ref: "#/components/responses/Session" }
@@ -630,6 +631,57 @@ paths:
         "401": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
 
+  /district/metrics:
+    get:
+      tags: [district]
+      summary: Сравнение УК района
+      description: |
+        Только для роли district (управа или жилинспекция), только чтение. По каждой УК, у которой есть дома в районе:
+        первый ответ (медиана за 7 дней, минуты, null — нет данных) и счётчики за period_days дней.
+        УК считается целиком, со всеми домами.
+      responses:
+        "200":
+          description: УК района по названию
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [district, period_days, sample_data, organizations]
+                properties:
+                  district: { type: string, example: Зябликово }
+                  period_days: { type: integer, example: 30 }
+                  sample_data: { type: boolean, description: Среди заявок есть синтетический пример данных }
+                  organizations:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, name, first_response_median_min, issues_total, open_total, overdue_open,
+                        closed_total, closed_on_time, confirmed_by_residents, reopened_by_residents, sample_data]
+                      properties:
+                        id: { type: string }
+                        name: { type: string }
+                        first_response_median_min: { type: [integer, "null"] }
+                        issues_total: { type: integer }
+                        open_total: { type: integer }
+                        overdue_open: { type: integer }
+                        closed_total: { type: integer }
+                        closed_on_time: { type: integer }
+                        confirmed_by_residents: { type: integer }
+                        reopened_by_residents: { type: integer }
+                        sample_data: { type: boolean }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+
+  /district/overdue:
+    get:
+      tags: [district]
+      summary: Просроченные заявки района
+      description: Открытые заявки домов района с истёкшим сроком, самые давние первыми. Только для роли district.
+      responses:
+        "200": { $ref: "#/components/responses/IssueList" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+
   /uk/metrics:
     get:
       tags: [uk]
@@ -733,7 +785,8 @@ components:
       properties:
         id: { type: integer, format: int64 }
         first_name: { type: string }
-        role: { type: string, enum: [resident, uk_operator] }
+        role: { type: string, enum: [resident, uk_operator, district] }
+        district: { type: string, description: Для роли district — какой район пользователь смотрит }
         house_id: { type: string }
         organization_id: { type: string }
         has_consent: { type: boolean }

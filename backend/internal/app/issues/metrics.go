@@ -31,15 +31,20 @@ func (s *Service) Metrics(ctx context.Context, u user.User) (Metrics, error) {
 	if u.Role != user.RoleOperator || u.OrganizationID == "" {
 		return Metrics{}, app.ErrForbidden
 	}
+	return s.orgMetrics(ctx, u.OrganizationID)
+}
+
+// orgMetrics — показатели одной УК: для её кабинета и для сравнения в кабинете района.
+func (s *Service) orgMetrics(ctx context.Context, orgID string) (Metrics, error) {
 	now := s.cfg.Now()
 	y, m, d := now.In(Moscow).Date()
 	today := time.Date(y, m, d, 0, 0, 0, 0, Moscow)
 
-	resp, err := s.store.Issues().FirstResponses(ctx, u.OrganizationID, today.AddDate(0, 0, -13))
+	resp, err := s.store.Issues().FirstResponses(ctx, orgID, today.AddDate(0, 0, -13))
 	if err != nil {
 		return Metrics{}, err
 	}
-	counts, err := s.store.Issues().OrgCounts(ctx, u.OrganizationID, now.AddDate(0, 0, -MetricsPeriodDays), now)
+	counts, err := s.store.Issues().OrgCounts(ctx, orgID, now.AddDate(0, 0, -MetricsPeriodDays), now)
 	if err != nil {
 		return Metrics{}, err
 	}

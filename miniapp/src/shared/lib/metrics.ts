@@ -1,5 +1,5 @@
 // Подписи для экрана метрик УК: длительности, сравнение недель, шкала графика.
-import type { DayMedian } from '../api/types';
+import type { DayMedian, DistrictOrg } from '../api/types';
 import { plural } from './format';
 
 /** «5:40 часов», «2 часа», «40 минут» — время до первого ответа для крупной цифры. */
@@ -64,6 +64,20 @@ export function longestDay(days: DayMedian[]): string | null {
 /** Процент закрытых в срок; null, если за период ничего не закрыто. */
 export function onTimeShare(m: { closed_total: number; closed_on_time: number }): number | null {
   return m.closed_total === 0 ? null : Math.round((m.closed_on_time / m.closed_total) * 100);
+}
+
+/**
+ * Строки сравнения УК района: сначала те, у кого есть просрочка (больше — выше), дальше по названию.
+ * «нет» — за период нечего считать (нет закрытых заявок или ответов).
+ */
+export function rankDistrict<T extends DistrictOrg>(orgs: T[]): (T & { onTime: string; response: string })[] {
+  return [...orgs]
+    .sort((a, b) => b.overdue_open - a.overdue_open || a.name.localeCompare(b.name, 'ru'))
+    .map((o) => {
+      const share = onTimeShare(o);
+      const min = o.first_response_median_min;
+      return { ...o, onTime: share === null ? 'нет' : `${share}%`, response: min === null ? 'нет' : shortResponse(min) };
+    });
 }
 
 /** Подписи к числам проверки ремонта жителями; null, если за период жители ничего не проверяли. */

@@ -140,4 +140,5 @@ type User struct {
 	ConsentAt      *time.Time
 	DeletedAt      *time.Time
 	CreatedAt      time.Time
+	District       string
 }

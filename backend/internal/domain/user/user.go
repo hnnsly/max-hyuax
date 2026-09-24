@@ -9,6 +9,8 @@ type Role string
 const (
 	RoleResident Role = "resident"
 	RoleOperator Role = "uk_operator"
+	// RoleDistrict — управа района или жилинспекция: сравнивает УК района, только смотрит.
+	RoleDistrict Role = "district"
 )
 
 type User struct {
@@ -19,6 +21,7 @@ type User struct {
 	HouseID        string
 	Role           Role
 	OrganizationID string // для оператора: УК, чьи заявки он ведёт
+	District       string // для района: какой район он смотрит
 	ConsentVersion string
 	ConsentAt      time.Time
 	DeletedAt      time.Time
@@ -27,6 +30,11 @@ type User struct {
 // CanManageIssues сообщает, может ли пользователь менять статусы заявок организации orgID.
 func (u User) CanManageIssues(orgID string) bool {
 	return u.Role == RoleOperator && u.OrganizationID != "" && u.OrganizationID == orgID
+}
+
+// CanViewDistrict — пользователь района видит сравнение УК и просроченные заявки своего района.
+func (u User) CanViewDistrict() bool {
+	return u.Role == RoleDistrict && u.District != ""
 }
 
 // HasConsent проверяет согласие именно на текущую версию документа.

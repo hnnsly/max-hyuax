@@ -80,6 +80,42 @@ func (q *Queries) GetOrganization(ctx context.Context, id string) (Organization,
 	return i, err
 }
 
+const listDistrictOrganizations = `-- name: ListDistrictOrganizations :many
+SELECT DISTINCT o.id, o.type, o.name, o.phone_office, o.phone_dispatcher, o.phone_emergency, o.schedule, o.source FROM organizations o
+JOIN houses h ON h.organization_id = o.id
+WHERE h.district = $1
+ORDER BY o.name
+`
+
+func (q *Queries) ListDistrictOrganizations(ctx context.Context, district string) ([]Organization, error) {
+	rows, err := q.db.Query(ctx, listDistrictOrganizations, district)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Organization
+	for rows.Next() {
+		var i Organization
+		if err := rows.Scan(
+			&i.ID,
+			&i.Type,
+			&i.Name,
+			&i.PhoneOffice,
+			&i.PhoneDispatcher,
+			&i.PhoneEmergency,
+			&i.Schedule,
+			&i.Source,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listEntrances = `-- name: ListEntrances :many
 SELECT id, house_id, number FROM entrances WHERE house_id = $1 ORDER BY number
 `

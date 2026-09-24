@@ -58,6 +58,7 @@ func toUser(r sqlcdb.User) user.User {
 		HouseID:        r.HouseID.String,
 		Role:           user.Role(r.Role),
 		OrganizationID: r.OrganizationID.String,
+		District:       r.District,
 		ConsentVersion: r.ConsentVersion,
 		ConsentAt:      timeOrZero(r.ConsentAt),
 		DeletedAt:      timeOrZero(r.DeletedAt),

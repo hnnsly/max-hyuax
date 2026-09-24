@@ -94,6 +94,9 @@ func New(d Deps) *fiber.App {
 	api.Get("/uk/metrics", h.auth, h.ukMetrics)
 	api.Get("/uk/houses", h.auth, h.ukHouses)
 
+	api.Get("/district/metrics", h.auth, h.districtMetrics)
+	api.Get("/district/overdue", h.auth, h.districtOverdue)
+
 	app.Post("/webhook/max", h.webhook)
 	return app
 }

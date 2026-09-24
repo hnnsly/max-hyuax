@@ -251,7 +251,7 @@ export function DemoGate() {
         <a href={`https://max.ru/${BOT_NAME}`}>Открыть в MAX</a>
       </Button>
       <Section title="Демо для проверки" />
-      <p className={s.hint}>Вход без MAX на модельных данных: дом на Ореховом бульваре, два соседа и сотрудник УК.</p>
+      <p className={s.hint}>Вход без MAX на модельных данных: дом на Ореховом бульваре, два соседа, сотрудник УК и управа района Зябликово.</p>
       <div className={s.stack}>
         {(Object.keys(demoRoles) as DemoRole[]).map((role) => (
           <Button key={role} variant="secondary" size="medium" stretched onClick={() => loginDemo(role)}>

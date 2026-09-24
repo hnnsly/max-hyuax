@@ -32,3 +32,9 @@ WHERE qr_code = @qr_code;
 
 -- name: ListOrganizationHouses :many
 SELECT * FROM houses WHERE organization_id = @organization_id ORDER BY address;
+
+-- name: ListDistrictOrganizations :many
+SELECT DISTINCT o.* FROM organizations o
+JOIN houses h ON h.organization_id = o.id
+WHERE h.district = @district
+ORDER BY o.name;

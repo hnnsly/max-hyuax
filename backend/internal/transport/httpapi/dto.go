@@ -18,6 +18,7 @@ type userDTO struct {
 	Role           string `json:"role"`
 	HouseID        string `json:"house_id,omitempty"`
 	OrganizationID string `json:"organization_id,omitempty"`
+	District       string `json:"district,omitempty"` // для роли района
 	HasConsent     bool   `json:"has_consent"`
 	ConsentVersion string `json:"consent_version"` // версия, на которую нужно согласие сейчас
 	// PhoneShared — житель оставил телефон для мастера; сам номер в ответах о себе не отдаётся.
@@ -27,7 +28,7 @@ type userDTO struct {
 func toUserDTO(u user.User, consentVersion string) userDTO {
 	return userDTO{
 		ID: u.ID, FirstName: u.FirstName, Role: string(u.Role), HouseID: u.HouseID,
-		OrganizationID: u.OrganizationID, HasConsent: u.HasConsent(consentVersion), ConsentVersion: consentVersion,
+		OrganizationID: u.OrganizationID, District: u.District, HasConsent: u.HasConsent(consentVersion), ConsentVersion: consentVersion,
 		PhoneShared: u.PhoneShared(),
 	}
 }
@@ -219,6 +220,42 @@ func toMetricsDTO(m issues.Metrics) metricsDTO {
 	}
 	d.ByDay = mapSlice(m.ByDay, func(day issues.DayMedian) dayMedianDTO {
 		return dayMedianDTO{Date: day.Day.Format(time.DateOnly), MedianMin: minutes(day.Median)}
+	})
+	return d
+}
+
+// districtMetricsDTO — сравнение УК района за период; длительности в минутах.
+type districtMetricsDTO struct {
+	District      string           `json:"district"`
+	PeriodDays    int              `json:"period_days"`
+	SampleData    bool             `json:"sample_data"`
+	Organizations []districtOrgDTO `json:"organizations"`
+}
+
+type districtOrgDTO struct {
+	ID               string `json:"id"`
+	Name             string `json:"name"`
+	FirstResponseMin *int   `json:"first_response_median_min"`
+	IssuesTotal      int    `json:"issues_total"`
+	OpenTotal        int    `json:"open_total"`
+	OverdueOpen      int    `json:"overdue_open"`
+	ClosedTotal      int    `json:"closed_total"`
+	ClosedOnTime     int    `json:"closed_on_time"`
+	Confirmed        int    `json:"confirmed_by_residents"`
+	Reopened         int    `json:"reopened_by_residents"`
+	SampleData       bool   `json:"sample_data"`
+}
+
+func toDistrictMetricsDTO(m issues.DistrictMetrics) districtMetricsDTO {
+	d := districtMetricsDTO{District: m.District, PeriodDays: issues.MetricsPeriodDays}
+	d.Organizations = mapSlice(m.Orgs, func(o issues.OrgMetrics) districtOrgDTO {
+		d.SampleData = d.SampleData || o.SampleData
+		return districtOrgDTO{
+			ID: o.Org.ID, Name: o.Org.Name, FirstResponseMin: minutes(o.Week),
+			IssuesTotal: o.Issues, OpenTotal: o.OpenTotal, OverdueOpen: o.OverdueOpen,
+			ClosedTotal: o.ClosedTotal, ClosedOnTime: o.ClosedOnTime, Confirmed: o.Confirmed, Reopened: o.Reopened,
+			SampleData: o.SampleData,
+		}
 	})
 	return d
 }

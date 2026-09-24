@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chartTopHours, compareWeeks, formatResponse, longestDay, onTimeShare, residentCheck, shortResponse, weekdayShort } from './metrics';
+import { chartTopHours, compareWeeks, formatResponse, longestDay, onTimeShare, rankDistrict, residentCheck, shortResponse, weekdayShort } from './metrics';
 
 describe('время первого ответа', () => {
   it('меньше часа показывается в минутах', () => {
@@ -70,6 +70,36 @@ describe('закрыто в срок', () => {
   it('процент и пустой случай', () => {
     expect(onTimeShare({ closed_total: 16, closed_on_time: 13 })).toBe(81);
     expect(onTimeShare({ closed_total: 0, closed_on_time: 0 })).toBeNull();
+  });
+});
+
+describe('сравнение УК района', () => {
+  const org = (id: string, name: string, overdue: number, closed: number, onTime: number, min: number | null) => ({
+    id,
+    name,
+    first_response_median_min: min,
+    issues_total: 5,
+    open_total: 3,
+    overdue_open: overdue,
+    closed_total: closed,
+    closed_on_time: onTime,
+    confirmed_by_residents: 1,
+    reopened_by_residents: 0,
+    sample_data: true,
+  });
+
+  it('сначала УК с просрочкой, дальше по названию; доля в срок и первый ответ подписаны', () => {
+    const rows = rankDistrict([
+      org('a', 'УК «Ясеневый двор»', 0, 5, 5, 90),
+      org('b', 'УК «Каширский квартал»', 3, 4, 1, 2880),
+      org('c', 'УК «Ореховый квартал»', 0, 0, 0, null),
+    ]);
+    expect(rows.map((r) => r.id)).toEqual(['b', 'c', 'a']);
+    expect(rows.map((r) => [r.onTime, r.response])).toEqual([
+      ['25%', '48 ч'],
+      ['нет', 'нет'],
+      ['100%', '1:30'],
+    ]);
   });
 });
 

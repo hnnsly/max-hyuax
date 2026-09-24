@@ -1,6 +1,6 @@
 // Клиент API: JSON, токен сессии, единый формат ошибок {"error": {"code", "message"}}.
 import type {
-  AppealLink, Category, CategoryHint, House, HouseDetails, Issue, IssueEvent, AssetObject, Photo, ReportInput, Session, Status, UkMetrics, User,
+  AppealLink, Category, CategoryHint, DistrictMetrics, House, HouseDetails, Issue, IssueEvent, AssetObject, Photo, ReportInput, Session, Status, UkMetrics, User,
 } from './types';
 
 export class ApiError extends Error {
@@ -72,6 +72,8 @@ export const api = {
   setHouse: (houseId: string) => request<User>('POST', '/me/house', { house_id: houseId }),
   deleteAccount: () => request<void>('DELETE', '/me'),
   sharePhone: (c: { phone: string; auth_date: string; hash: string }) => request<User>('POST', '/me/phone', c),
+  districtMetrics: () => request<DistrictMetrics>('GET', '/district/metrics'),
+  districtOverdue: () => request<Issue[]>('GET', '/district/overdue'),
   hidePhone: () => request<User>('DELETE', '/me/phone'),
   myIssues: () => request<Issue[]>('GET', '/me/issues'),
   categories: () => request<Category[]>('GET', '/categories'),

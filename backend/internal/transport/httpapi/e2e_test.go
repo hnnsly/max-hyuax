@@ -522,6 +522,47 @@ func TestPhoneForTheRepairman(t *testing.T) {
 	}
 }
 
+// Кабинет района: сравнение трёх УК Зябликово и просроченные заявки района, только чтение.
+func TestDistrictCabinet(t *testing.T) {
+	district := login(t, "district")
+	me := expect(t, call(t, "GET", "/api/v1/me", district, nil), 200, "district me").body
+	if me["role"] != "district" || me["district"] != "Зябликово" {
+		t.Fatalf("me = %v", me)
+	}
+	m := expect(t, call(t, "GET", "/api/v1/district/metrics", district, nil), 200, "district metrics").body
+	orgs := m["organizations"].([]any)
+	if m["district"] != "Зябликово" || m["period_days"] != 30.0 || len(orgs) != 3 {
+		t.Fatalf("metrics = %v", m)
+	}
+	byID := map[string]map[string]any{}
+	for _, o := range orgs {
+		byID[o.(map[string]any)["id"].(string)] = o.(map[string]any)
+	}
+	if k := byID["org-kashir"]; k == nil || k["overdue_open"].(float64) < 3 || k["name"] != "УК «Каширский квартал»" || k["sample_data"] != true {
+		t.Fatalf("kashir = %v", k)
+	}
+	if y := byID["org-yasen"]; y == nil || y["overdue_open"] != 0.0 || y["confirmed_by_residents"] != 5.0 {
+		t.Fatalf("yasen = %v", y)
+	}
+
+	overdue := expect(t, call(t, "GET", "/api/v1/district/overdue", district, nil), 200, "district overdue").list
+	if len(overdue) < 5 {
+		t.Fatalf("overdue = %d issues", len(overdue))
+	}
+	for _, it := range overdue {
+		if is := it.(map[string]any); is["overdue"] != true || is["address"] == "" {
+			t.Fatalf("overdue issue = %v", is)
+		}
+	}
+	// Карточку район открывает, но менять статус не может.
+	id := overdue[0].(map[string]any)["id"].(string)
+	expect(t, call(t, "GET", "/api/v1/issues/"+id, district, nil), 200, "district opens the card")
+	expect(t, call(t, "POST", "/api/v1/issues/"+id+"/status", district, map[string]string{"status": "done"}), 403, "district changes status")
+	for _, role := range []string{"resident", "uk_operator"} {
+		expect(t, call(t, "GET", "/api/v1/district/metrics", login(t, role), nil), 403, role+" on district metrics")
+	}
+}
+
 func TestClassifyHint(t *testing.T) {
 	anna := login(t, "resident")
 	got := expect(t, call(t, "POST", "/api/v1/classify", anna, map[string]string{"text": "Не горит свет на пятом этаже"}), 200, "classify").body

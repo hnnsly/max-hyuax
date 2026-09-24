@@ -26,6 +26,22 @@ func TestOperatorManagesOnlyOwnOrganization(t *testing.T) {
 	}
 }
 
+// Район (управа или ГЖИ) только смотрит свой район и не меняет статусы заявок.
+func TestDistrictViewsOnlyOwnDistrict(t *testing.T) {
+	d := user.User{ID: 3, Role: user.RoleDistrict, District: "Зябликово"}
+	if !d.CanViewDistrict() || d.CanManageIssues("org-1") {
+		t.Fatalf("district user: view = %v, manage = %v", d.CanViewDistrict(), d.CanManageIssues("org-1"))
+	}
+	for _, u := range []user.User{
+		{ID: 4, Role: user.RoleDistrict}, // район не задан
+		{ID: 5, Role: user.RoleOperator, OrganizationID: "org-1", District: "Зябликово"}, // район не роль
+	} {
+		if u.CanViewDistrict() {
+			t.Errorf("user %d must not view the district", u.ID)
+		}
+	}
+}
+
 func TestConsentRequiresCurrentDocVersion(t *testing.T) {
 	u := user.User{ID: 1}
 	if u.HasConsent("v1") {

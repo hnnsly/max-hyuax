@@ -8,7 +8,8 @@ export type Route =
   | { name: 'issue'; id: string; flash?: string }
   | { name: 'report'; objectCode?: string; category?: string }
   | { name: 'consent' }
-  | { name: 'uk' };
+  | { name: 'uk' }
+  | { name: 'district' };
 
 export type StackAction = { type: 'push'; route: Route } | { type: 'back' } | { type: 'reset'; routes: Route[] };
 

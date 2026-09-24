@@ -3,6 +3,7 @@
 package postgres_test
 
 import (
+	"slices"
 	"sync"
 	"testing"
 	"time"
@@ -87,6 +88,42 @@ func TestShiftSampleDataKeepsExampleFresh(t *testing.T) {
 	}
 	if days, err := s.ShiftSampleData(t.Context(), later); err != nil || days != 0 {
 		t.Errorf("repeated shift = %d, err = %v", days, err)
+	}
+}
+
+// Засев 00011: три УК в Зябликово, просроченные заявки района — две у «Орехового квартала» и три у «Каширского».
+func TestDistrictSeed(t *testing.T) {
+	s := freshStore(t)
+	orgs, err := s.Houses().OrganizationsInDistrict(t.Context(), "Зябликово")
+	if err != nil {
+		t.Fatal(err)
+	}
+	var names []string
+	for _, o := range orgs {
+		names = append(names, o.Name)
+	}
+	if want := []string{"УК «Каширский квартал»", "УК «Ореховый квартал»", "УК «Ясеневый двор»"}; !slices.Equal(names, want) {
+		t.Fatalf("organizations = %v, want %v", names, want)
+	}
+	overdue, err := s.Issues().OverdueInDistrict(t.Context(), "Зябликово", time.Now(), 50)
+	if err != nil || len(overdue) != 5 {
+		t.Fatalf("overdue = %d, err = %v", len(overdue), err)
+	}
+	for i := 1; i < len(overdue); i++ {
+		if overdue[i].Deadline().Before(overdue[i-1].Deadline()) {
+			t.Fatal("overdue issues must go oldest deadline first")
+		}
+	}
+	if none, _ := s.Issues().OverdueInDistrict(t.Context(), "Братеево", time.Now(), 50); len(none) != 0 {
+		t.Fatalf("another district = %d issues", len(none))
+	}
+	d, err := s.Users().ByDemoKey(t.Context(), "district_demo")
+	if err != nil || !d.CanViewDistrict() || d.District != "Зябликово" {
+		t.Fatalf("district demo user = %+v, err = %v", d, err)
+	}
+	kashir, err := s.Issues().OrgCounts(t.Context(), "org-kashir", time.Now().Add(-month), time.Now())
+	if err != nil || kashir.OverdueOpen != 3 || kashir.Confirmed != 1 || !kashir.SampleData {
+		t.Fatalf("kashir counts = %+v, err = %v", kashir, err)
 	}
 }
 

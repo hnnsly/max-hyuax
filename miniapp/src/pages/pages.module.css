@@ -332,6 +332,49 @@
 }
 .sheetText:user-invalid + .fieldError { display: flex; }
 
+/* Кабинет района: карточка УК с четырьмя цифрами */
+.orgCard {
+  container-type: inline-size;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px 16px;
+}
+.orgCardName {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 650;
+}
+.orgFigures {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 10px;
+  margin: 0;
+}
+.orgFigures div {
+  display: flex;
+  flex-direction: column-reverse;
+  /* Цифры на одной линии, даже если подпись переносится на две строки. */
+  justify-content: flex-end;
+  gap: 2px;
+}
+.orgFigures dt {
+  font-size: 12.5px;
+  color: var(--text-3);
+}
+.orgFigures dd {
+  margin: 0;
+  font-family: var(--font-plate);
+  font-size: 26px;
+  font-weight: 850;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+/* Узкий экран: цифры в два ряда, подписи не переносятся по буквам. */
+@container (width < 300px) {
+  .orgFigures { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
 /* Контакты жителей в карточке у УК */
 .contacts {
   margin: 0;

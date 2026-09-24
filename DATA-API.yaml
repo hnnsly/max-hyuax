@@ -24,6 +24,7 @@ auth:
     resident: житель дома «Ореховый бульвар, 17к2»
     resident_2: сосед из того же дома
     uk_operator: сотрудник УК «Ореховый квартал»
+    district: управа района Зябликово (только чтение)
 
 checks:
   - id: health
@@ -207,7 +208,30 @@ checks:
       content_type: application/json
       body: object
       required_fields: [first_response_median_min, prev_week_median_min, first_response_by_day, period_days,
-        issues_total, reports_per_issue, closed_total, closed_on_time, open_total, overdue_open, sample_data]
+        issues_total, reports_per_issue, closed_total, closed_on_time, confirmed_by_residents, reopened_by_residents,
+        open_total, overdue_open, sample_data]
+
+  - id: district_metrics
+    name: Кабинет района сравнивает УК
+    method: GET
+    path: /district/metrics
+    role: district
+    expect:
+      status: [200]
+      content_type: application/json
+      body: object
+      required_fields: [district, period_days, sample_data, organizations]
+
+  - id: district_overdue
+    name: Просроченные заявки района
+    method: GET
+    path: /district/overdue
+    role: district
+    expect:
+      status: [200]
+      content_type: application/json
+      body: array
+      required_fields: ["[].id", "[].number", "[].title", "[].status", "[].deadline", "[].overdue", "[].address"]
 
   - id: resident_forbidden_on_uk
     name: Житель не видит очередь УК
