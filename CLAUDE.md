@@ -110,7 +110,7 @@ docs/                   документация продукта (ведётс�
 - `task miniapp:install` — зависимости мини-приложения (`npm ci`);
 - `task miniapp:dev` — мини-приложение на `:5173`, `/api` проксируется на `task run`; открыть `http://localhost:5173/?demo=resident` (`resident_2`, `uk`), тема `&theme=dark`;
 - `task miniapp:test` / `task miniapp:typecheck` / `task miniapp:build` — Vitest, TypeScript, сборка в `miniapp/dist`;
-- превью для агента: `.claude/launch.json`, конфигурации `api` и `miniapp`.
+- превью для агента: `.claude/launch.json`, конфигурации `api` и `miniapp`; если `:8080` занят — `api-8081` и `miniapp-8081` (прокси Vite берёт адрес из `API_PROXY`).
 
 ## Ловушки платформы MAX
 - Bot API — только `https://platform-api2.max.ru` с заголовком `Authorization: <token>`; в образе `api` нужен корневой сертификат Минцифры.
