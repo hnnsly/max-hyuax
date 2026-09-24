@@ -1,7 +1,7 @@
 //go:build live
 
 // Проверка на настоящем Ollama: OLLAMA_URL=http://localhost:11434 go test -tags live ./internal/storage/llm
-// Модель — OLLAMA_MODEL (по умолчанию qwen3:1.7b), она должна быть скачана заранее.
+// Модель — OLLAMA_MODEL (по умолчанию qwen3:4b), она должна быть скачана заранее.
 package llm_test
 
 import (
@@ -20,12 +20,14 @@ func TestLiveOllamaClassifies(t *testing.T) {
 	if base == "" {
 		t.Skip("OLLAMA_URL is not set")
 	}
-	o := llm.NewOllama(base, cmp.Or(os.Getenv("OLLAMA_MODEL"), "qwen3:1.7b"), &http.Client{Timeout: 2 * time.Minute})
-	// Фразы без ключевых слов справочника: здесь как раз нужна модель.
+	o := llm.NewOllama(base, cmp.Or(os.Getenv("OLLAMA_MODEL"), "qwen3:4b"), &http.Client{Timeout: 2 * time.Minute})
+	// Фразы, где ключевых слов справочника нет или они уводят не туда («светится» — не про свет):
+	// здесь как раз нужна модель.
 	cases := map[string]string{
-		"Вода льётся по стене на пятом этаже":             "leak",
-		"Кабина стоит между этажами, кнопки не реагируют": "lift",
-		"В квартирах ледяные батареи уже третий день":     "heating",
+		"Вода льётся по стене на пятом этаже":          "leak",
+		"Подъёмник не едет, кнопка вызова не светится": "lift",
+		"На площадке кромешная тьма, ничего не видно":  "lighting",
+		"Магнитный ключ не открывает вход в подъезд":   "door",
 	}
 	hits := 0
 	for text, want := range cases {
@@ -40,7 +42,7 @@ func TestLiveOllamaClassifies(t *testing.T) {
 		}
 	}
 	// Модель маленькая и может ошибиться; ответ всё равно из списка, житель подтверждает сам.
-	if hits < 2 {
+	if hits < 3 {
 		t.Errorf("model matched %d of %d phrases", hits, len(cases))
 	}
 }

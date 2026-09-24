@@ -104,3 +104,21 @@ func TestRejectsBadText(t *testing.T) {
 		t.Errorf("LLM called %d times for invalid text", llm.calls)
 	}
 }
+
+// Прогрев загружает модель в память при старте, чтобы первая подсказка не упёрлась в таймаут.
+func TestWarmUpLoadsModelOnce(t *testing.T) {
+	llm := &fakeLLM{code: "lift"}
+	hints.NewService(llm, time.Millisecond, quiet).WarmUp(t.Context())
+	if llm.calls != 1 {
+		t.Fatalf("calls = %d, want 1", llm.calls)
+	}
+	hints.NewService(nil, 0, quiet).WarmUp(t.Context()) // без модели ничего не делает
+	// Модель ещё не готова: попытки повторяются, пока контекст не отменят.
+	failing := &fakeLLM{err: errors.New("model is still downloading")}
+	ctx, cancel := context.WithTimeout(t.Context(), 50*time.Millisecond)
+	defer cancel()
+	hints.NewService(failing, time.Millisecond, quiet).WarmUp(ctx)
+	if failing.calls < 1 || ctx.Err() == nil {
+		t.Fatalf("calls = %d, ctx err = %v: warm-up must retry until cancelled", failing.calls, ctx.Err())
+	}
+}

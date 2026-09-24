@@ -9,7 +9,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"slices"
 	"strings"
 
 	"dommax/internal/domain/rules"
@@ -45,29 +44,37 @@ func (o *Ollama) Category(ctx context.Context, text string, options []rules.Rule
 		return "", ErrBusy
 	}
 
-	codes := make([]string, len(options))
+	// Маленькая модель лучше выбирает по русским названиям, чем по английским кодам:
+	// просим название, код находим по нему сами.
+	titles := make([]string, len(options))
+	codeByTitle := make(map[string]string, len(options))
 	var list strings.Builder
 	for i, r := range options {
-		codes[i] = r.Code
-		fmt.Fprintf(&list, "- %s: %s\n", r.Code, r.Title)
+		titles[i] = r.Title
+		codeByTitle[r.Title] = r.Code
+		if len(r.Keywords) > 0 {
+			fmt.Fprintf(&list, "- %s (например: %s)\n", r.Title, strings.Join(r.Keywords, ", "))
+		} else {
+			fmt.Fprintf(&list, "- %s (всё остальное)\n", r.Title)
+		}
 	}
 	body, err := json.Marshal(map[string]any{
 		"model": o.model,
 		"messages": []message{
 			{Role: "system", Content: "Ты помогаешь жителям многоквартирного дома оформить заявку о поломке общего имущества. " +
-				"Выбери одну категорию из списка по описанию жителя. Если ни одна не подходит, выбери other. " +
-				"Ответь JSON вида {\"category\": \"<код>\"}.\n\nКатегории:\n" + list.String()},
+				"Выбери одну категорию из списка по смыслу описания жителя, даже если нужных слов в нём нет. " +
+				"Ответь JSON вида {\"category\": \"<название категории>\"}.\n\nКатегории:\n" + list.String()},
 			{Role: "user", Content: text},
 		},
 		"stream": false,
 		"think":  false,
 		"format": map[string]any{
 			"type":       "object",
-			"properties": map[string]any{"category": map[string]any{"type": "string", "enum": codes}},
+			"properties": map[string]any{"category": map[string]any{"type": "string", "enum": titles}},
 			"required":   []string{"category"},
 		},
 		"options":    map[string]any{"temperature": 0, "num_predict": 32},
-		"keep_alive": "30m",
+		"keep_alive": -1, // модель остаётся в памяти: иначе после простоя первая подсказка снова медленная
 	})
 	if err != nil {
 		return "", err
@@ -97,8 +104,9 @@ func (o *Ollama) Category(ctx context.Context, text string, options []rules.Rule
 	if err := json.Unmarshal([]byte(out.Message.Content), &answer); err != nil {
 		return "", fmt.Errorf("llm: answer is not JSON: %w", err)
 	}
-	if !slices.Contains(codes, answer.Category) {
+	code, ok := codeByTitle[answer.Category]
+	if !ok {
 		return "", fmt.Errorf("llm: category %q is not in the list", answer.Category)
 	}
-	return answer.Category, nil
+	return code, nil
 }

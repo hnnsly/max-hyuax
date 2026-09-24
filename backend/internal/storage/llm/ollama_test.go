@@ -47,7 +47,7 @@ func fakeOllama(t *testing.T, status int, content string, wait time.Duration) (*
 }
 
 func TestCategoryFromStructuredAnswer(t *testing.T) {
-	srv, got := fakeOllama(t, 200, `{"category":"leak"}`, 0)
+	srv, got := fakeOllama(t, 200, `{"category":"Протечка"}`, 0)
 	o := llm.NewOllama(srv.URL, "qwen3:1.7b", srv.Client())
 	code, err := o.Category(t.Context(), "с потолка капает", rules.Categories())
 	if err != nil || code != "leak" {
@@ -55,22 +55,22 @@ func TestCategoryFromStructuredAnswer(t *testing.T) {
 	}
 
 	req := *got
-	if req["model"] != "qwen3:1.7b" || req["stream"] != false || req["think"] != false {
+	if req["model"] != "qwen3:1.7b" || req["stream"] != false || req["think"] != false || req["keep_alive"] != -1.0 {
 		t.Errorf("request = %v", req)
 	}
 	if opts, _ := req["options"].(map[string]any); opts["temperature"] != 0.0 {
 		t.Errorf("options = %v, want temperature 0", req["options"])
 	}
-	// Ответ ограничен схемой с закрытым списком кодов.
+	// Ответ ограничен схемой с закрытым списком названий категорий.
 	props := req["format"].(map[string]any)["properties"].(map[string]any)
 	enum := props["category"].(map[string]any)["enum"].([]any)
-	if len(enum) != len(rules.Categories()) || !slices.Contains(enum, any("lift")) {
+	if len(enum) != len(rules.Categories()) || !slices.Contains(enum, any("Лифт")) {
 		t.Errorf("enum = %v", enum)
 	}
 	msgs := req["messages"].([]any)
 	system := msgs[0].(map[string]any)["content"].(string)
 	user := msgs[len(msgs)-1].(map[string]any)["content"].(string)
-	if !strings.Contains(system, "lift") || !strings.Contains(system, "Лифт") || user != "с потолка капает" {
+	if !strings.Contains(system, "Лифт") || !strings.Contains(system, "кабина") || user != "с потолка капает" {
 		t.Errorf("messages = %v", msgs)
 	}
 }
@@ -95,7 +95,7 @@ func TestCategoryErrors(t *testing.T) {
 }
 
 func TestCategoryRespectsDeadline(t *testing.T) {
-	srv, _ := fakeOllama(t, 200, `{"category":"lift"}`, time.Second)
+	srv, _ := fakeOllama(t, 200, `{"category":"Лифт"}`, time.Second)
 	ctx, cancel := context.WithTimeout(t.Context(), 30*time.Millisecond)
 	defer cancel()
 	_, err := llm.NewOllama(srv.URL, "m", srv.Client()).Category(ctx, "текст", rules.Categories())
@@ -106,7 +106,7 @@ func TestCategoryRespectsDeadline(t *testing.T) {
 
 // Модель на CPU медленная: лишние параллельные запросы сразу получают отказ, а не очередь.
 func TestCategoryLimitsConcurrency(t *testing.T) {
-	srv, _ := fakeOllama(t, 200, `{"category":"lift"}`, 300*time.Millisecond)
+	srv, _ := fakeOllama(t, 200, `{"category":"Лифт"}`, 300*time.Millisecond)
 	o := llm.NewOllama(srv.URL, "m", srv.Client())
 	var wg sync.WaitGroup
 	errs := make(chan error, llm.MaxParallel+3)

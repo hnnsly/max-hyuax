@@ -27,7 +27,7 @@ import (
 const (
 	sessionTTL = 12 * time.Hour
 	// llmTimeout — сколько ждать подсказку модели; дальше работают ключевые слова (ADR-008).
-	llmTimeout = 6 * time.Second
+	llmTimeout = 8 * time.Second
 )
 
 // Container — DI-контейнер сервиса: единственное место, где зависимости собираются вместе

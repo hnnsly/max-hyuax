@@ -55,7 +55,7 @@ services:
       DOMAIN: ${DOMAIN:-}
       # Подсказка категории через LLM (профиль llm). Пусто — только ключевые слова.
       OLLAMA_URL: ${OLLAMA_URL:-}
-      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:1.7b}
+      OLLAMA_MODEL: ${OLLAMA_MODEL:-qwen3:4b}
 
   ollama:
     # Self-hosted модель для подсказки категории (ADR-008). Запускается только с профилем llm.
@@ -79,7 +79,7 @@ services:
         condition: service_healthy
     environment:
       OLLAMA_HOST: http://ollama:11434
-    command: ["pull", "${OLLAMA_MODEL:-qwen3:1.7b}"]
+    command: ["pull", "${OLLAMA_MODEL:-qwen3:4b}"]
     restart: "no"
 
 volumes:

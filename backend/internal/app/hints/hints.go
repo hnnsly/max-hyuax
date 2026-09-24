@@ -83,3 +83,34 @@ func (s *Service) askLLM(ctx context.Context, text string) *rules.Rule {
 	}
 	return &r
 }
+
+const (
+	// warmUpTimeout — сколько ждать одну загрузку модели в память (на CPU это десятки секунд).
+	warmUpTimeout = 3 * time.Minute
+	// warmUpRetry — пауза между попытками: модель может ещё скачиваться (ollama-pull).
+	warmUpRetry = 20 * time.Second
+)
+
+// WarmUp загружает модель заранее, иначе первая подсказка после старта не уложится в таймаут.
+// Повторяет попытки, пока не получится или пока ctx не отменён; до этого работают ключевые слова.
+func (s *Service) WarmUp(ctx context.Context) {
+	if s.llm == nil {
+		return
+	}
+	for {
+		start := time.Now()
+		attempt, cancel := context.WithTimeout(ctx, warmUpTimeout)
+		_, err := s.llm.Category(attempt, "лифт не работает", rules.Categories())
+		cancel()
+		if err == nil {
+			s.log.InfoContext(ctx, "llm warmed up", "took", time.Since(start).Round(time.Millisecond).String())
+			return
+		}
+		s.log.WarnContext(ctx, "llm warm-up failed, will retry", "err", err)
+		select {
+		case <-ctx.Done():
+			return
+		case <-time.After(warmUpRetry):
+		}
+	}
+}

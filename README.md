@@ -76,7 +76,8 @@ docker compose -f deploy/compose.yaml --env-file deploy/.env.example up -d --bui
 Дополнительно api понимает:
 - `CONSENT_VERSION`: версия согласия на обработку данных, по умолчанию `v1`;
 - `MAX_API_URL`: адрес Bot API, по умолчанию `https://platform-api2.max.ru`;
-- `MAX_API_CA_FILE`: свой файл корневых сертификатов.
+- `MAX_API_CA_FILE`: свой файл корневых сертификатов;
+- `OLLAMA_URL`, `OLLAMA_MODEL`, `COMPOSE_PROFILES=llm`: подсказка категории через self-hosted модель (необязательно, см. [docs/deployment.md](docs/deployment.md)).
 
 ## Порты
 
@@ -101,7 +102,10 @@ docker compose -f deploy/compose.yaml --env-file deploy/.env.example up -d --bui
 | Let's Encrypt | сертификат для домена стенда | не нужен локально |
 
 - **Реальных интеграций** с ГИС ЖКХ и системами УК нет. Дома, УК и объекты модельные, это указано в интерфейсе и в [docs/data.md](docs/data.md).
-- **LLM** в текущей версии не используется: категория определяется по ключевым словам и справочнику.
+- **LLM (необязательно).** Подсказку категории может давать self-hosted модель в Ollama: профиль compose `llm`, модель `qwen3:4b`.
+  - Модель выбирает только из закрытого справочника, ответственного и срок задают правила.
+  - Без модели работают ключевые слова.
+  - Подробнее: [docs/architecture.md](docs/architecture.md#подсказка-категории).
 
 ## Работа с данными
 

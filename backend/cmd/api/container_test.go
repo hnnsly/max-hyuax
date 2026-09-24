@@ -93,7 +93,7 @@ func TestContainerGivesSingletonsAndServesHealth(t *testing.T) {
 // С OLLAMA_URL подсказка категории идёт через модель.
 func TestClassifyUsesOllamaWhenConfigured(t *testing.T) {
 	ollama := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		io.WriteString(w, `{"message":{"role":"assistant","content":"{\"category\":\"leak\"}"},"done":true}`)
+		io.WriteString(w, `{"message":{"role":"assistant","content":"{\"category\":\"Протечка\"}"},"done":true}`)
 	}))
 	defer ollama.Close()
 	cfg := testConfig(t)
