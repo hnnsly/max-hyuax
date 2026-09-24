@@ -320,6 +320,24 @@
   outline: none;
   border-color: var(--enamel);
 }
+/* Ошибка обязательного поля: только после ввода или попытки отправки, цветом и значком. */
+.sheetText:user-invalid { border-color: var(--surik); }
+.fieldError {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  margin: -4px 0 0;
+  font-size: 13.5px;
+  color: var(--surik);
+}
+.sheetText:user-invalid + .fieldError { display: flex; }
+
+/* Две кнопки рядом: «Починили» и «Не починили» */
+.pair {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
 
 /* Удаление аккаунта */
 .dangerLink {

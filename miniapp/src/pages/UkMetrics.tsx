@@ -2,7 +2,7 @@ import { api } from '../shared/api/client';
 import type { UkMetrics } from '../shared/api/types';
 import { useResource } from '../shared/api/useResource';
 import { plural } from '../shared/lib/format';
-import { chartTopHours, compareWeeks, formatResponse, longestDay, onTimeShare, shortResponse, weekdayShort } from '../shared/lib/metrics';
+import { chartTopHours, compareWeeks, formatResponse, longestDay, onTimeShare, residentCheck, shortResponse, weekdayShort } from '../shared/lib/metrics';
 import { EmptyState, ErrorState, Island, Loading } from '../shared/ui/Layout';
 import s from './metrics.module.css';
 
@@ -23,6 +23,7 @@ export function UkMetricsView() {
       <FirstResponse m={m} />
       {m.issues_total > 0 && <ReportsPerIssue perIssue={m.reports_per_issue} />}
       <OnTime m={m} period={period} />
+      <ResidentCheck m={m} />
       <p className={s.note}>
         {m.sample_data && 'Пример данных. '}
         Считается по событиям заявок за {period}: создание, присоединение, смена статуса.
@@ -131,6 +132,29 @@ function ReportsPerIssue({ perIssue }: { perIssue: number }) {
             </span>
           </span>
         </div>
+      </div>
+    </Island>
+  );
+}
+
+/** Проверка ремонта жителями: сколько ремонтов подтвердили и сколько заявок вернули в работу. */
+function ResidentCheck({ m }: { m: UkMetrics }) {
+  const labels = residentCheck(m);
+  if (!labels) return null;
+  return (
+    <Island>
+      <div className={s.card}>
+        <span className={s.label}>Проверка жителями</span>
+        <div className={s.line}>
+          <span className={`${s.midNum} ${s.ink}`}>{m.confirmed_by_residents}</span>
+          <span className={s.text}>{labels.confirmed}</span>
+        </div>
+        {m.reopened_by_residents > 0 && (
+          <div className={s.line}>
+            <span className={`${s.midNum} ${s.bad}`}>{m.reopened_by_residents}</span>
+            <span className={s.text}>{labels.reopened}: жители сообщили, что не починили</span>
+          </div>
+        )}
       </div>
     </Island>
   );

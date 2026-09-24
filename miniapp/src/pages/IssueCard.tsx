@@ -15,6 +15,7 @@ import { IssuePhotos } from '../shared/ui/Photos';
 import { Sheet } from '../shared/ui/Sheet';
 import { Rail } from '../shared/ui/Rail';
 import s from './pages.module.css';
+import { RepairCheck } from './RepairCheck';
 
 export function IssueCard({ id, flash }: { id: string; flash?: string }) {
   const user = useUser();
@@ -184,6 +185,17 @@ export function IssueCard({ id, flash }: { id: string; flash?: string }) {
                 {plural(n, 'сосед сообщил', 'соседа сообщили', 'соседей сообщили')}
               </span>
             </div>
+            {closed && issue.confirmed_count > 0 && (
+              <>
+                <span className={s.figureDivider} />
+                <div className={s.figure}>
+                  <span className={s.figureValue}>{issue.confirmed_count}</span>
+                  <span className={s.figureLabel}>
+                    {plural(issue.confirmed_count, 'сосед подтвердил', 'соседа подтвердили', 'соседей подтвердили')} ремонт
+                  </span>
+                </div>
+              </>
+            )}
             {!closed && <span className={s.figureDivider} />}
             {!closed &&
               (issue.overdue ? (
@@ -217,6 +229,8 @@ export function IssueCard({ id, flash }: { id: string; flash?: string }) {
           </div>
         </Island>
       )}
+
+      <RepairCheck issue={issue} onChanged={() => res.reload()} onToast={showToast} />
 
       <Island>
         <div className={s.block}>

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chartTopHours, compareWeeks, formatResponse, longestDay, onTimeShare, shortResponse, weekdayShort } from './metrics';
+import { chartTopHours, compareWeeks, formatResponse, longestDay, onTimeShare, residentCheck, shortResponse, weekdayShort } from './metrics';
 
 describe('время первого ответа', () => {
   it('меньше часа показывается в минутах', () => {
@@ -70,5 +70,22 @@ describe('закрыто в срок', () => {
   it('процент и пустой случай', () => {
     expect(onTimeShare({ closed_total: 16, closed_on_time: 13 })).toBe(81);
     expect(onTimeShare({ closed_total: 0, closed_on_time: 0 })).toBeNull();
+  });
+});
+
+describe('проверка ремонта жителями', () => {
+  it('подписи с согласованием чисел', () => {
+    expect(residentCheck({ confirmed_by_residents: 14, reopened_by_residents: 1 })).toEqual({
+      confirmed: 'ремонтов подтвердили жители',
+      reopened: 'заявку вернули в работу',
+    });
+    expect(residentCheck({ confirmed_by_residents: 1, reopened_by_residents: 3 })).toEqual({
+      confirmed: 'ремонт подтвердили жители',
+      reopened: 'заявки вернули в работу',
+    });
+  });
+
+  it('пусто, пока жители ничего не проверяли', () => {
+    expect(residentCheck({ confirmed_by_residents: 0, reopened_by_residents: 0 })).toBeNull();
   });
 });

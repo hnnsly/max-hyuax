@@ -65,3 +65,13 @@ export function longestDay(days: DayMedian[]): string | null {
 export function onTimeShare(m: { closed_total: number; closed_on_time: number }): number | null {
   return m.closed_total === 0 ? null : Math.round((m.closed_on_time / m.closed_total) * 100);
 }
+
+/** Подписи к числам проверки ремонта жителями; null, если за период жители ничего не проверяли. */
+export function residentCheck(m: { confirmed_by_residents: number; reopened_by_residents: number }): { confirmed: string; reopened: string } | null {
+  const { confirmed_by_residents: c, reopened_by_residents: r } = m;
+  if (c === 0 && r === 0) return null;
+  return {
+    confirmed: `${plural(c, 'ремонт', 'ремонта', 'ремонтов')} подтвердили жители`,
+    reopened: `${plural(r, 'заявку', 'заявки', 'заявок')} вернули в работу`,
+  };
+}

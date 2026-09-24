@@ -50,30 +50,55 @@ const statusText: Record<Status, string> = {
   rejected: 'УК отклонила заявку',
 };
 
-/** Хронология для карточки: присоединения подряд склеиваются, имена не показываются. */
+/**
+ * Хронология для карточки: присоединения и подтверждения ремонта подряд склеиваются,
+ * имена не показываются.
+ */
 export function buildTimeline(events: IssueEvent[]): TimelineItem[] {
   const out: Omit<TimelineItem, 'last'>[] = [];
-  let joined = 0;
-  const flushJoined = (at: string) => {
-    if (joined === 0) return;
-    const verb = joined === 1 ? 'Присоединился' : 'Присоединились';
-    out.push({ at, text: `${verb} ещё ${joined} ${plural(joined, 'сосед', 'соседа', 'соседей')}` });
-    joined = 0;
+  // Серия одинаковых событий подряд: сколько их и когда было последнее.
+  // Приведение, а не аннотация: иначе TypeScript сузит тип до null, не видя присваиваний в flush.
+  let run = null as { kind: 'joined' | 'confirmed'; count: number; at: string } | null;
+  const flush = () => {
+    if (!run) return;
+    const n = run.count;
+    const text =
+      run.kind === 'joined'
+        ? `${n === 1 ? 'Присоединился' : 'Присоединились'} ещё ${n} ${plural(n, 'сосед', 'соседа', 'соседей')}`
+        : n === 1
+          ? 'Сосед подтвердил, что починили'
+          : `${n} ${plural(n, 'сосед', 'соседа', 'соседей')} подтвердили, что починили`;
+    out.push({ at: run.at, text });
+    run = null;
   };
-  let lastJoinAt = '';
   for (const e of events) {
-    if (e.kind === 'joined') {
-      joined++;
-      lastJoinAt = e.at;
+    if (e.kind === 'joined' || e.kind === 'confirmed') {
+      if (run?.kind !== e.kind) flush();
+      run = { kind: e.kind, count: (run?.count ?? 0) + 1, at: e.at };
       continue;
     }
-    flushJoined(lastJoinAt);
+    flush();
+    const comment = e.comment ? { comment: e.comment } : {};
     if (e.kind === 'created') out.push({ at: e.at, text: 'Житель сообщил о проблеме' });
     else if (e.kind === 'overdue') out.push({ at: e.at, text: 'Срок ответа истёк', late: true });
-    else out.push({ at: e.at, text: statusText[e.status], ...(e.comment ? { comment: e.comment } : {}) });
+    else if (e.kind === 'reopened') out.push({ at: e.at, text: 'Житель вернул заявку в работу: не починили', ...comment });
+    else out.push({ at: e.at, text: statusText[e.status], ...comment });
   }
-  flushJoined(lastJoinAt);
+  flush();
   return out.map((item, i) => ({ ...item, last: i === out.length - 1 }));
+}
+
+/**
+ * Что показать жителю в карточке по проверке ремонта: спросить, починили ли
+ * (участник, заявка выполнена, окно открыто, ответа ещё нет), поблагодарить за «починили» или ничего.
+ */
+export function repairCheck(
+  it: { status: Status; joined: boolean; my_answer: 'fixed' | null; answer_until: string | null },
+  now: Date,
+): 'ask' | 'thanks' | null {
+  if (it.my_answer === 'fixed') return 'thanks';
+  if (!it.joined || it.status !== 'done' || !it.answer_until) return null;
+  return now < new Date(it.answer_until) ? 'ask' : null;
 }
 
 const transitions: Record<Status, Status[]> = {
@@ -91,6 +116,7 @@ interface QueueItem {
   status: Status;
   overdue: boolean;
   deadline: string;
+  reopened_at?: string;
 }
 
 /** Открытые заявки дома: просроченные сверху, остальные в порядке сервера (новые первыми). */
@@ -98,21 +124,30 @@ export function houseOpenIssues<T extends { status: Status; overdue: boolean }>(
   return items.filter((i) => i.status !== 'done' && i.status !== 'rejected').sort((a, b) => Number(b.overdue) - Number(a.overdue));
 }
 
-/** Группы очереди УК: сначала то, что горит, закрытые в конце. Пустые группы не показываются. */
+/**
+ * Группы очереди УК: сначала то, что горит, закрытые в конце. Заявки, которые жители вернули
+ * в работу после «выполнено», идут сразу после просроченных. Пустые группы не показываются.
+ */
 export function groupQueue<T extends QueueItem>(items: T[], now: Date): { title: string; late?: boolean; items: T[] }[] {
   const closed = (i: T) => i.status === 'done' || i.status === 'rejected';
-  const groups = [
-    { title: 'Просрочено', late: true, items: items.filter((i) => !closed(i) && i.overdue) },
-    { title: 'Срок сегодня и завтра', items: items.filter((i) => !closed(i) && !i.overdue && calendarDaysBetween(now, i.deadline) <= 1) },
-    { title: 'Новые', items: [] as T[] },
-    { title: 'В работе', items: [] as T[] },
-    { title: 'Закрытые', items: items.filter(closed) },
-  ];
-  const taken = new Set([...groups[0]!.items, ...groups[1]!.items]);
+  const late = items.filter((i) => !closed(i) && i.overdue);
+  const back = items.filter((i) => !closed(i) && !i.overdue && i.reopened_at);
+  const soon = items.filter((i) => !closed(i) && !i.overdue && !i.reopened_at && calendarDaysBetween(now, i.deadline) <= 1);
+  const fresh: T[] = [];
+  const working: T[] = [];
+  const taken = new Set([...late, ...back, ...soon]);
   for (const i of items) {
     if (closed(i) || taken.has(i)) continue;
-    (i.status === 'sent' ? groups[2]! : groups[3]!).items.push(i);
+    (i.status === 'sent' ? fresh : working).push(i);
   }
+  const groups = [
+    { title: 'Просрочено', late: true, items: late },
+    { title: 'Вернули жители', items: back },
+    { title: 'Срок сегодня и завтра', items: soon },
+    { title: 'Новые', items: fresh },
+    { title: 'В работе', items: working },
+    { title: 'Закрытые', items: items.filter(closed) },
+  ];
   return groups.filter((g) => g.items.length > 0);
 }
 

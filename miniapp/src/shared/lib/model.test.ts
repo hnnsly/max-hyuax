@@ -7,6 +7,7 @@ import {
   houseOpenIssues,
   nextStatuses,
   parseStartParam,
+  repairCheck,
   shareText,
   worthHint,
   type RailItem,
@@ -61,6 +62,44 @@ describe('хронология', () => {
       ['Житель сообщил о проблеме', false],
       ['Срок ответа истёк', true],
     ]);
+  });
+
+  it('склеивает подтверждения ремонта и показывает возврат в работу с комментарием', () => {
+    const items = buildTimeline([
+      { kind: 'status_changed', status: 'done', comment: 'Заменили лампы', at: '2026-09-18T08:00:00Z' },
+      { kind: 'confirmed', status: 'done', at: '2026-09-18T09:00:00Z' },
+      { kind: 'confirmed', status: 'done', at: '2026-09-18T10:00:00Z' },
+      { kind: 'reopened', status: 'in_progress', comment: 'На третьем этаже темно', at: '2026-09-18T11:00:00Z' },
+      { kind: 'status_changed', status: 'done', at: '2026-09-19T08:00:00Z' },
+      { kind: 'confirmed', status: 'done', at: '2026-09-19T09:00:00Z' },
+    ]);
+    expect(items.map((i) => i.text)).toEqual([
+      'УК отметила заявку выполненной',
+      '2 соседа подтвердили, что починили',
+      'Житель вернул заявку в работу: не починили',
+      'УК отметила заявку выполненной',
+      'Сосед подтвердил, что починили',
+    ]);
+    expect(items[2]?.comment).toBe('На третьем этаже темно');
+  });
+});
+
+describe('проверка ремонта жителем', () => {
+  const now = new Date('2026-09-20T10:00:00+03:00');
+  const done = { status: 'done', joined: true, my_answer: null, answer_until: '2026-09-25T10:00:00+03:00' } as const;
+
+  it('спрашивает участника выполненной заявки, пока открыто окно', () => {
+    expect(repairCheck(done, now)).toBe('ask');
+  });
+
+  it('благодарит за ответ «починили»', () => {
+    expect(repairCheck({ ...done, my_answer: 'fixed' }, now)).toBe('thanks');
+  });
+
+  it('молчит для соседа не из заявки, после окна и у невыполненной заявки', () => {
+    expect(repairCheck({ ...done, joined: false }, now)).toBeNull();
+    expect(repairCheck(done, new Date('2026-09-26T10:00:00+03:00'))).toBeNull();
+    expect(repairCheck({ ...done, status: 'in_progress', answer_until: null }, now)).toBeNull();
   });
 });
 
@@ -125,6 +164,24 @@ describe('группы очереди УК', () => {
       ['Новые', ['new']],
       ['В работе', ['work']],
       ['Закрытые', ['done']],
+    ]);
+  });
+
+  it('заявки, которые вернули жители, идут отдельной группой после просроченных', () => {
+    const now = new Date('2026-09-24T10:00:00+03:00');
+    const base = { participant_count: 1, created_at: '2026-09-20T10:00:00+03:00', reopened_at: '2026-09-23T10:00:00+03:00' };
+    const groups = groupQueue(
+      [
+        { id: 'late-back', status: 'in_progress', overdue: true, deadline: '2026-09-22T23:59:59+03:00', ...base },
+        { id: 'back', status: 'in_progress', overdue: false, deadline: '2026-09-25T23:59:59+03:00', ...base },
+        { id: 'work', status: 'in_progress', overdue: false, deadline: '2026-09-30T23:59:59+03:00', participant_count: 1, created_at: base.created_at },
+      ],
+      now,
+    );
+    expect(groups.map((g) => [g.title, g.items.map((i) => i.id)])).toEqual([
+      ['Просрочено', ['late-back']],
+      ['Вернули жители', ['back']],
+      ['В работе', ['work']],
     ]);
   });
 });
