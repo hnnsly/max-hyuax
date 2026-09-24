@@ -31,7 +31,19 @@ tags: [handoff, status]
 - **Часть C готова (`10c01ea`):** `GET /uk/houses` (`houses.ForOperator`); вкладка «Наклейки» в кабинете УК (`pages/Stickers.tsx`): дом и объект чипами, наклейка A6 по холсту, QR через `uqr` 0.1.3 (`lib/sticker.ts`: `objectStartParam`, `qrPath`, `stickerCopy`), печать `window.print()` с `@page A6`. Внизу наклейки `max.ru/<бот>` вместо ‹Название› (название продукта не выбрано).
 - **Часть D готова (`5f2dea3`):** «Удалить аккаунт» на «Моём доме» → лист подтверждения → `DELETE /me` → фаза сессии `deleted` и экран `AccountDeleted`. `LoginDemo` восстанавливает удалённого демо-пользователя (имя из `demoKeys`, без согласия), иначе жюри сломало бы демо; MemStore ищет демо по `DemoKeys`.
 - **Грабли:** `sed -i` по файлам `miniapp/src` Vite на Windows не замечает, модуль остаётся старым. Править через Edit.
-- **Дальше:** часть E (материалы к сдаче: README из 15 пунктов, `DATA-API.yaml`, `deploy/.env.example`, запуск одной командой Docker, `docs/deployment.md`, `testing.md`, `limitations.md`, `deploy/seed/test-data.json`).
+- **Часть E готова (`1a0aec0`, ADR-013):**
+  - README из 15 пунктов;
+  - `docs/deployment.md`, `testing.md`, `limitations.md`;
+  - `DATA-API.yaml` (16 проверок, формат 1.0), `deploy/seed/test-data.json`;
+  - `deploy/.env.example` рабочий для локального запуска, порты `HTTP_PORT`, `HTTPS_PORT`, `DB_PORT`;
+  - тест `httpapi/dataapi_test.go` гоняет DATA-API против API и `openapi.yaml`;
+  - замер: сборка `--no-cache` 129 с, `up` 20 с, данные переживают `down` и `up`.
+- **Для DevOps:** на сервере по-прежнему `deploy/.env`; `.env.example` теперь с локальными значениями (DOMAIN=:80 и т.д.), серверные значения описаны в `docs/deployment.md`. Порты по умолчанию прежние.
+- **Перед сдачей:**
+  - заменить `<домен-стенда>` (README, DATA-API.yaml, docs/testing.md, deploy/seed/test-data.json) на домен стенда;
+  - название продукта пока рабочее: «Заявки по дому в MAX»;
+  - презентация PDF и скрипт экспорта чистого репозитория (ADR-007) ещё не сделаны.
+- **Дальше:** часть F1 (подсказка категории: правила + Ollama, `POST /classify`).
 
 ## Было (25.09, ночь) — спайк «мини-приложение, живая карточка, диалог бота»
 - **Сделано:**
