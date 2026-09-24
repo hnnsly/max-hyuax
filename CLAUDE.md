@@ -69,7 +69,8 @@ f9LHodD0cOL2NmKbuATgdnneiJ5RFSQyh_YHIO6Tztr5VIn7MS536x4ixpeAAke_2GTrMtXrjl-lySJ-
 ## Архитектура (ADR-003, ADR-010, ADR-011)
 ```
 backend/                Go 1.27.1 · Fiber v3 · pgx + sqlc · PostgreSQL · goose
-  cmd/api/              точка сборки: конфиг, зависимости, HTTP, бот, фоновые задачи
+  cmd/api/              точка сборки: config.go, DI-контейнер container.go (ленивые провайдеры), run.go (бот, задачи, HTTP)
+  tools/covercheck/     проверка порога покрытия в CI
   internal/domain/      ядро DDD-lite без внешних зависимостей: issue (агрегат), house, user, rules
   internal/app/         сценарии + порты (интерфейсы); зависит только от domain
   internal/app/apptest/ хранилище в памяти для юнит-тестов сценариев
@@ -101,6 +102,7 @@ docs/                   документация продукта (ведётс�
 - `task db` — поднять Postgres 18.6 в Docker (Docker Desktop должен быть запущен);
 - `task test` — юнит-тесты; `task test:integration` — тесты на Postgres (временная база на каждый прогон);
 - `task lint` — `gofmt` и `go vet`;
+- `task test:cover` — integration с профилем по `./internal/...` + порог `tools/covercheck` (всего ≥ 80%, пакеты domain и app ≥ 80%; на 25.09 — 90,6%); `task miniapp:cover` — Vitest, порог 90% по `src/shared/lib`;
 - `task run` — api на `:8080`, миграции при старте; бот по `BOT_MODE` из `.env` (локально `off`);
 - `task test:live` — проверка на живом MAX Bot API;
 - `task sqlc` — перегенерировать код запросов после правки `queries/*.sql` или миграций;
