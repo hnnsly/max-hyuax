@@ -31,9 +31,13 @@ import (
 )
 
 var (
-	api      *fiber.App
-	webhooks = &recorder{}
+	api       *fiber.App
+	noDemoAPI *fiber.App // тот же API с выключенным демо-входом
+	testDSN   string
+	webhooks  = &recorder{}
 )
+
+const botToken = "t"
 
 type recorder struct {
 	mu  sync.Mutex
@@ -60,19 +64,24 @@ func TestMain(m *testing.M) {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+	testDSN = dsn
 	log := slog.New(slog.NewTextHandler(io.Discard, nil))
-	api = httpapi.New(httpapi.Deps{
-		Auth: auth.NewService(store, auth.Config{
-			BotToken: "t", SessionSecret: "s", SessionTTL: time.Hour, DemoEnabled: true, Now: time.Now,
-		}),
-		Issues:         issues.NewService(store, issues.Config{Now: time.Now, NewID: func() string { return uuid.NewV7().String() }, ConsentVersion: "v1"}),
-		Houses:         houses.NewService(store),
-		Webhook:        bot.NewWebhook("hook-secret", webhooks, store, log),
-		Ping:           store.Ping,
-		ConsentVersion: "v1",
-		Now:            time.Now,
-		Log:            log,
-	})
+	deps := func(demo bool) httpapi.Deps {
+		return httpapi.Deps{
+			Auth: auth.NewService(store, auth.Config{
+				BotToken: botToken, SessionSecret: "s", SessionTTL: time.Hour, DemoEnabled: demo, Now: time.Now,
+			}),
+			Issues:         issues.NewService(store, issues.Config{Now: time.Now, NewID: func() string { return uuid.NewV7().String() }, ConsentVersion: "v1"}),
+			Houses:         houses.NewService(store),
+			Webhook:        bot.NewWebhook("hook-secret", webhooks, store, log),
+			Ping:           store.Ping,
+			ConsentVersion: "v1",
+			Now:            time.Now,
+			Log:            log,
+		}
+	}
+	api = httpapi.New(deps(true))
+	noDemoAPI = httpapi.New(deps(false))
 	code := m.Run()
 	store.Close()
 	drop()
@@ -81,32 +90,43 @@ func TestMain(m *testing.M) {
 
 type resp struct {
 	status int
+	ctype  string
 	body   map[string]any
 	list   []any
 }
 
 func call(t *testing.T, method, path, token string, body any) resp {
 	t.Helper()
-	var rd io.Reader = http.NoBody
+	var raw []byte
 	if body != nil {
 		b, err := json.Marshal(body)
 		if err != nil {
 			t.Fatal(err)
 		}
-		rd = bytes.NewReader(b)
+		raw = b
+	}
+	return callRaw(t, api, method, path, token, raw)
+}
+
+// callRaw отправляет тело как есть: нужен для битого JSON и неверной кодировки.
+func callRaw(t *testing.T, app *fiber.App, method, path, token string, body []byte) resp {
+	t.Helper()
+	var rd io.Reader = http.NoBody
+	if body != nil {
+		rd = bytes.NewReader(body)
 	}
 	req := httptest.NewRequest(method, path, rd)
 	req.Header.Set("Content-Type", "application/json")
 	if token != "" {
 		req.Header.Set("Authorization", "Bearer "+token)
 	}
-	res, err := api.Test(req)
+	res, err := app.Test(req)
 	if err != nil {
 		t.Fatalf("%s %s: %v", method, path, err)
 	}
 	defer res.Body.Close()
 	raw, _ := io.ReadAll(res.Body)
-	out := resp{status: res.StatusCode}
+	out := resp{status: res.StatusCode, ctype: res.Header.Get("Content-Type")}
 	if len(raw) > 0 && raw[0] == '[' {
 		_ = json.Unmarshal(raw, &out.list)
 	} else if len(raw) > 0 {
