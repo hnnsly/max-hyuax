@@ -36,6 +36,7 @@ curl -X POST https://<домен>/api/v1/auth/demo -H "Content-Type: application
     - сколько ремонтов подтвердили жители и сколько заявок они вернули в работу;
     - сколько заявок открыто и сколько из них просрочено.
 11. **Проверить ремонт:** участник выполненной заявки в течение 7 дней отправляет `POST /issues/{id}/confirm` («починили») или `POST /issues/{id}/reopen` с телом `{"comment":"На третьем этаже темно"}` («не починили»). В карточке заявки поля `confirmed_count`, `my_answer`, `answer_until` и `reopened_at`.
+12. **Телефон для мастера:** житель, вошедший через MAX, отправляет `POST /me/phone` с полями `phone`, `auth_date` и `hash` из `WebApp.requestContact()`. `DELETE /me/phone` убирает номер. Демо-пользователю `403`. Номер виден только сотруднику ответственной УК в поле `contacts` карточки `GET /issues/{id}`.
 
 ## Ошибки
 
@@ -56,6 +57,7 @@ curl -X POST https://<домен>/api/v1/auth/demo -H "Content-Type: application
 | 409 | `window_closed` | с отметки «выполнено» прошло больше 7 дней |
 | 409 | `already_answered` | участник уже ответил на эту отметку «выполнено» |
 | 422 | `comment_required` | «не починили» без комментария |
+| 422 | `invalid_contact` | подпись номера из `requestContact` не сошлась или устарела |
 | 413 | `photo_too_large` | фото больше 5 МБ или 40 Мп |
 | 415 | `unsupported_media` | файл не JPEG и не PNG |
 | 422 | `reason_required` | отказ без причины |

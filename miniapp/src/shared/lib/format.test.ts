@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { calendarDaysBetween, capitalize, dayMonth, deadlineLabel, dotDateTime, plural, splitAddress, time } from './format';
+import { calendarDaysBetween, capitalize, dayMonth, deadlineLabel, dotDateTime, phoneView, plural, splitAddress, time } from './format';
+
+describe('телефон для мастера', () => {
+  it('российский номер группами, ссылка tel без пробелов', () => {
+    expect(phoneView('+79991234567')).toEqual({ text: '+7 999 123-45-67', href: 'tel:+79991234567' });
+  });
+
+  it('другие номера показываются как есть', () => {
+    expect(phoneView('+375291234567')).toEqual({ text: '+375291234567', href: 'tel:+375291234567' });
+  });
+});
 
 describe('plural', () => {
   it('согласует числительные', () => {

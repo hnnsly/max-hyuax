@@ -60,6 +60,12 @@ export function splitAddress(address: string): { street: string; number: string 
 
 export const capitalize = (s: string) => (s ? s[0]!.toUpperCase() + s.slice(1) : s);
 
+/** Телефон жителя для УК: «+7 999 123-45-67» и ссылка tel:. Сервер отдаёт номер как «+цифры». */
+export function phoneView(phone: string): { text: string; href: string } {
+  const m = /^\+7(\d{3})(\d{3})(\d{2})(\d{2})$/.exec(phone);
+  return { text: m ? `+7 ${m[1]} ${m[2]}-${m[3]}-${m[4]}` : phone, href: `tel:${phone}` };
+}
+
 export interface DeadlineLabel {
   text: string;
   overdue: boolean;

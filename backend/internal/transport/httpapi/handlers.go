@@ -92,6 +92,31 @@ func (h *handlers) setHouse(c fiber.Ctx) error {
 	return c.JSON(toUserDTO(u, h.ConsentVersion))
 }
 
+// sharePhone сохраняет телефон для мастера из WebApp.requestContact; сам номер в ответ не попадает.
+func (h *handlers) sharePhone(c fiber.Ctx) error {
+	var in struct {
+		Phone    string `json:"phone"`
+		AuthDate string `json:"auth_date"`
+		Hash     string `json:"hash"`
+	}
+	if err := bind(c, &in); err != nil {
+		return err
+	}
+	u, err := h.Auth.SharePhone(c.Context(), currentUser(c), auth.Contact{Phone: in.Phone, AuthDate: in.AuthDate, Hash: in.Hash})
+	if err != nil {
+		return err
+	}
+	return c.JSON(toUserDTO(u, h.ConsentVersion))
+}
+
+func (h *handlers) hidePhone(c fiber.Ctx) error {
+	u, err := h.Auth.HidePhone(c.Context(), currentUser(c))
+	if err != nil {
+		return err
+	}
+	return c.JSON(toUserDTO(u, h.ConsentVersion))
+}
+
 // deleteAccount: сначала фото пользователя, потом сам аккаунт. Если фото удалить не вышло,
 // аккаунт остаётся и запрос можно повторить.
 func (h *handlers) deleteAccount(c fiber.Ctx) error {
@@ -213,6 +238,12 @@ func (h *handlers) getIssue(c fiber.Ctx) error {
 	if r, err := rules.Lookup(is.Category()); err == nil {
 		d.Basis = r.Basis
 	}
+	// Телефоны участников — только сотруднику ответственной УК.
+	contacts, err := h.Issues.Contacts(c.Context(), u, is)
+	if err != nil {
+		return err
+	}
+	d.Contacts = mapSlice(contacts, func(ct issues.Contact) contactDTO { return contactDTO{FirstName: ct.FirstName, Phone: ct.Phone} })
 	return c.JSON(d)
 }
 

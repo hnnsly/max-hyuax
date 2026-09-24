@@ -2,6 +2,7 @@ package auth_test
 
 import (
 	"errors"
+	"strconv"
 	"testing"
 	"time"
 
@@ -140,6 +141,33 @@ func TestReturningMaxUserStartsFresh(t *testing.T) {
 	}
 }
 
+// Телефон оставляет только пользователь MAX с подписью от клиента; убрать его можно в любой момент.
+func TestSharePhoneRequiresSignedContact(t *testing.T) {
+	svc, s := newService(t, true)
+	u, err := svc.EnsureMaxUser(t.Context(), 67890, "Ольга")
+	if err != nil {
+		t.Fatal(err)
+	}
+	sec := strconv.FormatInt(now.Unix(), 10)
+	good := auth.Contact{Phone: "+79991234567", AuthDate: sec, Hash: signContact(botToken, sec, "+79991234567", 67890)}
+
+	if _, err := svc.SharePhone(t.Context(), u, auth.Contact{Phone: "+79991234567", AuthDate: sec, Hash: "00"}); !errors.Is(err, app.ErrInvalidInput) {
+		t.Fatalf("bad hash err = %v, want ErrInvalidInput", err)
+	}
+	got, err := svc.SharePhone(t.Context(), u, good)
+	if err != nil || !got.PhoneShared() || s.UserMap[u.ID].Phone != "+79991234567" {
+		t.Fatalf("share: %+v, err = %v", s.UserMap[u.ID], err)
+	}
+	got, err = svc.HidePhone(t.Context(), got)
+	if err != nil || got.PhoneShared() || s.UserMap[u.ID].Phone != "" {
+		t.Fatalf("hide: %+v, err = %v", s.UserMap[u.ID], err)
+	}
+	// Демо-вход без MAX: подписи номера быть не может.
+	if _, err := svc.SharePhone(t.Context(), s.UserMap[1], good); !errors.Is(err, app.ErrForbidden) {
+		t.Fatalf("demo user err = %v, want ErrForbidden", err)
+	}
+}
+
 func TestDeletedUserCannotAuthenticate(t *testing.T) {
 	svc, s := newService(t, true)
 	sess, _ := svc.LoginDemo(t.Context(), "resident")
@@ -162,7 +190,8 @@ func TestDemoLoginRestoresDeletedDemoUser(t *testing.T) {
 	if err != nil {
 		t.Fatalf("LoginDemo after delete: %v", err)
 	}
-	if u := sess.User; u.Deleted() || u.FirstName != "Анна" || !u.HasConsent("v1") || u.HouseID != "h-17k2" {
+	// Синтетический телефон демо-жительницы тоже возвращается: без него УК в демо не увидит контактов.
+	if u := sess.User; u.Deleted() || u.FirstName != "Анна" || !u.HasConsent("v1") || u.HouseID != "h-17k2" || u.Phone != "+79990000001" {
 		t.Fatalf("restored user = %+v, want the demo user as seeded", u)
 	}
 	if _, err := svc.Authenticate(t.Context(), sess.Token); err != nil {

@@ -332,6 +332,35 @@
 }
 .sheetText:user-invalid + .fieldError { display: flex; }
 
+/* Контакты жителей в карточке у УК */
+.contacts {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.contact {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 4px 12px;
+  padding: 10px 0;
+  font-size: 16px;
+}
+.contact + .contact { border-top: 1px solid var(--separator); }
+.contactPhone {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 24px;
+  color: var(--enamel);
+  font-variant-numeric: tabular-nums;
+  text-decoration: none;
+}
+.contactPhone:focus-visible {
+  outline: 2px solid var(--enamel);
+  outline-offset: 2px;
+}
+
 /* Две кнопки рядом: «Починили» и «Не починили» */
 .pair {
   display: grid;

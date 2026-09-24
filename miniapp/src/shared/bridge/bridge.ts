@@ -20,6 +20,7 @@ interface WebApp {
   openMaxLink?(url: string): void;
   openCodeReader?(fileSelect?: boolean): Promise<{ value: string }>;
   downloadFile?(url: string, fileName: string): Promise<{ status: 'downloading' | 'cancelled' }>;
+  requestContact?(): Promise<{ phone: string; authDate: string | number; hash: string }>;
   HapticFeedback?: { notificationOccurred(type: 'success' | 'error' | 'warning'): unknown };
 }
 
@@ -64,6 +65,23 @@ export const bridge = {
     offClick(cb: () => void): void {
       if (inMax()) wa()?.BackButton?.offClick(cb);
     },
+  },
+
+  /** Номер телефона отдаёт только клиент MAX (requestContact); в браузере его взять неоткуда. */
+  canRequestContact: () => inMax() && Boolean(wa()?.requestContact),
+
+  /**
+   * Запросить номер в нативном окне MAX (dev-max/docs/webapps/bridge.md). null — пользователь
+   * отказался; при сетевой ошибке клиента промис отклоняется.
+   */
+  async requestContact(): Promise<{ phone: string; auth_date: string; hash: string } | null> {
+    try {
+      const r = await wa()!.requestContact!();
+      return { phone: r.phone, auth_date: String(r.authDate), hash: r.hash };
+    } catch (err) {
+      if (JSON.stringify(err ?? '').includes('user_refused')) return null;
+      throw err;
+    }
   },
 
   /** Печать из WebView телефона не гарантирована: кнопку показываем на компьютере и в браузере. */

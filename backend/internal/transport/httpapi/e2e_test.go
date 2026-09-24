@@ -5,6 +5,9 @@ package httpapi_test
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json/v2"
 	"fmt"
 	"image"
@@ -16,6 +19,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
@@ -462,6 +466,59 @@ func TestConfirmAndReopenRepair(t *testing.T) {
 	}
 	if _, ok := kinds["confirmed"]; !ok || kinds["reopened"] != "На третьем этаже темно" {
 		t.Fatalf("timeline kinds = %v", kinds)
+	}
+}
+
+// signContact подписывает номер, как клиент MAX в requestContact (dev-max/docs/webapps/bridge.md).
+func signContact(authDate, phone string, maxID int64) string {
+	mac := hmac.New(sha256.New, []byte(botToken))
+	mac.Write([]byte("authDate=" + authDate + "\nphone=" + strings.TrimPrefix(phone, "+") + "\nuserId=" + strconv.FormatInt(maxID, 10)))
+	return hex.EncodeToString(mac.Sum(nil))
+}
+
+// Житель MAX оставляет телефон для мастера: его видит только УК заявки, убрать можно в любой момент.
+func TestPhoneForTheRepairman(t *testing.T) {
+	const maxID = 990777
+	olga, sergey, oper := maxLogin(t, maxID), login(t, "resident_2"), login(t, "uk_operator")
+	expect(t, call(t, "POST", "/api/v1/me/consent", olga, map[string]string{"version": "v1"}), 200, "consent")
+	id := expect(t, call(t, "POST", "/api/v1/issues", olga, map[string]string{"house_id": "h-17k2", "category": "door"}), 201, "report").body["id"].(string)
+	expect(t, call(t, "POST", "/api/v1/issues/"+id+"/join", sergey, nil), 200, "join")
+
+	now := strconv.FormatInt(time.Now().Unix(), 10)
+	contact := map[string]string{"phone": "+79991234567", "auth_date": now, "hash": signContact(now, "+79991234567", maxID)}
+	forged := map[string]string{"phone": "+79990000000", "auth_date": now, "hash": contact["hash"]}
+	if bad := expect(t, call(t, "POST", "/api/v1/me/phone", olga, forged), 422, "forged phone").body; bad["error"].(map[string]any)["code"] != "invalid_contact" {
+		t.Fatalf("forged = %v", bad)
+	}
+	expect(t, call(t, "POST", "/api/v1/me/phone", sergey, contact), 403, "demo user shares phone")
+	me := expect(t, call(t, "POST", "/api/v1/me/phone", olga, contact), 200, "share phone").body
+	if me["phone_shared"] != true || me["phone"] != nil {
+		t.Fatalf("me = %v, want phone_shared without the number", me)
+	}
+
+	contacts := func(token string) any {
+		return expect(t, call(t, "GET", "/api/v1/issues/"+id, token, nil), 200, "card").body["contacts"]
+	}
+	if got := contacts(oper).([]any); len(got) != 1 || got[0].(map[string]any)["phone"] != "+79991234567" || got[0].(map[string]any)["first_name"] != "Ольга" {
+		t.Fatalf("operator contacts = %v", got)
+	}
+	if got := contacts(sergey); got != nil {
+		t.Fatalf("neighbour sees contacts: %v", got)
+	}
+
+	me = expect(t, call(t, "DELETE", "/api/v1/me/phone", olga, nil), 200, "hide phone").body
+	if me["phone_shared"] != false {
+		t.Fatalf("after hide = %v", me)
+	}
+	if got := contacts(oper); got != nil {
+		t.Fatalf("contacts after hide = %v", got)
+	}
+
+	// У демо-жительницы Анны синтетический телефон: УК видит его в демо без клиента MAX.
+	annaIssue := expect(t, call(t, "POST", "/api/v1/issues", login(t, "resident"), map[string]string{"house_id": "h-17k2", "category": "door"}), 201, "anna report").body["id"].(string)
+	card := expect(t, call(t, "GET", "/api/v1/issues/"+annaIssue, oper, nil), 200, "anna card").body
+	if got, _ := card["contacts"].([]any); len(got) != 1 || got[0].(map[string]any)["phone"] != "+79990000001" {
+		t.Fatalf("demo contacts = %v", card["contacts"])
 	}
 }
 

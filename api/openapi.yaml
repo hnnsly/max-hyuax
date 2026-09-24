@@ -144,6 +144,37 @@ paths:
         "204": { description: Аккаунт удалён }
         "401": { $ref: "#/components/responses/Error" }
 
+  /me/phone:
+    post:
+      tags: [me]
+      summary: Оставить телефон для мастера
+      description: |
+        Номер из WebApp.requestContact() с подписью клиента MAX: hash = HMAC_SHA256("authDate=…\nphone=…\nuserId=…",
+        токен бота), телефон без «+». Подпись не старше часа. Номер — это и согласие показывать его УК по заявкам,
+        где житель участник. Только для входа через MAX: демо-пользователю 403.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [phone, auth_date, hash]
+              properties:
+                phone: { type: string, example: "+79991234567" }
+                auth_date: { type: string, description: Как вернул клиент MAX (секунды или миллисекунды) }
+                hash: { type: string, description: hex }
+      responses:
+        "200": { $ref: "#/components/responses/User" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "422": { $ref: "#/components/responses/Error" }
+    delete:
+      tags: [me]
+      summary: Не показывать телефон
+      responses:
+        "200": { $ref: "#/components/responses/User" }
+        "401": { $ref: "#/components/responses/Error" }
+
   /me/issues:
     get:
       tags: [me]
@@ -692,7 +723,9 @@ components:
             code:
               type: string
               enum: [unauthorized, consent_required, forbidden, not_found, already_joined, issue_closed,
-                     invalid_transition, reason_required, invalid_input, http_error, internal]
+                     invalid_transition, not_overdue, too_many_photos, not_done, window_closed, already_answered,
+                     photo_too_large, unsupported_media, reason_required, comment_required, invalid_contact,
+                     invalid_input, http_error, internal]
             message: { type: string, description: Текст для показа жителю }
 
     User:
@@ -705,6 +738,7 @@ components:
         organization_id: { type: string }
         has_consent: { type: boolean }
         consent_version: { type: string, description: Версия согласия, которая требуется сейчас }
+        phone_shared: { type: boolean, description: Житель оставил телефон для мастера; сам номер не возвращается }
 
     Category:
       type: object
@@ -808,3 +842,11 @@ components:
         my_answer: { type: [string, "null"], enum: [fixed, null], description: Ответ текущего пользователя на текущее «выполнено» }
         answer_until: { type: [string, "null"], format: date-time, description: До какого момента можно подтвердить или вернуть; null, если заявка не выполнена }
         reopened_at: { type: string, format: date-time, description: Когда жители в последний раз вернули заявку в работу; нет поля, если не возвращали }
+        contacts:
+          type: array
+          description: Только в GET /issues/{id} и только для сотрудника ответственной УК — участники, оставившие телефон для мастера
+          items:
+            type: object
+            properties:
+              first_name: { type: string }
+              phone: { type: string, example: "+79991234567" }

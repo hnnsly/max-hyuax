@@ -64,6 +64,8 @@ func New(d Deps) *fiber.App {
 	api.Post("/me/consent", h.auth, h.acceptConsent)
 	api.Post("/me/house", h.auth, h.setHouse)
 	api.Delete("/me", h.auth, h.deleteAccount)
+	api.Post("/me/phone", h.auth, h.sharePhone)
+	api.Delete("/me/phone", h.auth, h.hidePhone)
 	api.Get("/me/issues", h.auth, h.myIssues)
 
 	api.Get("/houses", h.auth, h.searchHouses)
@@ -160,6 +162,8 @@ func classify(err error) (int, string, string) {
 		return fiber.StatusUnsupportedMediaType, "unsupported_media", "Нужна фотография в формате JPEG или PNG"
 	case errors.Is(err, photos.ErrTooLarge):
 		return fiber.StatusRequestEntityTooLarge, "photo_too_large", "Фото слишком большое: нужно до 5 МБ и до 40 мегапикселей"
+	case errors.Is(err, auth.ErrInvalidContact):
+		return fiber.StatusUnprocessableEntity, "invalid_contact", "Не удалось подтвердить номер. Попробуйте ещё раз"
 	case errors.Is(err, issue.ErrReasonRequired):
 		return fiber.StatusUnprocessableEntity, "reason_required", "Укажите причину отказа"
 	case errors.Is(err, app.ErrInvalidInput), errors.Is(err, issue.ErrInvalid):

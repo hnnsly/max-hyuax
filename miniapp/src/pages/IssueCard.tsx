@@ -15,6 +15,7 @@ import { IssuePhotos } from '../shared/ui/Photos';
 import { Sheet } from '../shared/ui/Sheet';
 import { Rail } from '../shared/ui/Rail';
 import s from './pages.module.css';
+import { PhoneForRepair, ResidentContacts } from './PhoneForRepair';
 import { RepairCheck } from './RepairCheck';
 
 export function IssueCard({ id, flash }: { id: string; flash?: string }) {
@@ -231,6 +232,8 @@ export function IssueCard({ id, flash }: { id: string; flash?: string }) {
       )}
 
       <RepairCheck issue={issue} onChanged={() => res.reload()} onToast={showToast} />
+      {issue.contacts && issue.contacts.length > 0 && <ResidentContacts contacts={issue.contacts} />}
+      {issue.joined && !closed && user.role === 'resident' && <PhoneForRepair onToast={showToast} />}
 
       <Island>
         <div className={s.block}>

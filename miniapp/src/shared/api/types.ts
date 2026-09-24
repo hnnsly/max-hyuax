@@ -11,6 +11,14 @@ export interface User {
   organization_id?: string;
   has_consent: boolean;
   consent_version: string;
+  /** Житель оставил телефон для мастера; сам номер не приходит. */
+  phone_shared: boolean;
+}
+
+/** Участник заявки, оставивший телефон; видит только сотрудник ответственной УК. */
+export interface Contact {
+  first_name: string;
+  phone: string;
 }
 
 export interface Session {
@@ -93,6 +101,8 @@ export interface Issue {
   answer_until: string | null;
   /** Когда жители в последний раз вернули заявку в работу. */
   reopened_at?: string;
+  /** Только в карточке и только для сотрудника ответственной УК. */
+  contacts?: Contact[];
 }
 
 export interface IssueEvent {

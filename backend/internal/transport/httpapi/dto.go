@@ -20,13 +20,22 @@ type userDTO struct {
 	OrganizationID string `json:"organization_id,omitempty"`
 	HasConsent     bool   `json:"has_consent"`
 	ConsentVersion string `json:"consent_version"` // версия, на которую нужно согласие сейчас
+	// PhoneShared — житель оставил телефон для мастера; сам номер в ответах о себе не отдаётся.
+	PhoneShared bool `json:"phone_shared"`
 }
 
 func toUserDTO(u user.User, consentVersion string) userDTO {
 	return userDTO{
 		ID: u.ID, FirstName: u.FirstName, Role: string(u.Role), HouseID: u.HouseID,
 		OrganizationID: u.OrganizationID, HasConsent: u.HasConsent(consentVersion), ConsentVersion: consentVersion,
+		PhoneShared: u.PhoneShared(),
 	}
+}
+
+// contactDTO — участник заявки, оставивший телефон для мастера; видит только УК заявки.
+type contactDTO struct {
+	FirstName string `json:"first_name"`
+	Phone     string `json:"phone"`
 }
 
 type sessionDTO struct {
@@ -133,6 +142,8 @@ type issueDTO struct {
 	MyAnswer       *string    `json:"my_answer"`
 	AnswerUntil    *time.Time `json:"answer_until"`
 	ReopenedAt     time.Time  `json:"reopened_at,omitzero"` // когда жители в последний раз вернули заявку в работу
+	// Contacts — только в карточке и только для сотрудника ответственной УК.
+	Contacts []contactDTO `json:"contacts,omitempty"`
 }
 
 // eventDTO — шаг хронологии заявки. Кто именно действовал, не раскрывается.

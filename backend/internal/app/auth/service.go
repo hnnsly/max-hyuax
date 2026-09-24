@@ -36,11 +36,12 @@ type Session struct {
 }
 
 // demoKeys — демо-роли для проверяющих; пользователи создаются миграцией с демо-данными.
-// Имя и дом нужны, чтобы вернуть демо-пользователя, если проверяющий удалил аккаунт.
-var demoKeys = map[string]struct{ key, name, houseID string }{
-	"resident":    {"resident_demo_1", "Анна", "h-17k2"},
-	"resident_2":  {"resident_demo_2", "Сергей", "h-17k2"},
-	"uk_operator": {"uk_operator_demo", "Оператор УК", ""},
+// Имя, дом и синтетический телефон нужны, чтобы вернуть демо-пользователя, если проверяющий
+// удалил аккаунт.
+var demoKeys = map[string]struct{ key, name, houseID, phone string }{
+	"resident":    {"resident_demo_1", "Анна", "h-17k2", "+79990000001"},
+	"resident_2":  {"resident_demo_2", "Сергей", "h-17k2", ""},
+	"uk_operator": {"uk_operator_demo", "Оператор УК", "", ""},
 }
 
 // LoginMax проверяет initData и выдаёт сессию; новый пользователь MAX становится жителем.
@@ -86,6 +87,7 @@ func (s *Service) LoginDemo(ctx context.Context, role string) (Session, error) {
 	if u.Deleted() {
 		// Проверяющий удалил демо-аккаунт: возвращаем его в исходное состояние из демо-данных.
 		u.DeletedAt, u.FirstName, u.HouseID = time.Time{}, demo.name, demo.houseID
+		u.SharePhone(demo.phone)
 		u.AcceptConsent(s.cfg.ConsentVersion, s.cfg.Now())
 		if err := s.store.Users().Save(ctx, u); err != nil {
 			return Session{}, err
@@ -122,6 +124,26 @@ func (s *Service) SetHouse(ctx context.Context, u user.User, houseID string) (us
 		return u, err
 	}
 	u.HouseID = houseID
+	return u, s.store.Users().Save(ctx, u)
+}
+
+// SharePhone сохраняет телефон для мастера: номер из WebApp.requestContact с подписью MAX.
+// Демо-пользователи без аккаунта MAX оставить телефон не могут.
+func (s *Service) SharePhone(ctx context.Context, u user.User, c Contact) (user.User, error) {
+	if u.MaxUserID == 0 {
+		return u, fmt.Errorf("%w: phone can be shared only from MAX", app.ErrForbidden)
+	}
+	phone, err := VerifyContact(c, u.MaxUserID, s.cfg.BotToken, s.cfg.Now())
+	if err != nil {
+		return u, fmt.Errorf("%w: %w", app.ErrInvalidInput, err)
+	}
+	u.SharePhone(phone)
+	return u, s.store.Users().Save(ctx, u)
+}
+
+// HidePhone стирает телефон: УК больше не видит его ни по одной заявке.
+func (s *Service) HidePhone(ctx context.Context, u user.User) (user.User, error) {
+	u.HidePhone()
 	return u, s.store.Users().Save(ctx, u)
 }
 
