@@ -118,7 +118,8 @@ func snapshot(is *issue.Issue) *issue.Issue {
 		CreatedAt: is.CreatedAt(), Deadline: is.Deadline(),
 	}, issue.State{
 		Number: is.Number(), Status: is.Status(), StatusAt: is.StatusAt(),
-		StatusComment: is.StatusComment(), OverdueAt: is.OverdueAt(), Participants: is.Participants(),
+		StatusComment: is.StatusComment(), OverdueAt: is.OverdueAt(), ReopenedAt: is.ReopenedAt(),
+		Participants: is.Participants(), Answers: is.Answers(),
 	})
 }
 
@@ -229,6 +230,9 @@ func (r issueRepo) OrgCounts(_ context.Context, orgID string, since, now time.Ti
 			c.Issues++
 			c.Reports += len(is.Participants())
 		}
+		if !is.ReopenedAt().IsZero() && !is.ReopenedAt().Before(since) {
+			c.Reopened++
+		}
 		switch {
 		case !is.Status().Closed():
 			c.OpenTotal++
@@ -239,6 +243,9 @@ func (r issueRepo) OrgCounts(_ context.Context, orgID string, since, now time.Ti
 			c.ClosedTotal++
 			if !is.StatusAt().After(is.Deadline()) {
 				c.ClosedOnTime++
+			}
+			if is.ConfirmedCount() > 0 {
+				c.Confirmed++
 			}
 		}
 	}

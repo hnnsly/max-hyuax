@@ -78,6 +78,8 @@ func New(d Deps) *fiber.App {
 	api.Get("/issues/:id/timeline", h.auth, h.timeline)
 	api.Post("/issues/:id/join", h.auth, h.joinIssue)
 	api.Post("/issues/:id/status", h.auth, h.changeStatus)
+	api.Post("/issues/:id/confirm", h.auth, h.confirmRepair)
+	api.Post("/issues/:id/reopen", h.auth, h.reopenRepair)
 	api.Post("/issues/:id/appeal", h.auth, h.prepareAppeal)
 	api.Post("/issues/:id/photos", h.auth, h.uploadPhotos)
 	api.Get("/issues/:id/photos", h.auth, h.listPhotos)
@@ -132,7 +134,7 @@ func classify(err error) (int, string, string) {
 		return fiber.StatusUnauthorized, "unauthorized", "Нужно войти заново"
 	case errors.Is(err, app.ErrConsentRequired):
 		return fiber.StatusForbidden, "consent_required", "Нужно согласие на обработку персональных данных"
-	case errors.Is(err, app.ErrForbidden):
+	case errors.Is(err, app.ErrForbidden), errors.Is(err, issue.ErrNotParticipant):
 		return fiber.StatusForbidden, "forbidden", "Недостаточно прав"
 	case errors.Is(err, app.ErrNotFound):
 		return fiber.StatusNotFound, "not_found", "Не найдено"
@@ -142,6 +144,14 @@ func classify(err error) (int, string, string) {
 		return fiber.StatusConflict, "issue_closed", "Заявка уже закрыта"
 	case errors.Is(err, issue.ErrTransition):
 		return fiber.StatusConflict, "invalid_transition", "Такой переход статуса невозможен"
+	case errors.Is(err, issue.ErrNotDone):
+		return fiber.StatusConflict, "not_done", "УК ещё не отметила заявку выполненной"
+	case errors.Is(err, issue.ErrWindowClosed):
+		return fiber.StatusConflict, "window_closed", "Ответить можно в течение 7 дней после отметки о выполнении"
+	case errors.Is(err, issue.ErrAlreadyAnswered):
+		return fiber.StatusConflict, "already_answered", "Вы уже ответили по этому ремонту"
+	case errors.Is(err, issue.ErrCommentRequired):
+		return fiber.StatusUnprocessableEntity, "comment_required", "Напишите, что осталось не так"
 	case errors.Is(err, appeal.ErrNotOverdue):
 		return fiber.StatusConflict, "not_overdue", "Срок ответа ещё не истёк"
 	case errors.Is(err, photos.ErrTooMany):

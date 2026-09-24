@@ -62,6 +62,15 @@ type Issue struct {
 	DeadlineAt       time.Time
 	OverdueAt        *time.Time
 	Sample           bool
+	ReopenedAt       *time.Time
+}
+
+type IssueConfirmation struct {
+	IssueID string
+	UserID  int64
+	DoneAt  time.Time
+	Fixed   bool
+	At      time.Time
 }
 
 type IssueEvent struct {

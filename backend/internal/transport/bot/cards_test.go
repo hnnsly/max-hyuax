@@ -2,6 +2,7 @@ package bot_test
 
 import (
 	"context"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -23,6 +24,21 @@ func sampleCard() cards.Card {
 		Comment: "Мастер приедет завтра", Deadline: time.Date(2026, 9, 19, 23, 59, 59, 0, msk),
 		Participants: 13, Responsible: "УК «Ореховый квартал»",
 	}
+}
+
+// buttonLabels — подписи всех кнопок клавиатуры сообщения по порядку.
+func buttonLabels(m maxapi.NewMessage) []string {
+	var out []string
+	for _, a := range m.Attachments {
+		if kb, ok := a.Payload.(maxapi.KeyboardPayload); ok {
+			for _, row := range kb.Buttons {
+				for _, b := range row {
+					out = append(out, b.Text)
+				}
+			}
+		}
+	}
+	return out
 }
 
 func TestRenderCardFollowsDesign(t *testing.T) {
@@ -75,12 +91,25 @@ func TestRenderNotices(t *testing.T) {
 		}
 	}
 	c.Status, c.Comment = issue.StatusDone, "Лифт запустили"
-	if done := bot.RenderNotice(app.NotifyFinal, c, "b"); !strings.Contains(done.Text, "выполнена") || !strings.Contains(done.Text, "Лифт запустили") {
+	done := bot.RenderNotice(app.NotifyFinal, c, "b")
+	if !strings.Contains(done.Text, "выполнена") || !strings.Contains(done.Text, "Лифт запустили") || !strings.Contains(done.Text, "Проверьте") {
 		t.Errorf("final text:\n%s", done.Text)
 	}
+	// Житель отвечает прямо из сообщения: «Починили» — кнопкой, «Не починили» — в карточке, где пишется комментарий.
+	if labels := buttonLabels(done); !slices.Equal(labels, []string{"Починили", "Не починили", "Открыть заявку"}) {
+		t.Errorf("done buttons = %v", labels)
+	}
 	c.Status, c.Comment = issue.StatusRejected, "Не наш участок"
-	if rej := bot.RenderNotice(app.NotifyFinal, c, "b"); !strings.Contains(rej.Text, "отклонена") || !strings.Contains(rej.Text, "Причина: Не наш участок") {
+	rej := bot.RenderNotice(app.NotifyFinal, c, "b")
+	if !strings.Contains(rej.Text, "отклонена") || !strings.Contains(rej.Text, "Причина: Не наш участок") {
 		t.Errorf("rejected text:\n%s", rej.Text)
+	}
+	if labels := buttonLabels(rej); !slices.Equal(labels, []string{"Открыть заявку"}) {
+		t.Errorf("rejected buttons = %v", labels)
+	}
+	c.Status, c.Comment = issue.StatusInProgress, ""
+	if back := bot.RenderNotice(app.NotifyReopened, c, "b"); !strings.Contains(back.Text, "Заявка № 142 снова в работе") || !strings.Contains(back.Text, "не починили") {
+		t.Errorf("reopened text:\n%s", back.Text)
 	}
 	for _, m := range []maxapi.NewMessage{over, bot.RenderNotice(app.NotifyFinal, c, "b")} {
 		if strings.ContainsAny(m.Text, "—–") {

@@ -55,6 +55,8 @@ type OrgCounts struct {
 	Reports      int  // сколько жителей о них сообщили: авторы и присоединившиеся
 	ClosedTotal  int  // закрыто за период
 	ClosedOnTime int  // из них не позже срока
+	Confirmed    int  // из выполненных за период жители подтвердили ремонт
+	Reopened     int  // жители вернули в работу за период
 	OpenTotal    int  // открыто сейчас
 	OverdueOpen  int  // из открытых срок уже прошёл
 	SampleData   bool // среди заявок УК есть синтетические (пример данных)
@@ -89,6 +91,8 @@ const (
 	NotifyFinal NotificationKind = "final"
 	// NotifyOverdue — отдельное сообщение участнику, когда истёк срок ответа.
 	NotifyOverdue NotificationKind = "overdue"
+	// NotifyReopened — отдельное сообщение соседям, когда житель вернул выполненную заявку в работу.
+	NotifyReopened NotificationKind = "reopened"
 )
 
 // Notification — намерение уведомить участника. Текст собирается при отправке

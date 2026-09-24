@@ -131,6 +131,25 @@ func (s *Service) ChangeStatus(ctx context.Context, u user.User, issueID string,
 	})
 }
 
+// Confirm — участник подтверждает, что после «выполнено» действительно починили.
+func (s *Service) Confirm(ctx context.Context, u user.User, issueID string) (*issue.Issue, error) {
+	return s.update(ctx, issueID, func(is *issue.Issue) error {
+		return is.Confirm(u.ID, s.cfg.Now())
+	})
+}
+
+// Reopen — участник сообщает, что не починили: заявка снова в работе, срок заново по справочнику.
+func (s *Service) Reopen(ctx context.Context, u user.User, issueID, comment string) (*issue.Issue, error) {
+	return s.update(ctx, issueID, func(is *issue.Issue) error {
+		rule, err := rules.Lookup(is.Category())
+		if err != nil {
+			return err
+		}
+		now := s.cfg.Now().In(Moscow)
+		return is.Reopen(u.ID, comment, now, rule.Deadline(now))
+	})
+}
+
 // update загружает заявку с блокировкой, применяет изменение и в одной транзакции
 // сохраняет её вместе с уведомлениями участникам (outbox).
 func (s *Service) update(ctx context.Context, issueID string, change func(*issue.Issue) error) (*issue.Issue, error) {

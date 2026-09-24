@@ -425,6 +425,46 @@ func TestPhotosUploadListAndOpen(t *testing.T) {
 	expect(t, call(t, "GET", photoPath, anna, nil), 404, "removed photo")
 }
 
+// Жители проверяют ремонт: один подтверждает, другой возвращает заявку в работу с комментарием.
+func TestConfirmAndReopenRepair(t *testing.T) {
+	anna, sergey, oper := login(t, "resident"), login(t, "resident_2"), login(t, "uk_operator")
+	id := expect(t, call(t, "POST", "/api/v1/issues", anna, map[string]string{"house_id": "h-17k2", "category": "lighting"}), 201, "report").body["id"].(string)
+	path := "/api/v1/issues/" + id
+	expect(t, call(t, "POST", path+"/join", sergey, nil), 200, "join")
+	expect(t, call(t, "POST", path+"/confirm", sergey, nil), 409, "confirm before done")
+	for _, st := range []string{"in_progress", "done"} {
+		expect(t, call(t, "POST", path+"/status", oper, map[string]string{"status": st, "comment": "Заменили лампы"}), 200, st)
+	}
+
+	card := expect(t, call(t, "POST", path+"/confirm", sergey, nil), 200, "confirm").body
+	if card["confirmed_count"] != 1.0 || card["my_answer"] != "fixed" || card["answer_until"] == nil {
+		t.Fatalf("after confirm = %v", card)
+	}
+	if again := expect(t, call(t, "POST", path+"/confirm", sergey, nil), 409, "confirm twice").body; again["error"].(map[string]any)["code"] != "already_answered" {
+		t.Fatalf("twice = %v", again)
+	}
+	expect(t, call(t, "POST", path+"/confirm", oper, nil), 403, "operator confirms")
+	if empty := expect(t, call(t, "POST", path+"/reopen", anna, map[string]string{"comment": " "}), 422, "reopen without comment").body; empty["error"].(map[string]any)["code"] != "comment_required" {
+		t.Fatalf("empty comment = %v", empty)
+	}
+	reopened := expect(t, call(t, "POST", path+"/reopen", anna, map[string]string{"comment": "На третьем этаже темно"}), 200, "reopen").body
+	if reopened["status"] != "in_progress" || reopened["reopened_at"] == nil || reopened["confirmed_count"] != 0.0 {
+		t.Fatalf("after reopen = %v", reopened)
+	}
+	if nd := expect(t, call(t, "POST", path+"/confirm", sergey, nil), 409, "confirm reopened").body; nd["error"].(map[string]any)["code"] != "not_done" {
+		t.Fatalf("confirm reopened = %v", nd)
+	}
+
+	kinds := map[string]string{}
+	for _, e := range expect(t, call(t, "GET", path+"/timeline", anna, nil), 200, "timeline").list {
+		ev := e.(map[string]any)
+		kinds[ev["kind"].(string)], _ = ev["comment"].(string)
+	}
+	if _, ok := kinds["confirmed"]; !ok || kinds["reopened"] != "На третьем этаже темно" {
+		t.Fatalf("timeline kinds = %v", kinds)
+	}
+}
+
 func TestClassifyHint(t *testing.T) {
 	anna := login(t, "resident")
 	got := expect(t, call(t, "POST", "/api/v1/classify", anna, map[string]string{"text": "Не горит свет на пятом этаже"}), 200, "classify").body

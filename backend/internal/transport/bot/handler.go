@@ -33,6 +33,7 @@ const (
 	cbPick        = "k" // k:<text> — выбрать категорию
 	cbJoin        = "j" // j:<issue_id> — «это и у меня»
 	cbConsent     = "c" // c:<payload> — согласие, затем исходное действие
+	cbConfirm     = "f" // f:<issue_id> — «починили» в сообщении о выполнении
 	maxTextRunes  = 300 // длиннее — удобнее оформить в форме мини-приложения
 )
 
@@ -399,6 +400,9 @@ func (h *Handler) callbackReply(ctx context.Context, cb *maxapi.Callback) (maxap
 		}
 		return h.callbackReply(ctx, &maxapi.Callback{ID: cb.ID, Payload: rest, User: cb.User})
 
+	case cbConfirm:
+		return h.confirmRepair(ctx, u, rest)
+
 	case cbNew, cbJoin:
 		if !u.HasConsent(h.svc.ConsentVersion) {
 			m := maxapi.NewMessage{
@@ -415,6 +419,24 @@ func (h *Handler) callbackReply(ctx context.Context, cb *maxapi.Callback) (maxap
 		return h.report(ctx, u, category, desc)
 	}
 	return maxapi.CallbackAnswer{Notification: "Эта кнопка устарела. Напишите о проблеме ещё раз."}, nil
+}
+
+// confirmRepair — «Починили» из сообщения о выполнении. Ошибки правил отвечают понятным уведомлением.
+func (h *Handler) confirmRepair(ctx context.Context, u user.User, issueID string) (maxapi.CallbackAnswer, error) {
+	_, err := h.svc.Issues.Confirm(ctx, u, issueID)
+	switch {
+	case err == nil:
+		return maxapi.CallbackAnswer{Notification: "Спасибо, отметили: починили. Соседи и УК увидят это в заявке."}, nil
+	case errors.Is(err, issue.ErrAlreadyAnswered):
+		return maxapi.CallbackAnswer{Notification: "Вы уже ответили по этому ремонту."}, nil
+	case errors.Is(err, issue.ErrWindowClosed):
+		return maxapi.CallbackAnswer{Notification: "Прошло больше 7 дней после ремонта. Если проблема вернулась, сообщите о ней заново."}, nil
+	case errors.Is(err, issue.ErrNotDone):
+		return maxapi.CallbackAnswer{Notification: "Заявка снова в работе: ответить можно, когда УК отметит её выполненной."}, nil
+	case errors.Is(err, issue.ErrNotParticipant), errors.Is(err, app.ErrNotFound):
+		return maxapi.CallbackAnswer{Notification: "Эта кнопка устарела."}, nil
+	}
+	return maxapi.CallbackAnswer{}, err
 }
 
 func (h *Handler) report(ctx context.Context, u user.User, category, desc string) (maxapi.CallbackAnswer, error) {

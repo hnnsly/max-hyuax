@@ -133,6 +133,12 @@ func TestErrorResponses(t *testing.T) {
 		{"remove photo id not a uuid", api, "DELETE", "/api/v1/photos/abc", anna, "", 404, "not_found"},
 		{"remove unknown photo", api, "DELETE", "/api/v1/photos/" + unknown, anna, "", 404, "not_found"},
 		{"remove photo without token", api, "DELETE", "/api/v1/photos/" + unknown, "", "", 401, "unauthorized"},
+		{"confirm without token", api, "POST", "/api/v1/issues/" + sentID + "/confirm", "", "", 401, "unauthorized"},
+		{"confirm unknown issue", api, "POST", "/api/v1/issues/" + unknown + "/confirm", anna, "", 404, "not_found"},
+		{"confirm by a non-participant", api, "POST", "/api/v1/issues/" + doneID + "/confirm", anna, "", 403, "forbidden"},
+		{"confirm open issue", api, "POST", "/api/v1/issues/" + sentID + "/confirm", anna, "", 409, "not_done"},
+		{"reopen broken JSON", api, "POST", "/api/v1/issues/" + sentID + "/reopen", anna, `{"comment":`, 422, "invalid_input"},
+		{"reopen id not a uuid", api, "POST", "/api/v1/issues/abc/reopen", anna, `{"comment":"x"}`, 404, "not_found"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

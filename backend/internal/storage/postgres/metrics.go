@@ -20,6 +20,7 @@ func (r issueRepo) OrgCounts(ctx context.Context, orgID string, since, now time.
 	return app.OrgCounts{
 		Issues: int(row.Issues), Reports: int(row.Reports),
 		ClosedTotal: int(row.ClosedTotal), ClosedOnTime: int(row.ClosedOnTime),
+		Confirmed: int(row.Confirmed), Reopened: int(row.Reopened),
 		OpenTotal: int(row.OpenTotal), OverdueOpen: int(row.OverdueOpen),
 		SampleData: row.SampleData,
 	}, err
@@ -44,7 +45,8 @@ func (s *Store) ShiftSampleData(ctx context.Context, now time.Time) (int, error)
 			days = 0
 			return nil
 		}
-		for _, shift := range []func(context.Context, int32) error{q.ShiftSampleIssues, q.ShiftSampleEvents, q.ShiftSampleParticipants} {
+		shifts := []func(context.Context, int32) error{q.ShiftSampleIssues, q.ShiftSampleEvents, q.ShiftSampleParticipants, q.ShiftSampleConfirmations}
+		for _, shift := range shifts {
 			if err := shift(ctx, int32(days)); err != nil {
 				return err
 			}

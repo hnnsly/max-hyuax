@@ -45,6 +45,8 @@ const (
 	EventJoined        EventKind = "joined"
 	EventStatusChanged EventKind = "status_changed"
 	EventOverdue       EventKind = "overdue"
+	EventConfirmed     EventKind = "confirmed" // участник подтвердил, что починили
+	EventReopened      EventKind = "reopened"  // участник вернул заявку в работу
 )
 
 // Event — доменное событие; слой приложения превращает события в записи outbox.
@@ -75,9 +77,12 @@ type Issue struct {
 	statusAt         time.Time
 	statusComment    string
 	overdueAt        time.Time
+	reopenedAt       time.Time
 	createdAt        time.Time
 	deadline         time.Time
 	participants     []Participant
+	answers          []Answer // ответы на текущее «выполнено»
+	newAnswers       []Answer
 	events           []Event
 }
 
@@ -101,7 +106,9 @@ type State struct {
 	StatusAt      time.Time
 	StatusComment string
 	OverdueAt     time.Time // когда отмечена просрочка; ноль — ещё не отмечена
+	ReopenedAt    time.Time // когда жители вернули заявку в работу; ноль — не возвращали
 	Participants  []Participant
+	Answers       []Answer // ответы на текущее «выполнено»
 }
 
 // New создаёт заявку; автор становится её первым участником.
@@ -155,6 +162,9 @@ func (is *Issue) ChangeStatus(to Status, comment string, at time.Time) error {
 		return ErrReasonRequired
 	}
 	is.status, is.statusAt, is.statusComment = to, at, comment
+	if to == StatusDone {
+		is.answers = nil // новое «выполнено» — жители отвечают заново
+	}
 	is.record(Event{Kind: EventStatusChanged, Status: to, Comment: comment, At: at})
 	return nil
 }
@@ -239,8 +249,10 @@ func Restore(p NewParams, s State) *Issue {
 		statusAt:         s.StatusAt,
 		statusComment:    s.StatusComment,
 		overdueAt:        s.OverdueAt,
+		reopenedAt:       s.ReopenedAt,
 		createdAt:        p.CreatedAt,
 		deadline:         p.Deadline,
 		participants:     slices.Clone(s.Participants),
+		answers:          slices.Clone(s.Answers),
 	}
 }

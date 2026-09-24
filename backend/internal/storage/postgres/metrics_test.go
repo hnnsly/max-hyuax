@@ -30,7 +30,8 @@ func freshStore(t *testing.T) *postgres.Store {
 
 const month = 30 * 24 * time.Hour
 
-// Числа выводятся из засева 00002 (3 демо-заявки) и 00006 (22 синтетические).
+// Числа выводятся из засева 00002 (3 демо-заявки), 00006 (22 синтетические) и 00009
+// (подтверждения у 14 выполненных из 16, одна заявка возвращена жителями в работу).
 func TestSampleSeedGivesMetrics(t *testing.T) {
 	s := freshStore(t)
 	now := time.Now()
@@ -39,7 +40,7 @@ func TestSampleSeedGivesMetrics(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := app.OrgCounts{
-		Issues: 25, Reports: 98, ClosedTotal: 17, ClosedOnTime: 14, OpenTotal: 8, OverdueOpen: 2, SampleData: true,
+		Issues: 25, Reports: 98, ClosedTotal: 17, ClosedOnTime: 14, Confirmed: 14, Reopened: 1, OpenTotal: 8, OverdueOpen: 2, SampleData: true,
 	}
 	if got != want {
 		t.Errorf("counts = %+v, want %+v", got, want)

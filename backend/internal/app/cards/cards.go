@@ -28,16 +28,29 @@ func Plan(events []issue.Event, participants []issue.Participant) []app.Notifica
 		}
 	}
 	var closed, overdue bool
+	var reopenedBy []int64
 	for _, e := range events {
 		switch e.Kind {
 		case issue.EventCreated:
 			add(app.NotifyCard, e.UserID)
-		case issue.EventJoined, issue.EventStatusChanged, issue.EventOverdue:
+		case issue.EventJoined, issue.EventStatusChanged, issue.EventOverdue, issue.EventReopened:
 			for _, p := range participants {
 				add(app.NotifyCard, p.UserID)
 			}
 			closed = closed || (e.Kind == issue.EventStatusChanged && e.Status.Closed())
 			overdue = overdue || e.Kind == issue.EventOverdue
+			if e.Kind == issue.EventReopened {
+				reopenedBy = append(reopenedBy, e.UserID)
+			}
+		}
+		// EventConfirmed ничего не рассылает: «починили» от каждого соседа было бы спамом.
+	}
+	// О возврате в работу сообщаем соседям; тот, кто вернул, и так знает.
+	if len(reopenedBy) > 0 {
+		for _, p := range participants {
+			if !slices.Contains(reopenedBy, p.UserID) {
+				add(app.NotifyReopened, p.UserID)
+			}
 		}
 	}
 	for _, notice := range []struct {

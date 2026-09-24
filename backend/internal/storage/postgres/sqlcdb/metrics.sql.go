@@ -64,6 +64,10 @@ SELECT count(*) FILTER (WHERE i.created_at >= $1)::int AS issues,
        count(*) FILTER (WHERE i.status IN ('done', 'rejected') AND i.status_at >= $1)::int AS closed_total,
        count(*) FILTER (WHERE i.status IN ('done', 'rejected') AND i.status_at >= $1
                           AND i.status_at <= i.deadline_at)::int AS closed_on_time,
+       count(*) FILTER (WHERE i.status = 'done' AND i.status_at >= $1 AND EXISTS (
+                            SELECT 1 FROM issue_confirmations c
+                            WHERE c.issue_id = i.id AND c.done_at = i.status_at AND c.fixed))::int AS confirmed,
+       count(*) FILTER (WHERE i.reopened_at >= $1)::int AS reopened,
        count(*) FILTER (WHERE i.status NOT IN ('done', 'rejected'))::int AS open_total,
        count(*) FILTER (WHERE i.status NOT IN ('done', 'rejected') AND i.deadline_at < $2)::int AS overdue_open,
        COALESCE(bool_or(i.sample), false)::boolean AS sample_data
@@ -83,6 +87,8 @@ type OrgMetricCountsRow struct {
 	Reports      int32
 	ClosedTotal  int32
 	ClosedOnTime int32
+	Confirmed    int32
+	Reopened     int32
 	OpenTotal    int32
 	OverdueOpen  int32
 	SampleData   bool
@@ -96,6 +102,8 @@ func (q *Queries) OrgMetricCounts(ctx context.Context, arg OrgMetricCountsParams
 		&i.Reports,
 		&i.ClosedTotal,
 		&i.ClosedOnTime,
+		&i.Confirmed,
+		&i.Reopened,
 		&i.OpenTotal,
 		&i.OverdueOpen,
 		&i.SampleData,
@@ -106,7 +114,9 @@ func (q *Queries) OrgMetricCounts(ctx context.Context, arg OrgMetricCountsParams
 const sampleLatestAt = `-- name: SampleLatestAt :one
 SELECT COALESCE(max(t), $1::timestamptz)::timestamptz AS latest
 FROM (
-    SELECT greatest(i.created_at, i.status_at, i.overdue_at) AS t FROM issues i WHERE i.sample
+    SELECT greatest(i.created_at, i.status_at, i.overdue_at, i.reopened_at) AS t FROM issues i WHERE i.sample
+    UNION ALL
+    SELECT c.at FROM issue_confirmations c JOIN issues i ON i.id = c.issue_id WHERE i.sample
     UNION ALL
     SELECT e.at FROM issue_events e JOIN issues i ON i.id = e.issue_id WHERE i.sample
     UNION ALL
@@ -120,6 +130,20 @@ func (q *Queries) SampleLatestAt(ctx context.Context, now time.Time) (time.Time,
 	var latest time.Time
 	err := row.Scan(&latest)
 	return latest, err
+}
+
+const shiftSampleConfirmations = `-- name: ShiftSampleConfirmations :exec
+UPDATE issue_confirmations c
+SET done_at = c.done_at + make_interval(days => $1::int),
+    at      = c.at + make_interval(days => $1::int)
+FROM issues i
+WHERE i.id = c.issue_id AND i.sample
+`
+
+// done_at сдвигается вместе со status_at, иначе ответы перестанут относиться к текущему «выполнено».
+func (q *Queries) ShiftSampleConfirmations(ctx context.Context, days int32) error {
+	_, err := q.db.Exec(ctx, shiftSampleConfirmations, days)
+	return err
 }
 
 const shiftSampleEvents = `-- name: ShiftSampleEvents :exec
@@ -139,7 +163,8 @@ UPDATE issues
 SET created_at  = created_at + make_interval(days => $1::int),
     status_at   = status_at + make_interval(days => $1::int),
     deadline_at = deadline_at + make_interval(days => $1::int),
-    overdue_at  = overdue_at + make_interval(days => $1::int)
+    overdue_at  = overdue_at + make_interval(days => $1::int),
+    reopened_at = reopened_at + make_interval(days => $1::int)
 WHERE sample
 `
 

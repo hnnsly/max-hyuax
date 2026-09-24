@@ -46,6 +46,8 @@ func (r issueRepo) Save(ctx context.Context, is *issue.Issue) error {
 			StatusAt:      is.StatusAt(),
 			StatusComment: is.StatusComment(),
 			OverdueAt:     timePtr(is.OverdueAt()),
+			DeadlineAt:    is.Deadline(),
+			ReopenedAt:    timePtr(is.ReopenedAt()),
 		})
 		if err != nil {
 			return err
@@ -54,10 +56,17 @@ func (r issueRepo) Save(ctx context.Context, is *issue.Issue) error {
 	})
 }
 
-// saveChildren дописывает новых участников (существующие пропускаются) и события агрегата.
+// saveChildren дописывает новых участников и ответы на «выполнено» (существующие пропускаются)
+// и события агрегата.
 func saveChildren(ctx context.Context, q *sqlcdb.Queries, is *issue.Issue) error {
 	for _, p := range is.Participants() {
 		err := q.InsertParticipant(ctx, sqlcdb.InsertParticipantParams{IssueID: is.ID(), UserID: p.UserID, JoinedAt: p.JoinedAt})
+		if err != nil {
+			return err
+		}
+	}
+	for _, a := range is.NewAnswers() {
+		err := q.InsertAnswer(ctx, sqlcdb.InsertAnswerParams{IssueID: is.ID(), UserID: a.UserID, DoneAt: a.DoneAt, Fixed: a.Fixed, At: a.At})
 		if err != nil {
 			return err
 		}
@@ -87,7 +96,7 @@ func (r issueRepo) Get(ctx context.Context, id string) (*issue.Issue, error) {
 
 func (r issueRepo) GetForUpdate(ctx context.Context, id string) (*issue.Issue, error) {
 	if err := r.s.q.LockIssue(ctx, id); err != nil {
-		return nil, err
+		return nil, notFound(err)
 	}
 	return r.Get(ctx, id)
 }
@@ -169,6 +178,14 @@ func (r issueRepo) restore(ctx context.Context, rows []sqlcdb.GetIssueRow) ([]*i
 	for _, p := range parts {
 		byIssue[p.IssueID] = append(byIssue[p.IssueID], issue.Participant{UserID: p.UserID, JoinedAt: p.JoinedAt})
 	}
+	answerRows, err := r.s.q.ListCurrentAnswers(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	answers := map[string][]issue.Answer{}
+	for _, a := range answerRows {
+		answers[a.IssueID] = append(answers[a.IssueID], issue.Answer{UserID: a.UserID, Fixed: a.Fixed, DoneAt: a.DoneAt, At: a.At})
+	}
 	out := make([]*issue.Issue, len(rows))
 	for i, row := range rows {
 		out[i] = issue.Restore(issue.NewParams{
@@ -187,7 +204,9 @@ func (r issueRepo) restore(ctx context.Context, rows []sqlcdb.GetIssueRow) ([]*i
 			StatusAt:      row.StatusAt,
 			StatusComment: row.StatusComment,
 			OverdueAt:     timeOrZero(row.OverdueAt),
+			ReopenedAt:    timeOrZero(row.ReopenedAt),
 			Participants:  byIssue[row.ID],
+			Answers:       answers[row.ID],
 		})
 	}
 	return out, nil

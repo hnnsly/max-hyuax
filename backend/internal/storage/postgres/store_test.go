@@ -255,6 +255,55 @@ func TestUserCreateConsentAndDelete(t *testing.T) {
 	}
 }
 
+// Ответы на «выполнено», возврат в работу и новый срок переживают перезагрузку заявки.
+func TestAnswersAndReopenRoundTrip(t *testing.T) {
+	anna, sergey := demoUser(t, "resident_demo_1"), demoUser(t, "resident_demo_2")
+	is := newIssue(t, anna.ID)
+	now := is.CreatedAt()
+	if err := is.Join(sergey.ID, now); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Issues().Create(t.Context(), is); err != nil {
+		t.Fatal(err)
+	}
+	doneAt := now.Add(time.Hour)
+	for _, st := range []issue.Status{issue.StatusAccepted, issue.StatusDone} {
+		if err := is.ChangeStatus(st, "Починили", doneAt); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := store.Issues().Save(t.Context(), is); err != nil {
+		t.Fatal(err)
+	}
+	got, _ := store.Issues().Get(t.Context(), is.ID())
+	if err := got.Confirm(sergey.ID, doneAt.Add(time.Minute)); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Issues().Save(t.Context(), got); err != nil {
+		t.Fatal(err)
+	}
+	got, _ = store.Issues().Get(t.Context(), is.ID())
+	if got.ConfirmedCount() != 1 {
+		t.Fatalf("confirmed after reload = %d", got.ConfirmedCount())
+	}
+	at := doneAt.Add(2 * time.Hour)
+	newDeadline := at.Add(48 * time.Hour)
+	if err := got.Reopen(anna.ID, "Снова стоит", at, newDeadline); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.Issues().Save(t.Context(), got); err != nil {
+		t.Fatal(err)
+	}
+	got, _ = store.Issues().Get(t.Context(), is.ID())
+	if got.Status() != issue.StatusInProgress || !got.Deadline().Equal(newDeadline) || !got.ReopenedAt().Equal(at) || got.ConfirmedCount() != 0 {
+		t.Fatalf("after reopen: status %s, deadline %v, reopened %v, confirmed %d", got.Status(), got.Deadline(), got.ReopenedAt(), got.ConfirmedCount())
+	}
+	events, _ := store.Issues().Events(t.Context(), is.ID())
+	if last := events[len(events)-1]; last.Kind != issue.EventReopened || last.Comment != "Снова стоит" || last.UserID != anna.ID {
+		t.Fatalf("last event = %+v", last)
+	}
+}
+
 func TestPhotosByUploaderAndDelete(t *testing.T) {
 	anna := demoUser(t, "resident_demo_1")
 	is := newIssue(t, anna.ID)

@@ -127,6 +127,12 @@ type issueDTO struct {
 	Joined           bool      `json:"joined"` // текущий пользователь среди участников
 	Responsible      *orgDTO   `json:"responsible,omitzero"`
 	Basis            string    `json:"basis,omitempty"`
+	// Проверка ремонта жителями: сколько подтвердили текущее «выполнено», ответ текущего
+	// пользователя (fixed или null) и до какого момента можно ответить.
+	ConfirmedCount int        `json:"confirmed_count"`
+	MyAnswer       *string    `json:"my_answer"`
+	AnswerUntil    *time.Time `json:"answer_until"`
+	ReopenedAt     time.Time  `json:"reopened_at,omitzero"` // когда жители в последний раз вернули заявку в работу
 }
 
 // eventDTO — шаг хронологии заявки. Кто именно действовал, не раскрывается.
@@ -144,9 +150,17 @@ func toIssueDTO(is *issue.Issue, viewer user.User, now time.Time) issueDTO {
 		Status: string(is.Status()), StatusAt: is.StatusAt(), StatusComment: is.StatusComment(),
 		CreatedAt: is.CreatedAt(), Deadline: is.Deadline(), Overdue: is.IsOverdue(now),
 		ParticipantCount: is.ParticipantCount(), Joined: is.HasParticipant(viewer.ID),
+		ConfirmedCount: is.ConfirmedCount(), ReopenedAt: is.ReopenedAt(),
 	}
 	if r, err := rules.Lookup(is.Category()); err == nil {
 		d.CategoryTitle = r.Title
+	}
+	if until := is.AnswerUntil(); !until.IsZero() {
+		d.AnswerUntil = &until
+	}
+	// Ответ «не починили» закрывает круг и возвращает заявку в работу, поэтому здесь бывает только fixed.
+	if a, ok := is.AnswerOf(viewer.ID); ok && a.Fixed {
+		d.MyAnswer = new("fixed")
 	}
 	return d
 }
@@ -161,6 +175,8 @@ type metricsDTO struct {
 	ReportsPerIssue  float64        `json:"reports_per_issue"`
 	ClosedTotal      int            `json:"closed_total"`
 	ClosedOnTime     int            `json:"closed_on_time"`
+	Confirmed        int            `json:"confirmed_by_residents"` // из выполненных жители подтвердили ремонт
+	Reopened         int            `json:"reopened_by_residents"`  // жители вернули в работу
 	OpenTotal        int            `json:"open_total"`
 	OverdueOpen      int            `json:"overdue_open"`
 	SampleData       bool           `json:"sample_data"`
@@ -183,7 +199,8 @@ func toMetricsDTO(m issues.Metrics) metricsDTO {
 	d := metricsDTO{
 		FirstResponseMin: minutes(m.Week), PrevWeekMin: minutes(m.PrevWeek),
 		PeriodDays: issues.MetricsPeriodDays, IssuesTotal: m.Issues,
-		ClosedTotal: m.ClosedTotal, ClosedOnTime: m.ClosedOnTime, OpenTotal: m.OpenTotal, OverdueOpen: m.OverdueOpen,
+		ClosedTotal: m.ClosedTotal, ClosedOnTime: m.ClosedOnTime, Confirmed: m.Confirmed, Reopened: m.Reopened,
+		OpenTotal: m.OpenTotal, OverdueOpen: m.OverdueOpen,
 		SampleData: m.SampleData,
 	}
 	if m.Issues > 0 {

@@ -258,6 +258,37 @@ func TestPhotoIsAttachedToLatestIssue(t *testing.T) {
 	findButton(t, bs, "Открыть заявку")
 }
 
+// «Починили» в сообщении о выполнении подтверждает ремонт; повторное нажатие отвечает, что ответ уже есть.
+func TestConfirmRepairFromBot(t *testing.T) {
+	e := newEnv(t)
+	e.resident(3030, true)
+	e.handle(t, text(3030, "Не горит свет на лестнице"))
+	_, bs := e.max.last("")
+	e.handle(t, press(3030, "cb1", findButton(t, bs, "Отправить").Payload))
+	list, _ := e.store.Issues().ListByHouse(t.Context(), "h-1", 10)
+	is := list[0]
+	oper := user.User{ID: 9001, Role: user.RoleOperator, OrganizationID: "org-1"}
+	e.store.AddUser(oper)
+	svc := issues.NewService(e.store, issues.Config{Now: time.Now, NewID: func() string { return "unused" }, ConsentVersion: "v1"})
+	for _, st := range []issue.Status{issue.StatusInProgress, issue.StatusDone} {
+		if _, err := svc.ChangeStatus(t.Context(), oper, is.ID(), st, "Заменили лампы"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	payload := bot.ConfirmPayload(is.ID())
+	e.handle(t, press(3030, "cb2", payload))
+	if got, _ := e.store.Issues().Get(t.Context(), is.ID()); got.ConfirmedCount() != 1 {
+		t.Fatalf("confirmed = %d, want 1", got.ConfirmedCount())
+	}
+	if txt, _ := e.max.last("cb2"); !strings.Contains(txt, "Спасибо") {
+		t.Fatalf("answer = %q", txt)
+	}
+	e.handle(t, press(3030, "cb3", payload))
+	if txt, _ := e.max.last("cb3"); !strings.Contains(txt, "уже ответили") {
+		t.Fatalf("second answer = %q", txt)
+	}
+}
+
 // Альбом из нескольких снимков прикладывается целиком, а не только первое фото.
 func TestAlbumPhotosAreAttachedTogether(t *testing.T) {
 	e := newEnv(t)

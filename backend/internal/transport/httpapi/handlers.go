@@ -241,6 +241,30 @@ func (h *handlers) changeStatus(c fiber.Ctx) error {
 	return h.sendOne(c, fiber.StatusOK, is)
 }
 
+// confirmRepair — участник подтверждает, что после «выполнено» действительно починили.
+func (h *handlers) confirmRepair(c fiber.Ctx) error {
+	is, err := h.Issues.Confirm(c.Context(), currentUser(c), c.Params("id"))
+	if err != nil {
+		return err
+	}
+	return h.sendOne(c, fiber.StatusOK, is)
+}
+
+// reopenRepair — участник сообщает, что не починили; комментарий обязателен.
+func (h *handlers) reopenRepair(c fiber.Ctx) error {
+	var in struct {
+		Comment string `json:"comment"`
+	}
+	if err := bind(c, &in); err != nil {
+		return err
+	}
+	is, err := h.Issues.Reopen(c.Context(), currentUser(c), c.Params("id"), in.Comment)
+	if err != nil {
+		return err
+	}
+	return h.sendOne(c, fiber.StatusOK, is)
+}
+
 // ukQueue — очередь оператора УК.
 func (h *handlers) ukQueue(c fiber.Ctx) error {
 	list, err := h.Issues.Queue(c.Context(), currentUser(c))

@@ -333,7 +333,7 @@ paths:
                 items:
                   type: object
                   properties:
-                    kind: { type: string, enum: [created, joined, status_changed, overdue] }
+                    kind: { type: string, enum: [created, joined, status_changed, overdue, confirmed, reopened] }
                     status: { $ref: "#/components/schemas/Status" }
                     comment: { type: string }
                     at: { type: string, format: date-time }
@@ -384,6 +384,58 @@ paths:
             application/json:
               schema: { $ref: "#/components/schemas/Issue" }
         "403": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+        "422": { $ref: "#/components/responses/Error" }
+
+  /issues/{id}/confirm:
+    post:
+      tags: [issues]
+      summary: Подтвердить, что починили
+      description: |
+        Участник выполненной заявки в течение 7 дней после отметки «выполнено» (answer_until), один ответ
+        на каждое «выполнено». Уведомлений не рассылает. 403 не участник; 409 not_done, window_closed,
+        already_answered.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Заявка с числом подтверждений
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Issue" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+
+  /issues/{id}/reopen:
+    post:
+      tags: [issues]
+      summary: Не починили — вернуть заявку в работу
+      description: |
+        Те же условия, что у confirm, плюс обязательный комментарий (422 comment_required).
+        Заявка переходит в in_progress, срок считается заново по справочнику, просрочка сбрасывается,
+        reopened_at фиксирует возврат. Соседи получают сообщение в чате с ботом.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [comment]
+              properties:
+                comment: { type: string, example: На третьем этаже снова темно }
+      responses:
+        "200":
+          description: Заявка снова в работе
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Issue" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
         "409": { $ref: "#/components/responses/Error" }
         "422": { $ref: "#/components/responses/Error" }
 
@@ -563,7 +615,8 @@ paths:
               schema:
                 type: object
                 required: [first_response_median_min, prev_week_median_min, first_response_by_day, period_days,
-                  issues_total, reports_per_issue, closed_total, closed_on_time, open_total, overdue_open, sample_data]
+                  issues_total, reports_per_issue, closed_total, closed_on_time, confirmed_by_residents,
+                  reopened_by_residents, open_total, overdue_open, sample_data]
                 properties:
                   first_response_median_min: { type: [integer, "null"] }
                   prev_week_median_min: { type: [integer, "null"] }
@@ -582,6 +635,8 @@ paths:
                   reports_per_issue: { type: number, description: Сколько жителей в среднем сообщили об одной проблеме }
                   closed_total: { type: integer }
                   closed_on_time: { type: integer }
+                  confirmed_by_residents: { type: integer, description: Из выполненных за период жители подтвердили ремонт }
+                  reopened_by_residents: { type: integer, description: Жители вернули в работу за период }
                   open_total: { type: integer }
                   overdue_open: { type: integer }
                   sample_data: { type: boolean, description: Среди заявок есть синтетический пример данных }
@@ -749,3 +804,7 @@ components:
         joined: { type: boolean, description: Текущий пользователь среди участников }
         responsible: { $ref: "#/components/schemas/Organization" }
         basis: { type: string, description: Основание срока (только в карточке) }
+        confirmed_count: { type: integer, description: Сколько участников подтвердили текущее «выполнено» }
+        my_answer: { type: [string, "null"], enum: [fixed, null], description: Ответ текущего пользователя на текущее «выполнено» }
+        answer_until: { type: [string, "null"], format: date-time, description: До какого момента можно подтвердить или вернуть; null, если заявка не выполнена }
+        reopened_at: { type: string, format: date-time, description: Когда жители в последний раз вернули заявку в работу; нет поля, если не возвращали }

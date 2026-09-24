@@ -87,14 +87,23 @@ func shareURL(c cards.Card, botName string) string {
 	return "https://max.ru/:share?text=" + url.QueryEscape(text)
 }
 
-// RenderNotice — отдельное сообщение участникам: итог по закрытой заявке или просрочка.
+// ConfirmPayload — данные кнопки «Починили» в сообщении о выполнении.
+func ConfirmPayload(issueID string) string { return pack(cbConfirm, issueID) }
+
+// RenderNotice — отдельное сообщение участникам: итог по закрытой заявке, просрочка
+// или возврат в работу.
 func RenderNotice(kind app.NotificationKind, c cards.Card, botName string) maxapi.NewMessage {
 	var b strings.Builder
+	open := maxapi.OpenAppButton("Открыть заявку", botName, "i_"+c.IssueID)
+	rows := [][]maxapi.Button{{open}}
 	switch {
 	case kind == app.NotifyOverdue:
 		fmt.Fprintf(&b, "**Срок ответа по заявке № %d истёк.** %s\n", c.Number, plain(c.Title))
 		fmt.Fprintf(&b, "%s должна была ответить до %s.\n", cmp.Or(c.Responsible, "Управляющая компания"), dayMonth(c.Deadline))
 		b.WriteString("Если ответа не будет, соседи могут обратиться в Мосжилинспекцию: даты, комментарии УК и число сообщивших уже собраны в заявке.")
+	case kind == app.NotifyReopened:
+		fmt.Fprintf(&b, "**Заявка № %d снова в работе.** %s\n", c.Number, plain(c.Title))
+		fmt.Fprintf(&b, "Сосед сообщил, что не починили. Новый срок ответа до %s.", dayMonth(c.Deadline))
 	case c.Status == issue.StatusRejected:
 		fmt.Fprintf(&b, "**Заявка № %d отклонена.** %s\n", c.Number, plain(c.Title))
 		if c.Comment != "" {
@@ -105,14 +114,17 @@ func RenderNotice(kind app.NotificationKind, c cards.Card, botName string) maxap
 		if c.Comment != "" {
 			fmt.Fprintf(&b, "Комментарий УК: %s\n", plain(c.Comment))
 		}
-		b.WriteString("Если проблема повторится, сообщите о ней заново.")
+		b.WriteString("Проверьте, пожалуйста: если не починили, заявка вернётся в работу. Ответить можно в течение 7 дней.")
+		// «Не починили» ведёт в карточку: там пишется комментарий для УК.
+		rows = [][]maxapi.Button{
+			{maxapi.CallbackButton("Починили", ConfirmPayload(c.IssueID)), maxapi.OpenAppButton("Не починили", botName, "i_"+c.IssueID)},
+			{open},
+		}
 	}
 	return maxapi.NewMessage{
-		Text:   strings.TrimRight(b.String(), "\n"),
-		Format: "markdown",
-		Attachments: []maxapi.Attachment{maxapi.Keyboard([]maxapi.Button{
-			maxapi.OpenAppButton("Открыть заявку", botName, "i_"+c.IssueID),
-		})},
+		Text:        strings.TrimRight(b.String(), "\n"),
+		Format:      "markdown",
+		Attachments: []maxapi.Attachment{maxapi.Keyboard(rows...)},
 	}
 }
 

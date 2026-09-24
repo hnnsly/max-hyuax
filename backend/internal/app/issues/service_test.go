@@ -175,18 +175,27 @@ func TestMetricsCountOwnOrganization(t *testing.T) {
 	if _, err := f.svc.ChangeStatus(t.Context(), f.oper, a.ID(), issue.StatusAccepted, ""); err != nil {
 		t.Fatal(err)
 	}
-	b := report(t, f, f.sergey)
-	for _, st := range []issue.Status{issue.StatusAccepted, issue.StatusDone} {
-		if _, err := f.svc.ChangeStatus(t.Context(), f.oper, b.ID(), st, "Готово"); err != nil {
-			t.Fatal(err)
+	b, c := report(t, f, f.sergey), report(t, f, f.anna)
+	for _, id := range []string{b.ID(), c.ID()} {
+		for _, st := range []issue.Status{issue.StatusAccepted, issue.StatusDone} {
+			if _, err := f.svc.ChangeStatus(t.Context(), f.oper, id, st, "Готово"); err != nil {
+				t.Fatal(err)
+			}
 		}
+	}
+	// Ремонт по b жители подтвердили, c вернули в работу.
+	if _, err := f.svc.Confirm(t.Context(), f.sergey, b.ID()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.svc.Reopen(t.Context(), f.anna, c.ID(), "Не починили"); err != nil {
+		t.Fatal(err)
 	}
 
 	m, err := f.svc.Metrics(t.Context(), f.oper)
 	if err != nil {
 		t.Fatalf("Metrics: %v", err)
 	}
-	want := app.OrgCounts{Issues: 2, Reports: 3, ClosedTotal: 1, ClosedOnTime: 1, OpenTotal: 1}
+	want := app.OrgCounts{Issues: 3, Reports: 4, ClosedTotal: 1, ClosedOnTime: 1, Confirmed: 1, Reopened: 1, OpenTotal: 2}
 	if m.OrgCounts != want {
 		t.Errorf("counts = %+v, want %+v", m.OrgCounts, want)
 	}

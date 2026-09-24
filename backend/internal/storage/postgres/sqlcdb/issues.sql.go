@@ -12,7 +12,7 @@ import (
 
 const findSimilarIssues = `-- name: FindSimilarIssues :many
 SELECT id, number, house_id, COALESCE(object_id, '')::text AS object_id, category, title, description,
-       responsible_org_id, status, status_at, status_comment, created_by, created_at, deadline_at, overdue_at
+       responsible_org_id, status, status_at, status_comment, created_by, created_at, deadline_at, overdue_at, reopened_at
 FROM issues
 WHERE house_id = $1
   AND category = $2
@@ -46,6 +46,7 @@ type FindSimilarIssuesRow struct {
 	CreatedAt        time.Time
 	DeadlineAt       time.Time
 	OverdueAt        *time.Time
+	ReopenedAt       *time.Time
 }
 
 func (q *Queries) FindSimilarIssues(ctx context.Context, arg FindSimilarIssuesParams) ([]FindSimilarIssuesRow, error) {
@@ -78,6 +79,7 @@ func (q *Queries) FindSimilarIssues(ctx context.Context, arg FindSimilarIssuesPa
 			&i.CreatedAt,
 			&i.DeadlineAt,
 			&i.OverdueAt,
+			&i.ReopenedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -91,7 +93,7 @@ func (q *Queries) FindSimilarIssues(ctx context.Context, arg FindSimilarIssuesPa
 
 const getIssue = `-- name: GetIssue :one
 SELECT id, number, house_id, COALESCE(object_id, '')::text AS object_id, category, title, description,
-       responsible_org_id, status, status_at, status_comment, created_by, created_at, deadline_at, overdue_at
+       responsible_org_id, status, status_at, status_comment, created_by, created_at, deadline_at, overdue_at, reopened_at
 FROM issues
 WHERE id = $1
 `
@@ -112,6 +114,7 @@ type GetIssueRow struct {
 	CreatedAt        time.Time
 	DeadlineAt       time.Time
 	OverdueAt        *time.Time
+	ReopenedAt       *time.Time
 }
 
 func (q *Queries) GetIssue(ctx context.Context, id string) (GetIssueRow, error) {
@@ -133,8 +136,34 @@ func (q *Queries) GetIssue(ctx context.Context, id string) (GetIssueRow, error) 
 		&i.CreatedAt,
 		&i.DeadlineAt,
 		&i.OverdueAt,
+		&i.ReopenedAt,
 	)
 	return i, err
+}
+
+const insertAnswer = `-- name: InsertAnswer :exec
+INSERT INTO issue_confirmations (issue_id, user_id, done_at, fixed, at)
+VALUES ($1, $2, $3, $4, $5)
+ON CONFLICT DO NOTHING
+`
+
+type InsertAnswerParams struct {
+	IssueID string
+	UserID  int64
+	DoneAt  time.Time
+	Fixed   bool
+	At      time.Time
+}
+
+func (q *Queries) InsertAnswer(ctx context.Context, arg InsertAnswerParams) error {
+	_, err := q.db.Exec(ctx, insertAnswer,
+		arg.IssueID,
+		arg.UserID,
+		arg.DoneAt,
+		arg.Fixed,
+		arg.At,
+	)
+	return err
 }
 
 const insertEvent = `-- name: InsertEvent :exec
@@ -225,9 +254,54 @@ func (q *Queries) InsertParticipant(ctx context.Context, arg InsertParticipantPa
 	return err
 }
 
+const listCurrentAnswers = `-- name: ListCurrentAnswers :many
+SELECT c.issue_id, c.user_id, c.fixed, c.done_at, c.at
+FROM issue_confirmations c
+JOIN issues i ON i.id = c.issue_id
+WHERE c.issue_id = ANY ($1::uuid[])
+  AND i.status = 'done'
+  AND c.done_at = i.status_at
+ORDER BY c.at, c.user_id
+`
+
+type ListCurrentAnswersRow struct {
+	IssueID string
+	UserID  int64
+	Fixed   bool
+	DoneAt  time.Time
+	At      time.Time
+}
+
+// Ответы на текущее «выполнено»: у заявки в другом статусе их нет.
+func (q *Queries) ListCurrentAnswers(ctx context.Context, issueIds []string) ([]ListCurrentAnswersRow, error) {
+	rows, err := q.db.Query(ctx, listCurrentAnswers, issueIds)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListCurrentAnswersRow
+	for rows.Next() {
+		var i ListCurrentAnswersRow
+		if err := rows.Scan(
+			&i.IssueID,
+			&i.UserID,
+			&i.Fixed,
+			&i.DoneAt,
+			&i.At,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listHouseIssues = `-- name: ListHouseIssues :many
 SELECT id, number, house_id, COALESCE(object_id, '')::text AS object_id, category, title, description,
-       responsible_org_id, status, status_at, status_comment, created_by, created_at, deadline_at, overdue_at
+       responsible_org_id, status, status_at, status_comment, created_by, created_at, deadline_at, overdue_at, reopened_at
 FROM issues
 WHERE house_id = $1
 ORDER BY created_at DESC
@@ -255,6 +329,7 @@ type ListHouseIssuesRow struct {
 	CreatedAt        time.Time
 	DeadlineAt       time.Time
 	OverdueAt        *time.Time
+	ReopenedAt       *time.Time
 }
 
 func (q *Queries) ListHouseIssues(ctx context.Context, arg ListHouseIssuesParams) ([]ListHouseIssuesRow, error) {
@@ -282,6 +357,7 @@ func (q *Queries) ListHouseIssues(ctx context.Context, arg ListHouseIssuesParams
 			&i.CreatedAt,
 			&i.DeadlineAt,
 			&i.OverdueAt,
+			&i.ReopenedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -336,7 +412,7 @@ func (q *Queries) ListIssueEvents(ctx context.Context, issueID string) ([]ListIs
 
 const listOrgQueue = `-- name: ListOrgQueue :many
 SELECT id, number, house_id, COALESCE(object_id, '')::text AS object_id, category, title, description,
-       responsible_org_id, status, status_at, status_comment, created_by, created_at, deadline_at, overdue_at
+       responsible_org_id, status, status_at, status_comment, created_by, created_at, deadline_at, overdue_at, reopened_at
 FROM issues
 WHERE responsible_org_id = $1
 ORDER BY status IN ('done', 'rejected'), deadline_at
@@ -364,6 +440,7 @@ type ListOrgQueueRow struct {
 	CreatedAt        time.Time
 	DeadlineAt       time.Time
 	OverdueAt        *time.Time
+	ReopenedAt       *time.Time
 }
 
 func (q *Queries) ListOrgQueue(ctx context.Context, arg ListOrgQueueParams) ([]ListOrgQueueRow, error) {
@@ -391,6 +468,7 @@ func (q *Queries) ListOrgQueue(ctx context.Context, arg ListOrgQueueParams) ([]L
 			&i.CreatedAt,
 			&i.DeadlineAt,
 			&i.OverdueAt,
+			&i.ReopenedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -404,7 +482,7 @@ func (q *Queries) ListOrgQueue(ctx context.Context, arg ListOrgQueueParams) ([]L
 
 const listOverdueUnmarked = `-- name: ListOverdueUnmarked :many
 SELECT id, number, house_id, COALESCE(object_id, '')::text AS object_id, category, title, description,
-       responsible_org_id, status, status_at, status_comment, created_by, created_at, deadline_at, overdue_at
+       responsible_org_id, status, status_at, status_comment, created_by, created_at, deadline_at, overdue_at, reopened_at
 FROM issues
 WHERE overdue_at IS NULL
   AND status NOT IN ('done', 'rejected')
@@ -434,6 +512,7 @@ type ListOverdueUnmarkedRow struct {
 	CreatedAt        time.Time
 	DeadlineAt       time.Time
 	OverdueAt        *time.Time
+	ReopenedAt       *time.Time
 }
 
 func (q *Queries) ListOverdueUnmarked(ctx context.Context, arg ListOverdueUnmarkedParams) ([]ListOverdueUnmarkedRow, error) {
@@ -461,6 +540,7 @@ func (q *Queries) ListOverdueUnmarked(ctx context.Context, arg ListOverdueUnmark
 			&i.CreatedAt,
 			&i.DeadlineAt,
 			&i.OverdueAt,
+			&i.ReopenedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -474,7 +554,7 @@ func (q *Queries) ListOverdueUnmarked(ctx context.Context, arg ListOverdueUnmark
 
 const listParticipantIssues = `-- name: ListParticipantIssues :many
 SELECT i.id, i.number, i.house_id, COALESCE(i.object_id, '')::text AS object_id, i.category, i.title, i.description,
-       i.responsible_org_id, i.status, i.status_at, i.status_comment, i.created_by, i.created_at, i.deadline_at, i.overdue_at
+       i.responsible_org_id, i.status, i.status_at, i.status_comment, i.created_by, i.created_at, i.deadline_at, i.overdue_at, i.reopened_at
 FROM issues i
 JOIN issue_participants p ON p.issue_id = i.id
 WHERE p.user_id = $1
@@ -503,6 +583,7 @@ type ListParticipantIssuesRow struct {
 	CreatedAt        time.Time
 	DeadlineAt       time.Time
 	OverdueAt        *time.Time
+	ReopenedAt       *time.Time
 }
 
 func (q *Queries) ListParticipantIssues(ctx context.Context, arg ListParticipantIssuesParams) ([]ListParticipantIssuesRow, error) {
@@ -530,6 +611,7 @@ func (q *Queries) ListParticipantIssues(ctx context.Context, arg ListParticipant
 			&i.CreatedAt,
 			&i.DeadlineAt,
 			&i.OverdueAt,
+			&i.ReopenedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -579,8 +661,9 @@ func (q *Queries) LockIssue(ctx context.Context, id string) error {
 
 const updateIssueState = `-- name: UpdateIssueState :exec
 UPDATE issues
-SET status = $1, status_at = $2, status_comment = $3, overdue_at = $4
-WHERE id = $5
+SET status = $1, status_at = $2, status_comment = $3, overdue_at = $4,
+    deadline_at = $5, reopened_at = $6
+WHERE id = $7
 `
 
 type UpdateIssueStateParams struct {
@@ -588,15 +671,20 @@ type UpdateIssueStateParams struct {
 	StatusAt      time.Time
 	StatusComment string
 	OverdueAt     *time.Time
+	DeadlineAt    time.Time
+	ReopenedAt    *time.Time
 	ID            string
 }
 
+// Срок меняется, когда жители возвращают заявку в работу: он считается заново по справочнику.
 func (q *Queries) UpdateIssueState(ctx context.Context, arg UpdateIssueStateParams) error {
 	_, err := q.db.Exec(ctx, updateIssueState,
 		arg.Status,
 		arg.StatusAt,
 		arg.StatusComment,
 		arg.OverdueAt,
+		arg.DeadlineAt,
+		arg.ReopenedAt,
 		arg.ID,
 	)
 	return err
