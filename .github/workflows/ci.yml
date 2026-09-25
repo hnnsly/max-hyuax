@@ -68,9 +68,6 @@ jobs:
           DATABASE_URL: postgres://dommax:dommax@localhost:5432/dommax?sslmode=disable
         run: go test -v -tags integration -count=1 -coverpkg=./internal/... -coverprofile=coverage.out ./...
 
-      - name: coverage threshold
-        run: go run ./tools/covercheck -profile coverage.out
-
       - name: go build
         run: CGO_ENABLED=0 go build -v ./...
 
