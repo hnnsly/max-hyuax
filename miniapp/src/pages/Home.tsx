@@ -71,18 +71,24 @@ export function Home() {
   const dispatcher = org.phone_dispatcher ?? org.phone_office;
   const schedule = capitalize(org.schedule?.split('; ').pop() ?? '');
   const now = new Date();
+  // У дома из OpenStreetMap год и этажность неизвестны, а число подъездов условное: его не выдаём за факт.
+  const osm = house.source === 'osm';
+  const facts = [
+    ...(house.year_built ? [{ value: house.year_built, label: 'построен' }] : []),
+    ...(house.floors ? [{ value: house.floors, label: plural(house.floors, 'этаж', 'этажа', 'этажей') }] : []),
+    ...(osm ? [] : [{ value: house.entrances_count, label: plural(house.entrances_count, 'подъезд', 'подъезда', 'подъездов') }]),
+  ];
 
   return (
     <Screen title="Мой дом" actions={actions}>
       <HousePlate address={house.address} />
-      <Facts
-        items={[
-          ...(house.year_built ? [{ value: house.year_built, label: 'построен' }] : []),
-          ...(house.floors ? [{ value: house.floors, label: plural(house.floors, 'этаж', 'этажа', 'этажей') }] : []),
-          { value: house.entrances_count, label: plural(house.entrances_count, 'подъезд', 'подъезда', 'подъездов') },
-        ]}
-      />
+      {facts.length > 0 && <Facts items={facts} />}
       {house.source === 'model' && <DemoMark />}
+      {osm && (
+        <p className={s.hint}>
+          Дом добавлен по данным OpenStreetMap (© участники OpenStreetMap). Управляющая организация определена по району и может отличаться.
+        </p>
+      )}
 
       <Island>
         <div className={s.org}>

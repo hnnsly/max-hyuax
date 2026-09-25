@@ -75,7 +75,7 @@ func TestSearchAutoProvisionsFromOpenStreetMap(t *testing.T) {
 	svc := houses.NewService(s, geo)
 
 	// Ищем дом, которого нет в базе
-	got, err := svc.Search(t.Context(), "Тверская")
+	got, err := svc.Search(t.Context(), "Тверская 12")
 	if err != nil {
 		t.Fatalf("Search err = %v", err)
 	}

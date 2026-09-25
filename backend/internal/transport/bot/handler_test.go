@@ -189,7 +189,7 @@ func TestWithoutHouseBotAsksLocationThenBindsHouse(t *testing.T) {
 	e := newEnv(t)
 	e.handle(t, text(2001, "не горит свет на 5 этаже"))
 	_, bs := e.max.last("")
-	if findButton(t, bs, "Отправить геопозицию").Type != "request_geo_location" {
+	if findButton(t, bs, "Показать дома рядом").Type != "request_geo_location" {
 		t.Fatalf("buttons = %+v", bs)
 	}
 
@@ -491,7 +491,7 @@ func TestCommandsAndReportButton(t *testing.T) {
 		t.Fatalf("/help = %q", txt)
 	}
 	e.handle(t, text(8201, "/new"))
-	if _, bs := e.max.last(""); findButton(t, bs, "Отправить геопозицию").Type != "request_geo_location" {
+	if _, bs := e.max.last(""); findButton(t, bs, "Показать дома рядом").Type != "request_geo_location" {
 		t.Fatal("/new without house must ask for location")
 	}
 	e.handle(t, text(8201, "/unknown"))
@@ -525,7 +525,7 @@ func TestEmptyMessageAndLocationWithoutHouses(t *testing.T) {
 	loc := text(8301, "")
 	loc.Message.Body.Attachments = []maxapi.IncomingAttachment{{Type: "location", Latitude: 10, Longitude: 10}}
 	e.handle(t, loc)
-	if txt, _ := e.max.last(""); !strings.Contains(txt, "за пределами Москвы") && !strings.Contains(txt, "не нашлось") {
+	if txt, _ := e.max.last(""); !strings.Contains(txt, "за пределами Москвы") && !strings.Contains(txt, "не нашёлся") {
 		t.Fatalf("no houses nearby = %q", txt)
 	}
 }

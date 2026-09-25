@@ -1,6 +1,6 @@
 # Проверка решения
 
-Здесь пошаговые сценарии и ожидаемое поведение. Адрес стенда обозначен как `<домен-стенда>`, при локальном запуске через Docker это `http://localhost`.
+Здесь пошаговые сценарии и ожидаемое поведение. Демо-стенд: `https://max.iqj.app`. При локальном запуске через Docker вместо него `http://localhost`.
 
 ## 1. В MAX: бот и мини-приложение
 
@@ -25,11 +25,11 @@
 
 | Ссылка | Кто |
 |---|---|
-| `https://<домен-стенда>/?demo=resident` | житель Анна, дом «Ореховый бульвар, 17к2» |
-| `https://<домен-стенда>/?demo=resident_2` | сосед Сергей из того же дома |
-| `https://<домен-стенда>/?demo=chairman` | Нина, председатель совета того же дома |
-| `https://<домен-стенда>/?demo=uk` | сотрудник УК «Ореховый квартал» |
-| `https://<домен-стенда>/?demo=district` | управа района Зябликово, только чтение |
+| `https://max.iqj.app/?demo=resident` | житель Анна, дом «Ореховый бульвар, 17к2» |
+| `https://max.iqj.app/?demo=resident_2` | сосед Сергей из того же дома |
+| `https://max.iqj.app/?demo=chairman` | Нина, председатель совета того же дома |
+| `https://max.iqj.app/?demo=uk` | сотрудник УК «Ореховый квартал» |
+| `https://max.iqj.app/?demo=district` | управа района Зябликово, только чтение |
 
 ### Житель
 
@@ -108,7 +108,7 @@
 Контракт: [`api/openapi.yaml`](../api/openapi.yaml). Обязательные проверки для платформы оценки: [`DATA-API.yaml`](../DATA-API.yaml). Тестовые данные: [`deploy/seed/test-data.json`](../deploy/seed/test-data.json).
 
 ```bash
-BASE=https://<домен-стенда>/api/v1
+BASE=https://max.iqj.app/api/v1
 TOKEN=$(curl -s -X POST $BASE/auth/demo -H "Content-Type: application/json" -d '{"role":"resident"}' | jq -r .token)
 curl -s "$BASE/houses?query=17к2" -H "Authorization: Bearer $TOKEN"
 curl -s -X POST $BASE/issues -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \

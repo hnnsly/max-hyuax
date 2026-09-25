@@ -3,8 +3,8 @@
 Чат-бот и мини-приложение в мессенджере MAX для коллективных заявок по общему имуществу многоквартирного дома. Трек «Умный город».
 
 - Бот: https://max.ru/t105_hakaton_max_bot
-- Демо-стенд: `https://<домен-стенда>/` (демо-вход по ролям: `?demo=resident`, `?demo=resident_2`, `?demo=uk`)
-- API: `https://<домен-стенда>/api/v1`, контракт [`api/openapi.yaml`](api/openapi.yaml), обязательные проверки [`DATA-API.yaml`](DATA-API.yaml)
+- Демо-стенд: `https://max.iqj.app/` (демо-вход по ролям: `?demo=resident`, `?demo=resident_2`, `?demo=chairman`, `?demo=uk`, `?demo=district`)
+- API: `https://max.iqj.app/api/v1`, контракт [`api/openapi.yaml`](api/openapi.yaml), обязательные проверки [`DATA-API.yaml`](DATA-API.yaml)
 
 ## Назначение
 

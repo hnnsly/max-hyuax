@@ -200,9 +200,17 @@ func (h *Handler) openForm(ctx context.Context, to maxapi.Target, category strin
 		[]maxapi.Button{maxapi.OpenAppButton("Открыть форму", h.botName, payload)})
 }
 
+// askHouse спрашивает дом. Кнопки в два ряда: MAX добавляет к кнопке геопозиции иконку
+// и обрезает текст, если две кнопки стоят рядом.
 func (h *Handler) askHouse(ctx context.Context, to maxapi.Target) error {
-	return h.sendKeyboard(ctx, to, "Где вы живёте? Отправьте геопозицию, и я покажу ближайшие дома. Или найдите дом по адресу в приложении.",
-		[]maxapi.Button{maxapi.GeoButton("Отправить геопозицию"), maxapi.OpenAppButton("Найти по адресу", h.botName, "")})
+	_, err := h.max.Send(ctx, to, maxapi.NewMessage{
+		Text: "Где вы живёте? Покажу дома рядом с вами по геопозиции. Или найдите свой дом по адресу в приложении.",
+		Attachments: []maxapi.Attachment{maxapi.Keyboard(
+			[]maxapi.Button{maxapi.GeoButton("Показать дома рядом")},
+			[]maxapi.Button{maxapi.OpenAppButton("Найти дом по адресу", h.botName, "")},
+		)},
+	})
+	return err
 }
 
 func (h *Handler) askProblem(ctx context.Context, to maxapi.Target, from maxapi.User) error {
@@ -221,11 +229,16 @@ func (h *Handler) onLocation(ctx context.Context, to maxapi.Target, from maxapi.
 		return err
 	}
 	list, err := h.svc.Houses.Nearest(ctx, lat, lon)
-	if errors.Is(err, houses.ErrOutsideMoscow) || (err == nil && len(list) == 0) {
+	if errors.Is(err, houses.ErrOutsideMoscow) {
 		return h.outsideMoscowReply(ctx, to)
 	}
 	if err != nil {
 		return err
+	}
+	if len(list) == 0 {
+		// Точка в Москве, но дом по ней не определился (парк, стройка, геокодер не ответил).
+		return h.sendKeyboard(ctx, to, "По этой точке дом не нашёлся. Найдите его по адресу в приложении.",
+			[]maxapi.Button{maxapi.OpenAppButton("Найти дом по адресу", h.botName, "")})
 	}
 	var rows [][]maxapi.Button
 	for _, hs := range list[:min(3, len(list))] {

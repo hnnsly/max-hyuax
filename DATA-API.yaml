@@ -8,7 +8,7 @@ solution:
   team: "105"
   bot: https://max.ru/t105_hakaton_max_bot
 
-base_url: https://<домен-стенда>/api/v1
+base_url: https://max.iqj.app/api/v1
 
 auth:
   type: bearer

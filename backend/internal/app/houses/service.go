@@ -48,26 +48,26 @@ func (s *Service) Search(ctx context.Context, query string) ([]house.House, erro
 	if err != nil {
 		return nil, err
 	}
-	if len(list) < 3 && s.geo != nil {
+	// OpenStreetMap спрашиваем, только когда в запросе есть номер дома: иначе поиск по мере ввода
+	// («Твер», «Тверская») создавал бы в базе дома, которые житель и не собирался выбирать.
+	if len(list) < 3 && s.geo != nil && strings.ContainsAny(query, "0123456789") {
 		gctx, cancel := context.WithTimeout(ctx, LocateTimeout)
 		osmHouses, gerr := s.geo.SearchHouses(gctx, query)
 		cancel()
 		if gerr == nil && len(osmHouses) > 0 {
+			// Дом из базы с тем же адресом (например, модельный) не дублируем.
 			seen := make(map[string]bool, len(list))
 			for _, h := range list {
-				seen[h.ID] = true
+				seen[addressKey(h.Address)] = true
 			}
 			for _, gh := range osmHouses {
-				if !gh.InMoscow || gh.Address == "" {
-					continue
-				}
-				hID := ImportID(gh.Address)
-				if seen[hID] {
+				key := addressKey(gh.Address)
+				if !gh.InMoscow || gh.Address == "" || seen[key] {
 					continue
 				}
 				if prov, err := s.provisionGeoHouse(ctx, gh); err == nil {
 					list = append(list, prov)
-					seen[hID] = true
+					seen[key] = true
 				}
 			}
 		}
@@ -121,13 +121,19 @@ func (s *Service) Nearest(ctx context.Context, lat, lon float64) ([]house.House,
 	return closeHouses, nil
 }
 
+// addressKey — адрес без различий в регистре и пробелах: по нему сравниваются дома из базы и из OSM.
+func addressKey(a string) string { return strings.ToLower(normalizeSpaces(a)) }
+
+// provisionGeoHouse сохраняет дом, найденный в OpenStreetMap. УК определяется по району
+// (ГБУ «Жилищник»), это приближение: интерфейс помечает такие дома (source = osm).
 func (s *Service) provisionGeoHouse(ctx context.Context, gh app.GeoHouse) (house.House, error) {
 	dist := normalizeSpaces(gh.District)
-	if dist == "" {
-		dist = "Центральный"
-	}
 	orgID := "org-gbu-" + translitSlug(dist)
 	orgName := fmt.Sprintf("ГБУ «Жилищник района %s»", dist)
+	if dist == "" {
+		// Район не определился: отвечает городская диспетчерская, а не случайный «Жилищник».
+		orgID, orgName = "org-msk-edc", "Единый диспетчерский центр Москвы"
+	}
 
 	org := house.Organization{
 		ID:              orgID,
@@ -141,11 +147,11 @@ func (s *Service) provisionGeoHouse(ctx context.Context, gh app.GeoHouse) (house
 
 	addr := normalizeSpaces(gh.Address)
 	h := house.House{
-		ID:             ImportID(addr),
-		Address:        addr,
-		District:       dist,
-		YearBuilt:      1985,
-		Floors:         12,
+		ID:       ImportID(addr),
+		Address:  addr,
+		District: dist,
+		// Год и этажность в OSM обычно не указаны: 0 значит «неизвестно», интерфейс их не показывает.
+		// Четыре подъезда условны: они нужны, чтобы у дома были объекты с QR-кодами.
 		EntrancesCount: 4,
 		OrganizationID: orgID,
 		Lat:            gh.Lat,
