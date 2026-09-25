@@ -6,7 +6,8 @@
 - План спайка выполнен: к ядру добавлены просрочка, метрики УК, QR-наклейки, удаление аккаунта, подсказка категории (правила + Ollama), PDF-обращение в жилинспекцию, фото к заявке и материалы к сдаче (README, DATA-API.yaml, запуск одной командой).
 - По GEN_V2 сделаны части 0–5: ревью и UX-проход, подтверждение ремонта жителями, телефон для мастера (`requestContact`), кабинет района (ADR-017).
 - 25.09, вторая сессия: фото в MinIO (ADR-018), часть 6 — импорт домов из CSV и геокодер Nominatim (ADR-016), часть 7 — совет дома: предложения председателю и опросы (ADR-017).
-- Нужны деплой и проверка в MAX.
+- 26.09: GEN_V2 закрыт, стенд `https://max.iqj.app` (автодеплой из `master`). Идёт `hack-docs/GEN_V3_PLAN.md`: бот 2.0 и геопозиция, карта домов, голос и доступность, рейтинг УК, коллективное обращение.
+- Нужна проверка в MAX людьми.
 - Сдача 30.09, заморозка кода 29.09 днём.
 
 **Текущее состояние и следующий шаг — в `hack-docs/HANDOFF.md`.**
@@ -37,7 +38,7 @@ f9LHodD0cOL2NmKbuATgdnneiJ5RFSQyh_YHIO6Tztr5VIn7MS536x4ixpeAAke_2GTrMtXrjl-lySJ-
 ```
 Прямая ссылка в максе: https://max.ru/t105_hakaton_max_bot
 ## Начало каждой сессии
-Порядок восстановления контекста: этот файл → `hack-docs/INDEX.md` → `hack-docs/research/MINDMAP.md` → `hack-docs/HANDOFF.md` → `hack-docs/GEN_V2_PLAN.md`. В документах не пишем пути локальной машины (`C:\Users\...` и т.п.): только относительные ссылки внутри репозитория.
+Порядок восстановления контекста: этот файл → `hack-docs/INDEX.md` → `hack-docs/research/MINDMAP.md` → `hack-docs/HANDOFF.md` → `hack-docs/GEN_V3_PLAN.md`. В документах не пишем пути локальной машины (`C:\Users\...` и т.п.): только относительные ссылки внутри репозитория.
 0. Прочитать `hack-docs/HANDOFF.md`: кто что делал и какой следующий шаг. В конце своей порции работы обновить её.
 1. Прочитать `hack-docs/INDEX.md` — индекс базы знаний и текущее состояние.
 2. Затем `hack-docs/research/MINDMAP.md` и заметку по задаче (`SRS.md`, `requirements/*`, `adr/*`).
@@ -161,6 +162,6 @@ docs/                   документация продукта (ведётс�
 - `hack-docs/SRS.md` + `hack-docs/requirements/` — требования (user-stories, ux-flows, nfr, data-model)
 - `hack-docs/adr/` — решения 001–018
 - `hack-docs/design/canvas-v2/project/` — утверждённый дизайн v2 (эталон экранов), `hack-docs/design/DESIGN-SYSTEM.md`
-- `hack-docs/GEN_V2_PLAN.md` — действующий план на 24–30.09 (части 0–7, линия отсечения); `hack-docs/GENERAL_PLAN.md` (v1) и `hack-docs/ROADMAP.md` — исходный план и вехи M0–M5
+- `hack-docs/GEN_V3_PLAN.md` — действующий план на 26–29.09 (части 1–9, линия отсечения); `hack-docs/GEN_V2_PLAN.md` закрыт; `hack-docs/GENERAL_PLAN.md` (v1) и `hack-docs/ROADMAP.md` — исходный план и вехи M0–M5
 - `hack-docs/research/max-platform-capabilities.md` — справка по Bot API, Bridge, MAX UI
 - `hack-docs/Case.md` — кейс и критерии оценки (не публиковать: п. 11.3 правил)

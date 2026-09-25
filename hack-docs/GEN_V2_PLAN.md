@@ -1,9 +1,9 @@
 ---
 title: Общий план v2 на финальную неделю
 type: plan
-status: accepted
+status: completed
 version: 2.0
-updated: 2026-09-24
+updated: 2026-09-26
 tags: [plan, timeline, features]
 ---
 
