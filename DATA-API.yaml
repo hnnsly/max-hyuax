@@ -90,6 +90,17 @@ checks:
       body: object
       required_fields: [id, address, organization.name, entrances, objects]
 
+  - id: house_report_pdf
+    name: Сводный PDF-отчёт по реестру заявок дома
+    method: GET
+    path: /houses/{id}/report.pdf
+    role: none
+    params:
+      path: { id: h-17k2 }
+    expect:
+      status: [200]
+      content_type: application/pdf
+
   - id: object_by_qr
     name: Объект по коду QR
     method: GET

@@ -299,6 +299,25 @@ paths:
       responses:
         "200": { $ref: "#/components/responses/IssueList" }
 
+  /houses/{id}/report.pdf:
+    get:
+      tags: [houses]
+      summary: Сводный PDF-отчёт по реестру заявок дома
+      description: |
+        Генерирует PDF-документ с паспортом дома, управляющей организацией, сводной статистикой
+        (всего заявок, открыто, выполнено, просрочено) и реестром всех заявок дома.
+        Доступно без заголовка авторизации для скачивания через WebApp.downloadFile в MAX.
+      security: []
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, example: h-17k2 }
+      responses:
+        "200":
+          description: Сводный отчёт по дому (PDF)
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+        "404": { $ref: "#/components/responses/Error" }
+
   /objects/{code}:
     get:
       tags: [houses]

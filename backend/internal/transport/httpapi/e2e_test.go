@@ -633,3 +633,20 @@ func TestWebhookChecksSecret(t *testing.T) {
 		t.Fatalf("status = %d", s)
 	}
 }
+
+func TestHouseReportPDF(t *testing.T) {
+	req := httptest.NewRequest("GET", "/api/v1/houses/h-17k2/report.pdf", http.NoBody)
+	res, err := api.Test(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer res.Body.Close()
+	if res.StatusCode != 200 {
+		t.Fatalf("status = %d, want 200", res.StatusCode)
+	}
+	raw, _ := io.ReadAll(res.Body)
+	if !bytes.HasPrefix(raw, []byte("%PDF-1.4")) {
+		t.Fatalf("not a PDF: %q", raw[:min(16, len(raw))])
+	}
+	expect(t, call(t, "GET", "/api/v1/houses/no-such-house/report.pdf", "", nil), 404, "missing house report")
+}
