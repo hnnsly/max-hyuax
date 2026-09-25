@@ -212,6 +212,8 @@
   },
   "active": "88409cdb66fbe9df",
   "lastOpenFiles": [
+    "deploy/compose.yaml~",
+    "main.c",
     "hack-docs/HANDOFF.md.tmp.13916.499b90ce177d",
     "miniapp/dist/assets/index-C7G88PQ9.js",
     "miniapp/coverage/coverage-final.json",
@@ -221,8 +223,6 @@
     "miniapp/coverage/shared/lib/model.ts.html",
     "miniapp/coverage/shared/lib/metrics.ts.html",
     "miniapp/coverage/shared/lib/index.html",
-    "miniapp/coverage/shared/lib/format.ts.html",
-    "miniapp/coverage/shared/lib",
     "miniapp/coverage/sort-arrow-sprite.png",
     "miniapp/coverage/favicon.png",
     "hack-docs/adr/017-district-and-chairman-roles.md",
