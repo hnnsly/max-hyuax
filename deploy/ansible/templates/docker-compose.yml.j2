@@ -23,3 +23,4 @@ networks:
   {{ env_config.docker_network | default('postgres-max') }}:
     name: {{ env_config.docker_network | default('postgres-max') }}
     driver: bridge
+    external: true

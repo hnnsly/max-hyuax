@@ -202,6 +202,7 @@ jobs:
       - name: Run Ansible Playbook
         if: steps.secrets.outputs.ready == 'true'
         env:
+          ANSIBLE_CONFIG: ${{ github.workspace }}/deploy/ansible/ansible.cfg
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
           FALLBACK_TOKEN: ${{ secrets.GITHUB_TOKEN }}

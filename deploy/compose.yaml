@@ -68,7 +68,13 @@ services:
         condition: service_healthy
     # Порт наружу не публикуется: запросы приходят через Caddy (/api/*, /webhook/*).
     environment:
-      DATABASE_URL: postgres://dommax:${POSTGRES_PASSWORD:-dommax}@db:5432/dommax?sslmode=disable
+      POSTGRES_HOST: ${POSTGRES_HOST:-db}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      POSTGRES_USER: ${POSTGRES_USER:-dommax}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-dommax}
+      POSTGRES_DB: ${POSTGRES_DB:-dommax}
+      POSTGRES_SSLMODE: ${POSTGRES_SSLMODE:-disable}
+      DATABASE_URL: postgres://${POSTGRES_USER:-dommax}:${POSTGRES_PASSWORD:-dommax}@${POSTGRES_HOST:-db}:${POSTGRES_PORT:-5432}/${POSTGRES_DB:-dommax}?sslmode=${POSTGRES_SSLMODE:-disable}
       HTTP_ADDR: ":8080"
       # Пустые значения проверяет сам api при старте и пишет понятную ошибку в лог.
       SESSION_SECRET: ${SESSION_SECRET:-}
