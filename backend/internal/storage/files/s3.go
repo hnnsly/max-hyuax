@@ -5,6 +5,8 @@ import (
 	"context"
 	"fmt"
 	"io"
+	"strings"
+	"time"
 
 	"github.com/minio/minio-go/v7"
 	"github.com/minio/minio-go/v7/pkg/credentials"
@@ -27,10 +29,22 @@ type S3 struct {
 	bucket string
 }
 
+func cleanEndpoint(endpoint string, useSSL bool) string {
+	ep := strings.TrimPrefix(strings.TrimPrefix(strings.TrimSpace(endpoint), "https://"), "http://")
+	ep = strings.TrimRight(ep, "/")
+	if useSSL && strings.HasSuffix(ep, ":443") {
+		ep = strings.TrimSuffix(ep, ":443")
+	} else if !useSSL && strings.HasSuffix(ep, ":80") {
+		ep = strings.TrimSuffix(ep, ":80")
+	}
+	return ep
+}
+
 // NewS3 подключается к хранилищу и создаёт бакет, если его нет.
 // Ошибка доступа видна сразу при старте, а не при первой загрузке фото жителем.
 func NewS3(ctx context.Context, cfg S3Config) (*S3, error) {
-	client, err := minio.New(cfg.Endpoint, &minio.Options{
+	endpoint := cleanEndpoint(cfg.Endpoint, cfg.UseSSL)
+	client, err := minio.New(endpoint, &minio.Options{
 		Creds:  credentials.NewStaticV4(cfg.AccessKey, cfg.SecretKey, ""),
 		Secure: cfg.UseSSL,
 	})
@@ -38,7 +52,19 @@ func NewS3(ctx context.Context, cfg S3Config) (*S3, error) {
 		return nil, err
 	}
 	s := &S3{client: client, bucket: cfg.Bucket}
-	exists, err := client.BucketExists(ctx, cfg.Bucket)
+
+	var exists bool
+	for attempt := 1; attempt <= 3; attempt++ {
+		checkCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		exists, err = client.BucketExists(checkCtx, cfg.Bucket)
+		cancel()
+		if err == nil {
+			break
+		}
+		if attempt < 3 {
+			time.Sleep(2 * time.Second)
+		}
+	}
 	if err != nil {
 		return nil, fmt.Errorf("s3 bucket %q: %w", cfg.Bucket, err)
 	}

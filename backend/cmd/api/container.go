@@ -134,11 +134,20 @@ func Open(ctx context.Context, cfg config, log *slog.Logger) (*Container, error)
 		if err != nil {
 			return maxapi.User{}, err
 		}
-		me, err := client.Me(c.ctx)
-		if err != nil {
-			return maxapi.User{}, fmt.Errorf("bot identity: %w", err)
+		var me maxapi.User
+		for attempt := 1; attempt <= 3; attempt++ {
+			callCtx, cancel := context.WithTimeout(c.ctx, 7*time.Second)
+			me, err = client.Me(callCtx)
+			cancel()
+			if err == nil {
+				return me, nil
+			}
+			if attempt < 3 {
+				log.Warn("bot authorization attempt failed, retrying...", "attempt", attempt, "err", err)
+				time.Sleep(2 * time.Second)
+			}
 		}
-		return me, nil
+		return maxapi.User{}, fmt.Errorf("bot identity: %w", err)
 	})
 	c.botHandler = sync.OnceValues(func() (*bot.Handler, error) {
 		client, me, err := c.bot()

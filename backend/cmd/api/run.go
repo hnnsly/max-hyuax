@@ -91,8 +91,21 @@ func (c *Container) startBot(ctx context.Context) (<-chan error, error) {
 	}
 	if c.cfg.BotMode == "webhook" {
 		types := []maxapi.UpdateType{maxapi.UpdateBotStarted, maxapi.UpdateMessageCreated, maxapi.UpdateMessageCallback}
-		if err := client.Subscribe(ctx, c.cfg.WebhookURL(), c.cfg.WebhookSecret, types); err != nil {
-			return nil, err
+		var subErr error
+		for attempt := 1; attempt <= 3; attempt++ {
+			subCtx, cancel := context.WithTimeout(ctx, 7*time.Second)
+			subErr = client.Subscribe(subCtx, c.cfg.WebhookURL(), c.cfg.WebhookSecret, types)
+			cancel()
+			if subErr == nil {
+				break
+			}
+			if attempt < 3 {
+				c.log.Warn("webhook subscription attempt failed, retrying...", "attempt", attempt, "err", subErr)
+				time.Sleep(2 * time.Second)
+			}
+		}
+		if subErr != nil {
+			return nil, subErr
 		}
 		c.log.Info("webhook subscribed", "url", c.cfg.WebhookURL())
 		return nil, nil

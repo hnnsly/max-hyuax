@@ -86,6 +86,10 @@ func buildDatabaseURL(getenv func(string) string) string {
 
 // loadConfig читает переменные окружения через getenv и собирает все ошибки сразу.
 func loadConfig(getenv func(string) string) (config, error) {
+	rawS3 := cmp.Or(getenv("S3_ENDPOINT"), getenv("MINIO_ENDPOINT"))
+	useSSL := getenv("S3_USE_SSL") == "true" || getenv("MINIO_USE_SSL") == "true" || getenv("USE_SSL") == "true" ||
+		strings.HasPrefix(rawS3, "https://") || strings.HasSuffix(rawS3, ":443")
+
 	c := config{
 		DatabaseURL:    buildDatabaseURL(getenv),
 		HTTPAddr:       cmp.Or(getenv("HTTP_ADDR"), ":8080"),
@@ -98,10 +102,11 @@ func loadConfig(getenv func(string) string) (config, error) {
 		MaxAPIURL:      cmp.Or(getenv("MAX_API_URL"), maxapi.DefaultBaseURL),
 		MaxCAFile:      getenv("MAX_API_CA_FILE"),
 		S3: files.S3Config{
-			Endpoint:  cmp.Or(getenv("S3_ENDPOINT"), getenv("MINIO_ENDPOINT")),
+			Endpoint:  rawS3,
 			AccessKey: cmp.Or(getenv("S3_ACCESS_KEY"), getenv("MINIO_ACCESS_KEY_ID"), getenv("MINIO_ROOT_USER")),
 			SecretKey: cmp.Or(getenv("S3_SECRET_KEY"), getenv("MINIO_SECRET_ACCESS_KEY"), getenv("MINIO_ROOT_PASSWORD")),
 			Bucket:    cmp.Or(getenv("S3_BUCKET"), getenv("MINIO_BUCKET"), "photos"),
+			UseSSL:    useSSL,
 		},
 		PhotosDir:   cmp.Or(getenv("PHOTOS_DIR"), "data/photos"),
 		GeocoderURL: getenv("GEOCODER_URL"),
@@ -121,7 +126,9 @@ func loadConfig(getenv func(string) string) (config, error) {
 	}
 	parseBool("DEMO_AUTH_ENABLED", &c.DemoAuth)
 	parseBool("MAX_API_INSECURE_TLS", &c.MaxInsecureTLS)
-	parseBool("S3_USE_SSL", &c.S3.UseSSL)
+	if getenv("S3_USE_SSL") != "" {
+		parseBool("S3_USE_SSL", &c.S3.UseSSL)
+	}
 
 	if c.DatabaseURL == "" {
 		errs = append(errs, errors.New("DATABASE_URL or POSTGRES_HOST/DB_HOST is required"))
