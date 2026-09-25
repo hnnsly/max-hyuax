@@ -249,14 +249,12 @@ func TestChangesEnqueueLiveCardNotifications(t *testing.T) {
 	if _, err := f.svc.ChangeStatus(t.Context(), f.oper, is.ID(), issue.StatusDone, "Починили"); err != nil {
 		t.Fatal(err)
 	}
-	var finals int
+	kinds := map[app.NotificationKind]int{}
 	for _, n := range pending() {
-		if n.Kind == app.NotifyFinal {
-			finals++
-		}
+		kinds[n.Kind]++
 	}
-	// Карточки Анны и Сергея схлопываются в очереди, итоговых сообщений два.
-	if len(pending()) != 4 || finals != 2 {
+	// Карточки Анны и Сергея схлопываются в очереди; «в работе» и «выполнена» — по сообщению каждому.
+	if len(pending()) != 6 || kinds[app.NotifyFinal] != 2 || kinds[app.NotifyStatus] != 2 {
 		t.Fatalf("pending = %+v", pending())
 	}
 }

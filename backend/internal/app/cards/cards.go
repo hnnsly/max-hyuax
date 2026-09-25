@@ -27,7 +27,7 @@ func Plan(events []issue.Event, participants []issue.Participant) []app.Notifica
 			out = append(out, n)
 		}
 	}
-	var closed, overdue bool
+	var closed, overdue, moved bool
 	var reopenedBy []int64
 	for _, e := range events {
 		switch e.Kind {
@@ -38,6 +38,8 @@ func Plan(events []issue.Event, participants []issue.Participant) []app.Notifica
 				add(app.NotifyCard, p.UserID)
 			}
 			closed = closed || (e.Kind == issue.EventStatusChanged && e.Status.Closed())
+			// «Принята» и «в работе» — отдельное сообщение: закрытие и так шлёт итоговое.
+			moved = moved || (e.Kind == issue.EventStatusChanged && !e.Status.Closed())
 			overdue = overdue || e.Kind == issue.EventOverdue
 			if e.Kind == issue.EventReopened {
 				reopenedBy = append(reopenedBy, e.UserID)
@@ -56,7 +58,7 @@ func Plan(events []issue.Event, participants []issue.Participant) []app.Notifica
 	for _, notice := range []struct {
 		on   bool
 		kind app.NotificationKind
-	}{{closed, app.NotifyFinal}, {overdue, app.NotifyOverdue}} {
+	}{{closed, app.NotifyFinal}, {overdue, app.NotifyOverdue}, {moved && !closed, app.NotifyStatus}} {
 		if !notice.on {
 			continue
 		}
@@ -135,6 +137,11 @@ func (s *Service) Deliver(ctx context.Context, n app.Notification) error {
 		return s.store.Outbox().SaveCardMID(ctx, n.IssueID, n.UserID, newMID)
 	}
 	return nil
+}
+
+// Card собирает карточку заявки из актуального состояния: её показывает и бот по запросу жителя.
+func (s *Service) Card(ctx context.Context, issueID string) (Card, error) {
+	return s.card(ctx, issueID)
 }
 
 func (s *Service) card(ctx context.Context, issueID string) (Card, error) {

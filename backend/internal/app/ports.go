@@ -124,6 +124,9 @@ const (
 	NotifyOverdue NotificationKind = "overdue"
 	// NotifyReopened — отдельное сообщение соседям, когда житель вернул выполненную заявку в работу.
 	NotifyReopened NotificationKind = "reopened"
+	// NotifyStatus — отдельное сообщение участникам, когда УК приняла заявку или взяла её в работу:
+	// правка живой карточки телефон не подсвечивает, и житель не узнал бы о движении.
+	NotifyStatus NotificationKind = "status"
 )
 
 // Notification — намерение уведомить участника. Текст собирается при отправке
@@ -209,6 +212,23 @@ type CouncilRepo interface {
 	Tally(ctx context.Context, p council.Poll, userID int64) (Tally, error)
 }
 
+// BotPending — действие бота, которое ждёт следующего текстового сообщения пользователя:
+// комментарий к «Не починили», текст предложения совету, описание проблемы до выбора места.
+type BotPending struct {
+	Action    string
+	Ref       string // id заявки, категория и т.п., смысл задаёт действие
+	Text      string // текст, сохранённый до следующего шага
+	ExpiresAt time.Time
+}
+
+// BotPendingRepo — одно ожидающее действие на пользователя.
+type BotPendingRepo interface {
+	// Set заменяет ожидающее действие пользователя.
+	Set(ctx context.Context, userID int64, p BotPending) error
+	// Take забирает действие и стирает его; ok = false, если действия нет или оно истекло.
+	Take(ctx context.Context, userID int64, now time.Time) (p BotPending, ok bool, err error)
+}
+
 // Store — доступ к репозиториям; InTx выполняет fn в одной транзакции.
 type Store interface {
 	Issues() IssueRepo
@@ -217,5 +237,6 @@ type Store interface {
 	Outbox() OutboxRepo
 	Photos() PhotoRepo
 	Council() CouncilRepo
+	Pending() BotPendingRepo
 	InTx(ctx context.Context, fn func(tx Store) error) error
 }

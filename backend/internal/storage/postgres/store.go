@@ -67,11 +67,12 @@ func (s *Store) Close() { s.pool.Close() }
 
 func (s *Store) Ping(ctx context.Context) error { return s.pool.Ping(ctx) }
 
-func (s *Store) Issues() app.IssueRepo    { return issueRepo{s} }
-func (s *Store) Houses() app.HouseRepo    { return houseRepo{s.q} }
-func (s *Store) Users() app.UserRepo      { return userRepo{s.q} }
-func (s *Store) Photos() app.PhotoRepo    { return photoRepo{s.q} }
-func (s *Store) Council() app.CouncilRepo { return councilRepo{s.q} }
+func (s *Store) Issues() app.IssueRepo       { return issueRepo{s} }
+func (s *Store) Houses() app.HouseRepo       { return houseRepo{s.q} }
+func (s *Store) Users() app.UserRepo         { return userRepo{s.q} }
+func (s *Store) Photos() app.PhotoRepo       { return photoRepo{s.q} }
+func (s *Store) Council() app.CouncilRepo    { return councilRepo{s.q} }
+func (s *Store) Pending() app.BotPendingRepo { return pendingRepo{s.q} }
 
 // InTx выполняет fn в транзакции; вложенный вызов переиспользует текущую.
 func (s *Store) InTx(ctx context.Context, fn func(tx app.Store) error) error {

@@ -15,6 +15,7 @@ import (
 
 	"dommax/internal/app/apptest"
 	"dommax/internal/app/auth"
+	"dommax/internal/app/cards"
 	"dommax/internal/app/hints"
 	"dommax/internal/app/houses"
 	"dommax/internal/app/issues"
@@ -98,9 +99,10 @@ func findButton(t *testing.T, bs []maxapi.Button, text string) maxapi.Button {
 const botName = "t105_hakaton_max_bot"
 
 type env struct {
-	store *apptest.MemStore
-	max   *fakeMax
-	h     *bot.Handler
+	store  *apptest.MemStore
+	max    *fakeMax
+	h      *bot.Handler
+	issues *issues.Service
 }
 
 func newEnv(t *testing.T) env { return newEnvWithLLM(t, nil) }
@@ -119,11 +121,13 @@ func newEnvWithLLM(t *testing.T, llm hints.LLM) env {
 		Houses:         houses.NewService(s, nil),
 		Hints:          hints.NewService(llm, time.Second, slog.New(slog.NewTextHandler(io.Discard, nil))),
 		Photos:         photos.NewService(s, &apptest.MemFiles{}, photos.Config{Now: now, NewID: func() string { n++; return fmt.Sprintf("p-%d", n) }, ConsentVersion: "v1"}),
+		Cards:          cards.NewService(s, nil, now),
+		Pending:        s.Pending(),
 		ConsentVersion: "v1",
 		Now:            now,
 	}
 	f := &fakeMax{}
-	return env{store: s, max: f, h: bot.NewHandler(f, botName, svc, slog.New(slog.NewTextHandler(io.Discard, nil)))}
+	return env{store: s, max: f, issues: svc.Issues, h: bot.NewHandler(f, botName, svc, slog.New(slog.NewTextHandler(io.Discard, nil)))}
 }
 
 func text(from int64, body string) maxapi.Update {
@@ -530,7 +534,8 @@ func TestEmptyMessageAndLocationWithoutHouses(t *testing.T) {
 	}
 }
 
-func TestMyCommandListsIssuesAsAppButtons(t *testing.T) {
+// «Мои заявки» открывают карточку прямо в чате: статус, срок, хронология и кнопки.
+func TestMyCommandOpensIssueCardInChat(t *testing.T) {
 	e := newEnv(t)
 	e.resident(8401, true)
 	e.handle(t, text(8401, "Не горит свет на лестнице"))
@@ -538,8 +543,72 @@ func TestMyCommandListsIssuesAsAppButtons(t *testing.T) {
 	e.handle(t, press(8401, "cb1", findButton(t, bs, "Отправить").Payload))
 	e.handle(t, text(8401, "/my"))
 	txt, bs := e.max.last("")
-	if !strings.Contains(txt, "Ваши заявки") || len(bs) != 1 || bs[0].Type != "open_app" || !strings.HasPrefix(bs[0].Payload, "i_") {
+	if !strings.Contains(txt, "Ваши заявки") || len(bs) != 1 || bs[0].Type != "callback" || !strings.HasPrefix(bs[0].Payload, "i:") {
 		t.Fatalf("/my = %q %+v", txt, bs)
+	}
+	e.handle(t, press(8401, "cb2", bs[0].Payload))
+	card, cbs := e.max.last("")
+	if !strings.Contains(card, "Заявка № 101") || !strings.Contains(card, "Хронология") || !strings.Contains(card, "заявка подана") {
+		t.Fatalf("card = %q", card)
+	}
+	findButton(t, cbs, "Открыть в приложении")
+	// Автор уже участник: кнопки «Это и у меня» у него нет.
+	for _, b := range cbs {
+		if b.Text == "Это и у меня" {
+			t.Fatal("author sees join button")
+		}
+	}
+}
+
+// Меню: /menu и пункты «Сейчас в доме» и «Мой дом».
+func TestMenuShowsHouseIssues(t *testing.T) {
+	e := newEnv(t)
+	e.resident(8601, true)
+	e.handle(t, text(8601, "/menu"))
+	_, bs := e.max.last("")
+	e.handle(t, press(8601, "cb1", findButton(t, bs, "Сейчас в доме").Payload))
+	if txt, _ := e.max.last(""); !strings.Contains(txt, "нет открытых заявок") {
+		t.Fatalf("empty house = %q", txt)
+	}
+	e.handle(t, press(8601, "cb2", findButton(t, bs, "Мой дом").Payload))
+	if txt, _ := e.max.last(""); !strings.Contains(txt, "Ореховый бульвар, 17к2") {
+		t.Fatalf("my house = %q", txt)
+	}
+}
+
+// «Не починили» в боте: бот спрашивает комментарий, следующее сообщение возвращает заявку в работу,
+// а не создаёт новую проблему.
+func TestReopenAsksCommentInChat(t *testing.T) {
+	e := newEnv(t)
+	anna := e.resident(8701, true)
+	e.handle(t, text(8701, "Не горит свет на лестнице"))
+	_, bs := e.max.last("")
+	e.handle(t, press(8701, "cb1", findButton(t, bs, "Отправить").Payload))
+	oper := user.User{ID: 900, Role: user.RoleOperator, OrganizationID: "org-1"}
+	e.store.AddUser(oper)
+	for _, st := range []issue.Status{issue.StatusInProgress, issue.StatusDone} {
+		if _, err := e.issues.ChangeStatus(t.Context(), oper, "i-1", st, ""); err != nil {
+			t.Fatal(err)
+		}
+	}
+	e.handle(t, press(8701, "cb2", "i:i-1"))
+	_, cbs := e.max.last("")
+	e.handle(t, press(8701, "cb3", findButton(t, cbs, "Не починили").Payload))
+	if txt, _ := e.max.last(""); !strings.Contains(txt, "что осталось не так") {
+		t.Fatalf("reopen prompt = %q", txt)
+	}
+	e.handle(t, text(8701, "На третьем этаже всё ещё темно"))
+	if txt, _ := e.max.last(""); !strings.Contains(txt, "снова в работе") {
+		t.Fatalf("after comment = %q", txt)
+	}
+	is, _ := e.issues.Get(t.Context(), "i-1")
+	if is.Status() != issue.StatusInProgress || !is.HasParticipant(anna.ID) {
+		t.Fatalf("issue after reopen = %v", is.Status())
+	}
+	// Следующий текст снова считается новой проблемой.
+	e.handle(t, text(8701, "не горит свет в подъезде"))
+	if txt, _ := e.max.last(""); strings.Contains(txt, "снова в работе") {
+		t.Fatalf("pending was not cleared: %q", txt)
 	}
 }
 

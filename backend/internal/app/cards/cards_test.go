@@ -31,6 +31,9 @@ func card(id int64) app.Notification {
 func final(id int64) app.Notification {
 	return app.Notification{Kind: app.NotifyFinal, IssueID: "i1", UserID: id}
 }
+func status(id int64) app.Notification {
+	return app.Notification{Kind: app.NotifyStatus, IssueID: "i1", UserID: id}
+}
 func overdue(id int64) app.Notification {
 	return app.Notification{Kind: app.NotifyOverdue, IssueID: "i1", UserID: id}
 }
@@ -44,7 +47,9 @@ func TestPlanNotifiesOnlyParticipants(t *testing.T) {
 	}{
 		{"created: card to reporter", []issue.Event{{Kind: issue.EventCreated, IssueID: "i1", UserID: 1}}, parts(1), []app.Notification{card(1)}},
 		{"joined: counter refresh for all", []issue.Event{{Kind: issue.EventJoined, IssueID: "i1", UserID: 2}}, parts(1, 2), []app.Notification{card(1), card(2)}},
-		{"status: cards for all", []issue.Event{{Kind: issue.EventStatusChanged, IssueID: "i1", Status: issue.StatusInProgress}}, parts(1, 2), []app.Notification{card(1), card(2)}},
+		// «В работе» — карточка и отдельное сообщение: правка карточки телефон не подсвечивает.
+		{"status: cards and status messages", []issue.Event{{Kind: issue.EventStatusChanged, IssueID: "i1", Status: issue.StatusInProgress}}, parts(1, 2),
+			[]app.Notification{card(1), card(2), status(1), status(2)}},
 		{"done: cards and final messages", []issue.Event{{Kind: issue.EventStatusChanged, IssueID: "i1", Status: issue.StatusDone}}, parts(1, 2),
 			[]app.Notification{card(1), card(2), final(1), final(2)}},
 		{"overdue: cards and overdue messages", []issue.Event{{Kind: issue.EventOverdue, IssueID: "i1", Status: issue.StatusAccepted}}, parts(1, 2),
@@ -52,7 +57,7 @@ func TestPlanNotifiesOnlyParticipants(t *testing.T) {
 		{"several events are deduplicated", []issue.Event{
 			{Kind: issue.EventJoined, IssueID: "i1", UserID: 2},
 			{Kind: issue.EventStatusChanged, IssueID: "i1", Status: issue.StatusAccepted},
-		}, parts(1, 2), []app.Notification{card(1), card(2)}},
+		}, parts(1, 2), []app.Notification{card(1), card(2), status(1), status(2)}},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

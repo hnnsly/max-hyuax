@@ -154,8 +154,13 @@ func Open(ctx context.Context, cfg config, log *slog.Logger) (*Container, error)
 		if err != nil {
 			return nil, err
 		}
+		cardSvc, err := c.cards()
+		if err != nil {
+			return nil, err
+		}
 		return bot.NewHandler(client, me.Username, bot.Services{
-			Auth: c.Auth(), Issues: c.Issues(), Houses: c.Houses(), Hints: c.Hints(), Photos: c.Photos(), ConsentVersion: cfg.ConsentVersion, Now: time.Now,
+			Auth: c.Auth(), Issues: c.Issues(), Houses: c.Houses(), Hints: c.Hints(), Photos: c.Photos(),
+			Cards: cardSvc, Pending: store.Pending(), ConsentVersion: cfg.ConsentVersion, Now: time.Now,
 		}, log), nil
 	})
 	c.webhook = sync.OnceValues(func() (*bot.Webhook, error) {

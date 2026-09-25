@@ -101,6 +101,13 @@ func RenderNotice(kind app.NotificationKind, c cards.Card, botName string) maxap
 		fmt.Fprintf(&b, "**Срок ответа по заявке № %d истёк.** %s\n", c.Number, plain(c.Title))
 		fmt.Fprintf(&b, "%s должна была ответить до %s.\n", cmp.Or(c.Responsible, "Управляющая компания"), dayMonth(c.Deadline))
 		b.WriteString("Если ответа не будет, соседи могут обратиться в Мосжилинспекцию: даты, комментарии УК и число сообщивших уже собраны в заявке.")
+	case kind == app.NotifyStatus:
+		fmt.Fprintf(&b, "**Заявка № %d %s.** %s\n", c.Number, statusWord[c.Status], plain(c.Title))
+		fmt.Fprintf(&b, "%s, срок ответа до %s.\n", cmp.Or(c.Responsible, "Управляющая компания"), dayMonth(c.Deadline))
+		if c.Comment != "" {
+			fmt.Fprintf(&b, "Комментарий УК: %s\n", plain(c.Comment))
+		}
+		rows = [][]maxapi.Button{{maxapi.CallbackButton("Подробнее", pack(cbIssue, c.IssueID)), open}}
 	case kind == app.NotifyReopened:
 		fmt.Fprintf(&b, "**Заявка № %d снова в работе.** %s\n", c.Number, plain(c.Title))
 		fmt.Fprintf(&b, "Сосед сообщил, что не починили. Новый срок ответа до %s.", dayMonth(c.Deadline))
@@ -115,9 +122,9 @@ func RenderNotice(kind app.NotificationKind, c cards.Card, botName string) maxap
 			fmt.Fprintf(&b, "Комментарий УК: %s\n", plain(c.Comment))
 		}
 		b.WriteString("Проверьте, пожалуйста: если не починили, заявка вернётся в работу. Ответить можно в течение 7 дней.")
-		// «Не починили» ведёт в карточку: там пишется комментарий для УК.
+		// «Не починили»: бот спросит комментарий следующим сообщением.
 		rows = [][]maxapi.Button{
-			{maxapi.CallbackButton("Починили", ConfirmPayload(c.IssueID)), maxapi.OpenAppButton("Не починили", botName, "i_"+c.IssueID)},
+			{maxapi.CallbackButton("Починили", ConfirmPayload(c.IssueID)), maxapi.CallbackButton("Не починили", pack(cbReopen, c.IssueID))},
 			{open},
 		}
 	}

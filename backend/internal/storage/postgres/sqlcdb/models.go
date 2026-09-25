@@ -26,6 +26,14 @@ type BotCard struct {
 	UpdatedAt time.Time
 }
 
+type BotPending struct {
+	UserID    int64
+	Action    string
+	Ref       string
+	Text      string
+	ExpiresAt time.Time
+}
+
 type Entrance struct {
 	ID      string
 	HouseID string

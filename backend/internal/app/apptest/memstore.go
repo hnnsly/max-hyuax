@@ -31,6 +31,7 @@ type MemStore struct {
 	nextUID  int64
 	outbox   MemOutbox
 	council  memCouncil
+	pending  map[int64]app.BotPending
 }
 
 // MemOutbox — очередь уведомлений в памяти: Pending виден тестам напрямую.
@@ -655,4 +656,26 @@ func (r councilRepo) Tally(_ context.Context, p council.Poll, userID int64) (app
 		}
 	}
 	return t, nil
+}
+
+func (s *MemStore) Pending() app.BotPendingRepo { return pendingRepo{s} }
+
+type pendingRepo struct{ s *MemStore }
+
+func (r pendingRepo) Set(_ context.Context, userID int64, p app.BotPending) error {
+	r.s.mu.Lock()
+	defer r.s.mu.Unlock()
+	if r.s.pending == nil {
+		r.s.pending = map[int64]app.BotPending{}
+	}
+	r.s.pending[userID] = p
+	return nil
+}
+
+func (r pendingRepo) Take(_ context.Context, userID int64, now time.Time) (app.BotPending, bool, error) {
+	r.s.mu.Lock()
+	defer r.s.mu.Unlock()
+	p, ok := r.s.pending[userID]
+	delete(r.s.pending, userID)
+	return p, ok && now.Before(p.ExpiresAt), nil
 }

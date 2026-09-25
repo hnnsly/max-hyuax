@@ -14,6 +14,7 @@ import (
 
 	"dommax/internal/app"
 	"dommax/internal/app/auth"
+	"dommax/internal/app/cards"
 	"dommax/internal/app/hints"
 	"dommax/internal/app/houses"
 	"dommax/internal/app/issues"
@@ -52,6 +53,8 @@ type Services struct {
 	Houses         *houses.Service
 	Hints          *hints.Service
 	Photos         *photos.Service
+	Cards          *cards.Service     // карточка заявки для показа в чате
+	Pending        app.BotPendingRepo // что бот ждёт от жителя следующим сообщением
 	ConsentVersion string
 	Now            func() time.Time
 }
@@ -70,6 +73,7 @@ func NewHandler(m Messenger, botName string, svc Services, log *slog.Logger) *Ha
 
 // Команды для меню бота (PATCH /me/commands).
 var Commands = []maxapi.Command{
+	{Name: "menu", Description: "Главное меню"},
 	{Name: "new", Description: "Сообщить о проблеме"},
 	{Name: "my", Description: "Мои заявки"},
 	{Name: "house", Description: "Мой дом и контакты УК"},
@@ -81,7 +85,7 @@ const greetingText = "Здравствуйте! Я помогаю соседям
 
 const helpText = "Напишите одним сообщением, что сломалось и где, например: «не горит свет на 5 этаже во втором подъезде». " +
 	"Я определю категорию, ответственного и срок и проверю, не сообщали ли уже соседи.\n\n" +
-	"Команды:\n/new сообщить о проблеме\n/my мои заявки\n/house мой дом и контакты УК\n\n" +
+	"Команды:\n/menu главное меню\n/new сообщить о проблеме\n/my мои заявки\n/house мой дом и контакты УК\n\n" +
 	"Соседи видят только число сообщивших. Имя получает только управляющая компания."
 
 func (h *Handler) Handle(ctx context.Context, u maxapi.Update) error {
@@ -130,8 +134,18 @@ func (h *Handler) onMessage(ctx context.Context, m *maxapi.Message) error {
 			return h.myIssues(ctx, to, m.Sender)
 		case "house":
 			return h.myHouse(ctx, to, m.Sender)
+		case "menu":
+			return h.menu(ctx, to)
 		}
 		return h.greet(ctx, to, "")
+	}
+	u, err := h.resident(ctx, m.Sender)
+	if err != nil {
+		return err
+	}
+	// Бот мог спросить комментарий или текст предложения: тогда это ответ, а не новая проблема.
+	if handled, err := h.onPending(ctx, to, u, txt); handled || err != nil {
+		return err
 	}
 	return h.onProblemText(ctx, to, m.Sender, txt)
 }
@@ -271,16 +285,7 @@ func (h *Handler) myIssues(ctx context.Context, to maxapi.Target, from maxapi.Us
 	if err != nil {
 		return err
 	}
-	if len(list) == 0 {
-		return h.send(ctx, to, "Заявок пока нет. Напишите, что сломалось, и я помогу оформить заявку.")
-	}
-	var rows [][]maxapi.Button
-	for _, is := range list[:min(8, len(list))] {
-		label := truncate(fmt.Sprintf("№ %d, %s", is.Number(), is.Title()), 60)
-		rows = append(rows, []maxapi.Button{maxapi.OpenAppButton(label, h.botName, "i_"+is.ID())})
-	}
-	_, err = h.max.Send(ctx, to, maxapi.NewMessage{Text: "Ваши заявки:", Attachments: []maxapi.Attachment{maxapi.Keyboard(rows...)}})
-	return err
+	return h.issueList(ctx, to, "Ваши заявки:", "Заявок пока нет. Напишите, что сломалось, и я помогу оформить заявку.", list)
 }
 
 // maxBotPhotos — сколько снимков из одного сообщения прикладывается за раз, как и в мини-приложении.
@@ -407,7 +412,23 @@ func (h *Handler) callbackReply(ctx context.Context, cb *maxapi.Callback) (maxap
 		if _, err := h.svc.Auth.SetHouse(ctx, u, rest); err != nil {
 			return maxapi.CallbackAnswer{}, err
 		}
-		return replace(fmt.Sprintf("Дом сохранён: %s.\nТеперь опишите проблему одним сообщением: что сломалось и где.", d.House.Address)), nil
+		m := maxapi.NewMessage{
+			Text:        fmt.Sprintf("Дом сохранён: %s.\nТеперь опишите проблему одним сообщением: что сломалось и где. Или выберите действие:", d.House.Address),
+			Attachments: []maxapi.Attachment{menuKeyboard(h.botName)},
+		}
+		return maxapi.CallbackAnswer{Message: &m}, nil
+
+	case cbMenu:
+		return h.menuItem(ctx, maxapi.ToUser(cb.User.UserID), cb.User, rest)
+
+	case cbIssue:
+		if err := h.showIssue(ctx, maxapi.ToUser(cb.User.UserID), u, rest); err != nil {
+			return maxapi.CallbackAnswer{}, err
+		}
+		return maxapi.CallbackAnswer{Notification: "Заявка открыта ниже"}, nil
+
+	case cbReopen:
+		return h.askReopenComment(ctx, u, maxapi.ToUser(cb.User.UserID), rest)
 
 	case cbPick:
 		var rows [][]maxapi.Button
@@ -491,11 +512,8 @@ func (h *Handler) join(ctx context.Context, u user.User, issueID string) (maxapi
 
 func (h *Handler) greet(ctx context.Context, to maxapi.Target, startPayload string) error {
 	_, err := h.max.Send(ctx, to, maxapi.NewMessage{
-		Text: greetingText,
-		Attachments: []maxapi.Attachment{maxapi.Keyboard(
-			[]maxapi.Button{maxapi.CallbackButton("Сообщить о проблеме", PayloadReport)},
-			[]maxapi.Button{maxapi.OpenAppButton("Открыть приложение", h.botName, startPayload)},
-		)},
+		Text:        greetingText,
+		Attachments: []maxapi.Attachment{greetKeyboard(h.botName, startPayload)},
 	})
 	return err
 }
