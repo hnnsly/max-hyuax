@@ -64,6 +64,7 @@ OLLAMA_URL=http://ollama:11434
    | `DOMAIN` | домен стенда, например `dom.example.ru`; Caddy сам получит сертификат Let's Encrypt |
    | `POSTGRES_PASSWORD` | свой пароль |
    | `SESSION_SECRET` | случайная строка: `openssl rand -hex 32` |
+   | `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD` | свой логин и пароль MinIO (пароль не короче 8 символов). Порты MinIO открыты только на `127.0.0.1`, наружу их не пробрасывать |
    | `DEMO_AUTH_ENABLED` | `true` на стенде для жюри |
    | `BOT_MODE` | `webhook` |
    | `MAX_BOT_TOKEN` | токен бота из кабинета MAX |
@@ -77,7 +78,7 @@ OLLAMA_URL=http://ollama:11434
 
 **Бэкап:**
 - база: `docker compose -f deploy/compose.yaml exec db pg_dump -U dommax dommax > backup.sql`;
-- фото к заявкам лежат в томе `photos`: `docker run --rm -v dom-max_photos:/data -v "$PWD":/out alpine tar czf /out/photos.tgz -C /data .`.
+- фото к заявкам лежат в MinIO, том `minio_data`: `docker run --rm -v dom-max_minio_data:/data -v "$PWD":/out alpine tar czf /out/minio.tgz -C /data .`.
 
 ## Особенности MAX
 

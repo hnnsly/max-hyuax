@@ -11,6 +11,7 @@ import (
 
 	"github.com/gofiber/fiber/v3"
 
+	"dommax/internal/app"
 	"dommax/internal/app/appeal"
 	"dommax/internal/app/auth"
 	"dommax/internal/app/cards"
@@ -43,7 +44,7 @@ type Container struct {
 	log   *slog.Logger
 	ctx   context.Context // корневой контекст для провайдеров, которым нужна сеть
 	store *postgres.Store
-	files *files.Disk
+	files fileStore
 
 	auth       func() *auth.Service
 	issues     func() *issues.Service
@@ -69,13 +70,12 @@ func Open(ctx context.Context, cfg config, log *slog.Logger) (*Container, error)
 	if err != nil {
 		return nil, fmt.Errorf("database open: %w", err)
 	}
-	// Каталог фото проверяется при старте: без него загрузка фото сломается уже у жителя.
-	disk, err := files.NewDisk(cfg.PhotosDir)
+	photoFiles, err := openFiles(ctx, cfg, log)
 	if err != nil {
 		store.Close()
-		return nil, fmt.Errorf("photos dir: %w", err)
+		return nil, fmt.Errorf("photos storage: %w", err)
 	}
-	c := &Container{cfg: cfg, log: log, ctx: ctx, store: store, files: disk}
+	c := &Container{cfg: cfg, log: log, ctx: ctx, store: store, files: photoFiles}
 
 	c.auth = sync.OnceValue(func() *auth.Service {
 		return auth.NewService(store, auth.Config{
@@ -90,7 +90,7 @@ func Open(ctx context.Context, cfg config, log *slog.Logger) (*Container, error)
 	})
 	c.houses = sync.OnceValue(func() *houses.Service { return houses.NewService(store) })
 	c.photos = sync.OnceValue(func() *photos.Service {
-		return photos.NewService(store, disk, photos.Config{
+		return photos.NewService(store, photoFiles, photos.Config{
 			Now: time.Now, NewID: func() string { return uuid.NewV7().String() }, ConsentVersion: cfg.ConsentVersion,
 		})
 	})
@@ -188,6 +188,31 @@ func Open(ctx context.Context, cfg config, log *slog.Logger) (*Container, error)
 		return httpapi.New(deps), nil
 	})
 	return c, nil
+}
+
+// fileStore — хранилище фото, которое закрывается вместе с контейнером.
+type fileStore interface {
+	app.FileStore
+	Close() error
+}
+
+// openFiles выбирает хранилище фото: S3 (MinIO), если он настроен, иначе каталог на диске.
+// Хранилище проверяется при старте: без него загрузка фото сломается уже у жителя.
+func openFiles(ctx context.Context, cfg config, log *slog.Logger) (fileStore, error) {
+	if cfg.S3.Endpoint != "" {
+		s3, err := files.NewS3(ctx, cfg.S3)
+		if err != nil {
+			return nil, err
+		}
+		log.Info("photos storage", "kind", "s3", "endpoint", cfg.S3.Endpoint, "bucket", cfg.S3.Bucket)
+		return s3, nil
+	}
+	disk, err := files.NewDisk(cfg.PhotosDir)
+	if err != nil {
+		return nil, err
+	}
+	log.Info("photos storage", "kind", "disk", "dir", cfg.PhotosDir)
+	return disk, nil
 }
 
 func (c *Container) Close() {

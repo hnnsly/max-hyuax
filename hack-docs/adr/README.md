@@ -30,8 +30,9 @@ tags: [adr, decisions]
 | [012](012-taskfile.md) | Taskfile.yml — единая точка команд, `.env` в корне | accepted | 2026-09-24 |
 | [013](013-submission-run-and-data-api.md) | Запуск для жюри одной командой, формат DATA-API.yaml 1.0 и его проверка в CI | accepted | 2026-09-24 |
 | [014](014-llm-model-and-prompt.md) | Модель подсказки категории: qwen3:4b, выбор из русских названий, таймаут 8 с, прогрев | accepted | 2026-09-24 |
-| [015](015-photo-storage.md) | Фото к заявке на томе через порт FileStore вместо MinIO; EXIF вычищается, доступ участникам и УК | accepted | 2026-09-24 |
+| [015](015-photo-storage.md) | Фото к заявке на томе через порт FileStore вместо MinIO; EXIF вычищается, доступ участникам и УК | superseded (хранение → 018) | 2026-09-24 |
 | [017](017-district-and-chairman-roles.md) | Роль района (только чтение, сравнение УК) и роль председателя совета | accepted | 2026-09-25 |
+| [018](018-photos-in-minio.md) | Фото в MinIO по S3 API (`minio-go`), диск запасной; AGPL сервера не касается кода | accepted | 2026-09-25 |
 
 Статусы: `candidate` — решение нужно, не обсуждалось; `proposed` — предложено; `accepted` — принято; `superseded` — заменено.
 

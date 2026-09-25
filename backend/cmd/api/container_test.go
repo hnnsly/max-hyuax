@@ -9,6 +9,7 @@ import (
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
+	"os"
 	"strings"
 	"sync/atomic"
 	"testing"
@@ -16,6 +17,7 @@ import (
 
 	"github.com/jackc/pgx/v5"
 
+	"dommax/internal/storage/files"
 	"dommax/internal/storage/postgres/pgtest"
 )
 
@@ -259,4 +261,33 @@ func TestWebhookModeSubscribesAndChecksSecret(t *testing.T) {
 	if err != nil || res.StatusCode != http.StatusUnauthorized {
 		t.Fatalf("webhook with wrong secret: %v, %v", res, err)
 	}
+}
+
+// С S3_ENDPOINT фото уходят в MinIO, без него — на диск; неверный ключ доступа виден при старте.
+func TestOpenFilesPicksStorage(t *testing.T) {
+	disk, err := openFiles(t.Context(), config{PhotosDir: t.TempDir()}, quietLog())
+	if err != nil {
+		t.Fatalf("disk: %v", err)
+	}
+	_ = disk.Close()
+
+	endpoint := os.Getenv("TEST_S3_ENDPOINT")
+	if endpoint == "" {
+		t.Skip("TEST_S3_ENDPOINT не задан: MinIO не поднят (task s3)")
+	}
+	cfg := config{S3: files.S3Config{
+		Endpoint: endpoint, AccessKey: os.Getenv("TEST_S3_ACCESS_KEY"), SecretKey: "wrong-secret", Bucket: "photos",
+	}}
+	if _, err := openFiles(t.Context(), cfg, quietLog()); err == nil {
+		t.Fatal("openFiles with wrong S3 secret succeeded")
+	}
+	cfg.S3.SecretKey = os.Getenv("TEST_S3_SECRET_KEY")
+	s3, err := openFiles(t.Context(), cfg, quietLog())
+	if err != nil {
+		t.Fatalf("s3: %v", err)
+	}
+	if _, ok := s3.(*files.S3); !ok {
+		t.Fatalf("store = %T, want *files.S3", s3)
+	}
+	_ = s3.Close()
 }

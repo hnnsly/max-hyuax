@@ -121,7 +121,7 @@ curl -s -X POST $BASE/issues -H "Authorization: Bearer $TOKEN" -H "Content-Type:
 | Команда | Что проверяет |
 |---|---|
 | `task test` | юнит-тесты бэкенда: домен, сценарии, бот, фоновые задачи |
-| `task db` и `task test:integration` | тесты на настоящем Postgres: хранилище, весь HTTP API с негативными путями, контейнер зависимостей, проверки из `DATA-API.yaml` |
+| `task db`, `task s3` и `task test:integration` | тесты на настоящих Postgres и MinIO: хранилище данных и фото, весь HTTP API с негативными путями, контейнер зависимостей, проверки из `DATA-API.yaml` |
 | `task test:cover` | покрытие бэкенда с порогом: всего не меньше 80%, пакеты домена и сценариев не меньше 80% |
 | `task miniapp:test` и `task miniapp:cover` | логика мини-приложения: форматирование, модели экранов, метрики, наклейки |
 | `task miniapp:typecheck` | TypeScript в строгом режиме |

@@ -82,7 +82,7 @@ backend/                Go 1.27.1 · Fiber v3 · pgx + sqlc · PostgreSQL · goo
   internal/app/         сценарии + порты (интерфейсы); зависит только от domain
   internal/app/apptest/ хранилище в памяти для юнит-тестов сценариев
   internal/transport/   входящие: httpapi (Fiber), bot (события MAX, webhook, polling), jobs (outbox, просрочки), pdf (обращение в ГЖИ)
-  internal/storage/     исходящие: postgres (репозитории, migrations, queries → sqlcdb), maxapi (клиент Bot API), llm (Ollama), files (фото на томе)
+  internal/storage/     исходящие: postgres (репозитории, migrations, queries → sqlcdb), maxapi (клиент Bot API), llm (Ollama), files (фото в MinIO по S3, диск запасной)
 miniapp/                Vite · React 19 · TypeScript (strict) · @maxhub/max-ui · MAX Bridge · Vitest
   src/app (сессия, стек экранов), src/pages, src/shared/{api,bridge,lib,ui,theme}
 deploy/                 compose.yaml, Caddyfile, seed/
@@ -95,7 +95,7 @@ docs/                   документация продукта (ведётс�
   - `app` зависит только от `domain`;
   - `transport` и `storage` зависят от `app` и `domain`;
   - сборка зависимостей — только в `cmd/api`.
-- **YAGNI** (список в ADR-010): без CQRS, шины событий и DTO на каждый сценарий. LLM (ADR-014) и PDF подключены как Should; вместо MinIO фото лежат на томе за портом `FileStore` (ADR-015).
+- **YAGNI** (список в ADR-010): без CQRS, шины событий и DTO на каждый сценарий. LLM (ADR-014) и PDF подключены как Should; фото в MinIO за портом `FileStore` (ADR-018), без `S3_ENDPOINT` на диске.
 - **Go:** версия 1.27.1. Перед правкой Go-файла — скилл `modern-go-guidelines:use-modern-go` (`list --go-version 1.27`), после правок — диагностика gopls.
 - **Бот:** свой тонкий клиент `internal/storage/maxapi` (около 6 методов). SDK `max-bot-api-client-go` — только если он поддерживает `platform-api2` без обходных путей.
 - **LLM:** Ollama self-hosted, профиль compose `llm` (ADR-008).
@@ -106,7 +106,7 @@ docs/                   документация продукта (ведётс�
 **Добавляйте сюда реальные команды сразу, как только они заработают.** Не вписывайте непроверенные команды.
 
 Единая точка — `Taskfile.yml` в корне (Task v3; `task` показывает список). Переменные для локального запуска лежат в `.env` в корне. Новые команды добавляются в Taskfile.
-- `task db` — поднять Postgres 18.6 в Docker (Docker Desktop должен быть запущен);
+- `task db` — поднять Postgres 18.6 в Docker (Docker Desktop должен быть запущен); `task s3` — MinIO на `127.0.0.1:19000` (нужен для `task test:integration`);
 - `task test` — юнит-тесты; `task test:integration` — тесты на Postgres (временная база на каждый прогон);
 - `task lint` — `gofmt` и `go vet`;
 - `task test:cover` — integration с профилем по `./internal/...` + порог `tools/covercheck` (всего ≥ 80%, пакеты domain и app ≥ 80%; на 25.09 — 91,4%); `task miniapp:cover` — Vitest, порог 90% по `src/shared/lib`;
@@ -157,7 +157,7 @@ docs/                   документация продукта (ведётс�
 - `hack-docs/HANDOFF.md` — текущее состояние работы и следующий шаг
 - `hack-docs/INDEX.md` — вход в базу знаний
 - `hack-docs/SRS.md` + `hack-docs/requirements/` — требования (user-stories, ux-flows, nfr, data-model)
-- `hack-docs/adr/` — решения 001–015 и 017 (016 зарезервирован под геокодер)
+- `hack-docs/adr/` — решения 001–015, 017 и 018 (016 зарезервирован под геокодер)
 - `hack-docs/design/canvas-v2/project/` — утверждённый дизайн v2 (эталон экранов), `hack-docs/design/DESIGN-SYSTEM.md`
 - `hack-docs/GEN_V2_PLAN.md` — действующий план на 24–30.09 (части 0–7, линия отсечения); `hack-docs/GENERAL_PLAN.md` (v1) и `hack-docs/ROADMAP.md` — исходный план и вехи M0–M5
 - `hack-docs/research/max-platform-capabilities.md` — справка по Bot API, Bridge, MAX UI

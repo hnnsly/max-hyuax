@@ -41,6 +41,11 @@ tasks:
     cmds:
       - '{{.COMPOSE}} up -d --wait db'
 
+  s3:
+    desc: Поднять только MinIO (фото, S3 API на 127.0.0.1:19000, консоль на :19001)
+    cmds:
+      - '{{.COMPOSE}} up -d --wait minio'
+
   db:psql:
     desc: Консоль psql в контейнере БД
     interactive: true
@@ -71,13 +76,13 @@ tasks:
       - go test ./...
 
   test:integration:
-    desc: Тесты на настоящем Postgres (сначала task db)
+    desc: Тесты на настоящих Postgres и MinIO (сначала task db и task s3)
     dir: backend
     cmds:
       - go test -tags integration -count=1 ./...
 
   test:cover:
-    desc: Покрытие (с integration) и порог — всего ≥ 80%, пакеты domain и app ≥ 80% (сначала task db)
+    desc: Покрытие (с integration) и порог — всего ≥ 80%, пакеты domain и app ≥ 80% (сначала task db и task s3)
     dir: backend
     cmds:
       - go test -tags integration -count=1 -coverpkg=./internal/... -coverprofile=coverage.out ./...

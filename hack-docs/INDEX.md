@@ -99,7 +99,8 @@ tags: [index, hub]
 | [adr/012-taskfile.md](adr/012-taskfile.md) | Taskfile.yml — единая точка команд, `.env` в корне для локального запуска | accepted | 2026-09-24 |
 | [adr/013-submission-run-and-data-api.md](adr/013-submission-run-and-data-api.md) | запуск для жюри одной командой из `deploy/.env.example`, формат `DATA-API.yaml` 1.0 и его проверка в CI | accepted | 2026-09-24 |
 | [adr/014-llm-model-and-prompt.md](adr/014-llm-model-and-prompt.md) | подсказка категории через Ollama: модель qwen3:4b, русские названия в enum, откат на ключевые слова, прогрев | accepted | 2026-09-24 |
-| [adr/015-photo-storage.md](adr/015-photo-storage.md) | фото к заявке: том и порт FileStore вместо MinIO, перекодирование без EXIF, доступ участникам и УК | accepted | 2026-09-24 |
+| [adr/015-photo-storage.md](adr/015-photo-storage.md) | фото к заявке: порт FileStore, перекодирование без EXIF, доступ участникам и УК; хранение заменено ADR-018 | superseded | 2026-09-24 |
+| [adr/018-photos-in-minio.md](adr/018-photos-in-minio.md) | фото в MinIO по S3 API (`minio-go`), образ `coollabsio/minio`, AGPL сервера не касается кода, диск запасной | accepted | 2026-09-25 |
 | [adr/017-district-and-chairman-roles.md](adr/017-district-and-chairman-roles.md) | роль района (только чтение, сравнение УК) и роль председателя совета | accepted | 2026-09-25 |
 | [HANDOFF.md](HANDOFF.md) | заметка передачи: кто в работе, что сделано, следующий шаг | active | 2026-09-25 |
 | [design/canvas-v2/project/](design/canvas-v2/project/canvas.json) | утверждённый дизайн v2: 12 артбордов (житель, УК, бот, наклейка, тёмная тема, разбор системы) | accepted | 2026-09-23 |

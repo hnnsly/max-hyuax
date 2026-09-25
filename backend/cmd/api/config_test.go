@@ -28,6 +28,28 @@ func TestConfigRequiresSecrets(t *testing.T) {
 	}
 }
 
+// Без S3_ENDPOINT фото пишутся на диск; с ним нужны ключи доступа, бакет по умолчанию photos.
+func TestConfigS3(t *testing.T) {
+	c, err := loadConfig(env(base()))
+	if err != nil || c.S3.Endpoint != "" {
+		t.Fatalf("default S3 = %+v, err = %v", c.S3, err)
+	}
+	m := base()
+	m["S3_ENDPOINT"] = "minio:9000"
+	m["S3_USE_SSL"] = "maybe"
+	_, err = loadConfig(env(m))
+	for _, want := range []string{"S3_ACCESS_KEY", "S3_SECRET_KEY", "S3_USE_SSL"} {
+		if err == nil || !strings.Contains(err.Error(), want) {
+			t.Fatalf("err = %v, want mention of %s", err, want)
+		}
+	}
+	m["S3_ACCESS_KEY"], m["S3_SECRET_KEY"], m["S3_USE_SSL"] = "user", "secret", "true"
+	c, err = loadConfig(env(m))
+	if err != nil || c.S3.Bucket != "photos" || !c.S3.UseSSL || c.S3.AccessKey != "user" {
+		t.Fatalf("S3 = %+v, err = %v", c.S3, err)
+	}
+}
+
 func TestWebhookModeNeedsDomainTokenAndValidSecret(t *testing.T) {
 	m := base()
 	m["BOT_MODE"] = "webhook"

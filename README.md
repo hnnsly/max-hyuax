@@ -68,7 +68,8 @@ docker compose -f deploy/compose.yaml --env-file deploy/.env.example up -d --bui
 | Переменная | Назначение | Локально |
 |---|---|---|
 | `DOMAIN` | адрес сайта для Caddy; на сервере домен, для него выпускается сертификат | `:80` |
-| `HTTP_PORT`, `HTTPS_PORT`, `DB_PORT` | порты на машине | `80`, `443`, `15432` |
+| `HTTP_PORT`, `HTTPS_PORT`, `DB_PORT`, `S3_PORT`, `S3_CONSOLE_PORT` | порты на машине | `80`, `443`, `15432`, `19000`, `19001` |
+| `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD` | логин и пароль MinIO, ими же api входит в хранилище фото | `dommax`, `dommax-local-only` |
 | `POSTGRES_PASSWORD` | пароль базы | локальный |
 | `SESSION_SECRET` | подпись сессий мини-приложения, не короче 16 символов | локальный |
 | `DEMO_AUTH_ENABLED` | демо-вход по ролям для проверки | `true` |
@@ -80,7 +81,8 @@ docker compose -f deploy/compose.yaml --env-file deploy/.env.example up -d --bui
 - `CONSENT_VERSION`: версия согласия на обработку данных, по умолчанию `v1`;
 - `MAX_API_URL`: адрес Bot API, по умолчанию `https://platform-api2.max.ru`;
 - `MAX_API_CA_FILE`: свой файл корневых сертификатов;
-- `PHOTOS_DIR`: каталог фото к заявкам, в Docker это том `photos` (`/data/photos`);
+- `S3_ENDPOINT`, `S3_ACCESS_KEY`, `S3_SECRET_KEY`, `S3_BUCKET`, `S3_USE_SSL`: хранилище фото к заявкам по S3 API. В Docker это сервис `minio`, ключи берутся из `MINIO_ROOT_USER` и `MINIO_ROOT_PASSWORD`;
+- `PHOTOS_DIR`: каталог фото на диске, если `S3_ENDPOINT` не задан (локальный запуск без Docker);
 - `OLLAMA_URL`, `OLLAMA_MODEL`, `COMPOSE_PROFILES=llm`: подсказка категории через self-hosted модель (необязательно, см. [docs/deployment.md](docs/deployment.md)).
 
 ## Порты
@@ -90,6 +92,7 @@ docker compose -f deploy/compose.yaml --env-file deploy/.env.example up -d --bui
 | 80 / 443 | машина | `web` (Caddy): мини-приложение, `/api/*`, `/webhook/*` |
 | 8080 | внутри сети compose | `api` |
 | 5432 | внутри сети compose; на машине `127.0.0.1:15432` | `db` |
+| 9000 / 9001 | внутри сети compose; на машине `127.0.0.1:19000` и `127.0.0.1:19001` | `minio`: S3 API и консоль |
 
 ## Зависимости
 
@@ -113,7 +116,7 @@ docker compose -f deploy/compose.yaml --env-file deploy/.env.example up -d --bui
 
 ## Работа с данными
 
-- **Хранение.** Данные лежат в PostgreSQL, схема создаётся миграциями при старте `api`. Фото к заявкам лежат на томе `photos`.
+- **Хранение.** Данные лежат в PostgreSQL, схема создаётся миграциями при старте `api`. Фото к заявкам лежат в MinIO (S3 API), том `minio_data`.
 - **Журнал событий.** По каждой заявке хранятся создание, присоединения, смена статуса и просрочка.
 - **Персональные данные:**
   - соседи видят только число сообщивших;

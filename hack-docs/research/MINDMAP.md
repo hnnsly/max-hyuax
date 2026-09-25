@@ -246,7 +246,7 @@ sequenceDiagram
 ## 6. Что решено на интервью (17.09)
 1. **Фокус и сегмент** — ядро H1 + H2 + шеринг; жители панельного фонда 70–90-х; пилот Москва; экосистема за воротами 22.09 → [Блок А](../interview/BLOCK-A.md), [ADR-002](../adr/002-product-scope.md).
 2. **UX** — бот и мини-приложение равнозначны; простое решается в боте, сложное — через LLM и форму; хаб «Мой дом»; УК — список + дашборд → [Блок Б](../interview/BLOCK-B.md), [ux-flows](../requirements/ux-flows.md).
-3. **Данные и стек** — открытые данные района Москвы; Go + Fiber v3 + PostgreSQL + MinIO (позже заменён томом, [ADR-015](../adr/015-photo-storage.md)); React JS (позже TypeScript, [ADR-011](../adr/011-miniapp-typescript.md)) + MAX UI; Ollama → [Блок В](../interview/BLOCK-V.md), [ADR-003](../adr/003-backend-architecture.md), [ADR-008](../adr/008-llm-self-hosted.md).
+3. **Данные и стек** — открытые данные района Москвы; Go + Fiber v3 + PostgreSQL + MinIO (сначала заменён томом, [ADR-015](../adr/015-photo-storage.md), затем возвращён, [ADR-018](../adr/018-photos-in-minio.md)); React JS (позже TypeScript, [ADR-011](../adr/011-miniapp-typescript.md)) + MAX UI; Ollama → [Блок В](../interview/BLOCK-V.md), [ADR-003](../adr/003-backend-architecture.md), [ADR-008](../adr/008-llm-self-hosted.md).
 4. **Команда** — фулстек-пары; GitHub Issues + PR + CI; сдача из чистого репозитория → [Блок Г](../interview/BLOCK-G.md), [ADR-007](../adr/007-submission-packaging.md).
 
 ---
