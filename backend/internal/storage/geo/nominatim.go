@@ -86,22 +86,22 @@ type address struct {
 	ISO          string `json:"ISO3166-2-lvl4"`
 }
 
+const (
+	minLat = 54.20
+	maxLat = 56.95
+	minLon = 35.10
+	maxLon = 40.25
+)
+
 func isMoscow(p place, lat, lon float64) bool {
-	inBBox := lat >= 55.10 && lat <= 56.10 && lon >= 36.80 && lon <= 38.00
-	if !inBBox {
-		return false
-	}
-	a := p.Address
-	if strings.Contains(a.State, "Московская область") || strings.Contains(a.County, "Московская область") || a.ISO == "RU-MOS" {
-		return false
-	}
-	return true
+	return lat >= minLat && lat <= maxLat && lon >= minLon && lon <= maxLon
 }
 
 func CleanDistrictName(raw string) string {
 	d := strings.TrimSpace(raw)
 	for _, prefix := range []string{
 		"муниципальный округ ", "Муниципальный округ ",
+		"городской округ ", "Городской округ ",
 		"район ", "Район ",
 		"поселение ", "Поселение ",
 		"городское поселение ",
@@ -111,6 +111,7 @@ func CleanDistrictName(raw string) string {
 	for _, suffix := range []string{
 		" район", " Район",
 		" муниципальный округ",
+		" городской округ",
 	} {
 		d = strings.TrimSuffix(d, suffix)
 	}
@@ -118,16 +119,20 @@ func CleanDistrictName(raw string) string {
 }
 
 func extractDistrict(a address) string {
-	for _, candidate := range []string{a.Suburb, a.Municipality, a.CityDistrict, a.County} {
+	for _, candidate := range []string{a.City, a.Town, a.Suburb, a.Municipality, a.CityDistrict, a.County} {
 		d := CleanDistrictName(candidate)
-		if d != "" && !strings.Contains(strings.ToLower(d), "административный округ") {
+		if d != "" && d != "Москва" && !strings.Contains(strings.ToLower(d), "административный округ") && !strings.Contains(strings.ToLower(d), "область") {
 			return d
 		}
 	}
-	for _, candidate := range []string{a.CityDistrict, a.Suburb} {
-		if d := CleanDistrictName(candidate); d != "" {
-			return d
-		}
+	if a.City != "" && a.City != "Москва" {
+		return a.City
+	}
+	if a.Town != "" {
+		return a.Town
+	}
+	if a.Village != "" {
+		return a.Village
 	}
 	return "Центральный"
 }
@@ -245,15 +250,12 @@ func (n *Nominatim) ReverseHouse(ctx context.Context, lat, lon float64) (app.Geo
 	}, true, nil
 }
 
-// SearchHouses ищет дома по текстовому запросу в Москве с поддержкой корпусов и fallback на улицу.
+// SearchHouses ищет дома по текстовому запросу в Москве и области с поддержкой корпусов и fallback на улицу.
 func (n *Nominatim) SearchHouses(ctx context.Context, query string) ([]app.GeoHouse, error) {
 	q := strings.TrimSpace(query)
 	streetPart, userHouseNum := splitStreetAndHouse(q)
 
 	normQ := normalizeForOSM(q)
-	if !strings.HasPrefix(strings.ToLower(normQ), "москва") {
-		normQ = city + ", " + normQ
-	}
 
 	places, err := n.queryPlaces(ctx, normQ)
 	if err != nil {
@@ -262,12 +264,21 @@ func (n *Nominatim) SearchHouses(ctx context.Context, query string) ([]app.GeoHo
 
 	out := n.extractGeoHouses(places, userHouseNum)
 
-	// Fallback: если конкретный номер дома/корпус в OSM не нашёлся, но пользователь указал дом,
-	// ищем улицу в Москве и формируем дом в её районе.
+	// Fallback 1: если по прямому запросу ничего не нашлось, пробуем с явным префиксом "Москва, "
+	if len(out) == 0 && !strings.HasPrefix(strings.ToLower(normQ), "москва") {
+		places, _ = n.queryPlaces(ctx, "Москва, "+normQ)
+		out = n.extractGeoHouses(places, userHouseNum)
+	}
+
+	// Fallback 2: если конкретный номер дома/корпус в OSM не нашёлся, но пользователь указал дом,
+	// ищем улицу в Московском регионе и формируем дом в её районе.
 	if len(out) == 0 && userHouseNum != "" && streetPart != "" {
-		streetQ := city + ", " + streetPart
-		streetPlaces, err := n.queryPlaces(ctx, streetQ)
+		streetPlaces, err := n.queryPlaces(ctx, streetPart)
 		if err == nil && len(streetPlaces) > 0 {
+			out = n.extractGeoHouses(streetPlaces, userHouseNum)
+		}
+		if len(out) == 0 {
+			streetPlaces, _ = n.queryPlaces(ctx, "Москва, "+streetPart)
 			out = n.extractGeoHouses(streetPlaces, userHouseNum)
 		}
 	}
@@ -278,8 +289,9 @@ func (n *Nominatim) SearchHouses(ctx context.Context, query string) ([]app.GeoHo
 func (n *Nominatim) queryPlaces(ctx context.Context, q string) ([]place, error) {
 	body, err := n.fetchRaw(ctx, "/search", url.Values{
 		"q":            {q},
-		"limit":        {"8"},
+		"limit":        {"10"},
 		"countrycodes": {"ru"},
+		"viewbox":      {"35.10,56.95,40.25,54.20"},
 	})
 	if err != nil {
 		return nil, err

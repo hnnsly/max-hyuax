@@ -172,7 +172,7 @@ func (s *Service) provisionGeoHouse(ctx context.Context, gh app.GeoHouse) (house
 }
 
 func isMoscowBBox(lat, lon float64) bool {
-	return lat >= 55.10 && lat <= 56.10 && lon >= 36.80 && lon <= 38.00
+	return lat >= 54.20 && lat <= 56.95 && lon >= 35.10 && lon <= 40.25
 }
 
 func distanceMeters(lat1, lon1, lat2, lon2 float64) float64 {

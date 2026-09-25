@@ -55,17 +55,31 @@ export function HouseSearch() {
 
   const nearby = () => {
     if (!('geolocation' in navigator)) {
-      showToast('Геопозиция недоступна. Найдите дом по адресу');
+      showToast('Геопозиция не поддерживается вашим браузером. Введите адрес');
       return;
     }
     navigator.geolocation.getCurrentPosition(
       ({ coords: { latitude, longitude } }) => {
-        api.nearestHouses(latitude, longitude).then(setFound, () => showToast('Не удалось найти дома рядом'));
+        api.nearestHouses(latitude, longitude).then(
+          (list) => {
+            setFound(list);
+            if (list.length === 0) {
+              showToast('Рядом нет подключенных домов. Введите адрес вручную');
+            }
+          },
+          () => showToast('Не удалось найти дома рядом'),
+        );
         // Адрес по карте только подсказывает, какой дом выбрать: без него список домов работает.
         api.reverseGeocode(latitude, longitude).then(setPlace, () => setPlace(null));
       },
-      () => showToast('Нет доступа к геопозиции. Найдите дом по адресу'),
-      { timeout: 10_000 },
+      (err) => {
+        if (err.code === 1) {
+          showToast('Доступ к геопозиции заблокирован. Разрешите его в настройках браузера или введите адрес');
+        } else {
+          showToast('Не удалось определить координаты. Введите адрес вручную');
+        }
+      },
+      { timeout: 15_000, enableHighAccuracy: true },
     );
   };
 
