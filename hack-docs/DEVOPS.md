@@ -68,6 +68,25 @@ tags: [devops, deploy, runbook]
 3. Webhook бота регистрируется сам при старте бэкенда (`BOT_MODE=webhook`). Проверка: `docker compose logs api | grep webhook`.
 4. Проверить: `https://<домен>/api/v1/health` отвечает `{"status":"ok"}`, а в MAX бот отвечает на `/start`.
 
+## Автоматический деплой через GitHub Actions + Ansible
+
+Пайплайн `.github/workflows/ci.yml` состоит из трёх стадий:
+1. **validate** (`validate-backend` и `validate-miniapp`): проверка форматирования, линтеры, unit/integration-тесты, порог покрытия ≥ 80%, сборка.
+2. **build**: сборка и публикация образов `api` и `web` в GitHub Container Registry (`ghcr.io/<repo>/api:<sha>` и `ghcr.io/<repo>/web:<sha>`) с кэшированием слоёв `--cache-from`.
+3. **deploy**: запуск `deploy/ansible/playbook.yml` — подключение к серверу по SSH, логин в `ghcr.io`, рендеринг `docker-compose.yml` из `deploy/ansible/templates/docker-compose.yml.j2`, `docker compose pull && docker compose up -d --remove-orphans`.
+
+### Настройка перед первым автодеплоем
+1. Заполните параметры сервера в `deploy/ansible/vault.yml` (по образцу `deploy/ansible/vault.yml.example`) и зашифруйте его:
+   ```bash
+   ansible-vault encrypt deploy/ansible/vault.yml
+   ```
+2. На целевом VPS создайте каталог деплоя (например, `/opt/dom-max`) и положите туда `.env` с настройками `DATABASE_URL`, `SESSION_SECRET`, `MAX_BOT_TOKEN`, `MAX_WEBHOOK_SECRET`, `DOMAIN`.
+3. Настройте внешний веб-сервер (Nginx/Caddy) на проксирование трафика домена на `127.0.0.1:10380` (или порт, указанный в `host_port` внутри `vault.yml`).
+4. Добавьте в GitHub Secrets (`Settings → Secrets and variables → Actions`):
+   - `SSH_PRIVATE_KEY` — приватный SSH-ключ пользователя деплоя (в формате PEM или base64);
+   - `ANSIBLE_VAULT_PASSWORD` — пароль от `deploy/ansible/vault.yml`;
+   - `DEPLOY_USER` и `DEPLOY_TOKEN` (опционально, если для скачивания приватных пакетов с `ghcr.io` нужен отдельный PAT с правом `read:packages`).
+
 ## Обычные операции
 | Задача | Команда (из `deploy/`) |
 |---|---|

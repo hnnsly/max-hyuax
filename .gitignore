@@ -15,5 +15,9 @@ coverage.out
 tmp/
 .DS_Store
 
+# Ansible
+deploy/ansible/.vault-pass
+*.retry
+
 # Фото к заявкам при локальном запуске (PHOTOS_DIR по умолчанию)
 backend/data/
