@@ -34,6 +34,56 @@ func TestNearestValidatesCoordinates(t *testing.T) {
 	}
 }
 
+func TestNearestOutsideMoscow(t *testing.T) {
+	s, _ := setup()
+	geo := &reverseGeo{addr: "Светлая улица, 46/8", inMoscow: false}
+	svc := houses.NewService(s, geo)
+
+	// Точка в Подмосковье (например, за пределами Москвы)
+	_, err := svc.Nearest(t.Context(), 54.5, 36.0)
+	if !errors.Is(err, houses.ErrOutsideMoscow) {
+		t.Fatalf("expected ErrOutsideMoscow, got %v", err)
+	}
+}
+
+func TestNearestAutoProvisionsMoscowHouse(t *testing.T) {
+	s, _ := setup()
+	geo := &reverseGeo{addr: "Тверская улица, 12", inMoscow: true}
+	svc := houses.NewService(s, geo)
+
+	// Точка в центре Москвы (Тверская), которой пока нет в s.HouseMap
+	got, err := svc.Nearest(t.Context(), 55.76, 37.60)
+	if err != nil {
+		t.Fatalf("Nearest err = %v", err)
+	}
+	if len(got) != 1 || got[0].Address != "Тверская улица, 12" {
+		t.Fatalf("got = %+v, want provisioned house on Tverskaya", got)
+	}
+	// Проверяем, что создалась организация Жилищник
+	d, err := svc.Get(t.Context(), got[0].ID)
+	if err != nil {
+		t.Fatalf("Get house: %v", err)
+	}
+	if d.Organization.Name != "ГБУ «Жилищник района Тверской»" {
+		t.Fatalf("org name = %q, want ГБУ «Жилищник района Тверской»", d.Organization.Name)
+	}
+}
+
+func TestSearchAutoProvisionsFromOpenStreetMap(t *testing.T) {
+	s, _ := setup()
+	geo := &reverseGeo{inMoscow: true}
+	svc := houses.NewService(s, geo)
+
+	// Ищем дом, которого нет в базе
+	got, err := svc.Search(t.Context(), "Тверская")
+	if err != nil {
+		t.Fatalf("Search err = %v", err)
+	}
+	if len(got) == 0 || got[0].Address != "Тверская улица, 12" {
+		t.Fatalf("Search = %+v, want auto-provisioned house", got)
+	}
+}
+
 func TestGetCollectsHouseDetails(t *testing.T) {
 	_, svc := setup()
 	d, err := svc.Get(t.Context(), "h-1")
@@ -97,7 +147,7 @@ func TestLocate(t *testing.T) {
 	if addr, err := svc.Locate(t.Context(), 55.6, 37.7); addr != "" || err != nil {
 		t.Fatalf("without geocoder = %q, %v", addr, err)
 	}
-	geo := &reverseGeo{addr: "Ореховый бульвар, 15"}
+	geo := &reverseGeo{addr: "Ореховый бульвар, 15", inMoscow: true}
 	svc = houses.NewService(s, geo)
 	if addr, err := svc.Locate(t.Context(), 55.6, 37.7); addr != "Ореховый бульвар, 15" || err != nil {
 		t.Fatalf("Locate = %q, %v", addr, err)
@@ -117,10 +167,36 @@ func TestLocate(t *testing.T) {
 
 type reverseGeo struct {
 	fakeGeo
-	addr string
-	err  error
+	addr     string
+	inMoscow bool
+	err      error
 }
 
 func (g *reverseGeo) Reverse(context.Context, float64, float64) (string, bool, error) {
 	return g.addr, g.addr != "", g.err
+}
+
+func (g *reverseGeo) ReverseHouse(_ context.Context, lat, lon float64) (app.GeoHouse, bool, error) {
+	if g.err != nil {
+		return app.GeoHouse{}, false, g.err
+	}
+	if g.addr == "" {
+		return app.GeoHouse{}, false, nil
+	}
+	return app.GeoHouse{
+		Address:  g.addr,
+		District: "Тверской",
+		Lat:      lat,
+		Lon:      lon,
+		InMoscow: g.inMoscow,
+	}, true, nil
+}
+
+func (g *reverseGeo) SearchHouses(_ context.Context, _ string) ([]app.GeoHouse, error) {
+	if g.err != nil {
+		return nil, g.err
+	}
+	return []app.GeoHouse{
+		{Address: "Тверская улица, 12", District: "Тверской", Lat: 55.76, Lon: 37.60, InMoscow: true},
+	}, nil
 }

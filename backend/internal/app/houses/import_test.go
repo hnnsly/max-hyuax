@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"dommax/internal/app"
 	"dommax/internal/app/houses"
 	"dommax/internal/domain/house"
 )
@@ -28,6 +29,14 @@ func (g *fakeGeo) Geocode(_ context.Context, addr string) (float64, float64, boo
 
 func (g *fakeGeo) Reverse(context.Context, float64, float64) (string, bool, error) {
 	return "", false, g.err
+}
+
+func (g *fakeGeo) ReverseHouse(context.Context, float64, float64) (app.GeoHouse, bool, error) {
+	return app.GeoHouse{}, false, g.err
+}
+
+func (g *fakeGeo) SearchHouses(context.Context, string) ([]app.GeoHouse, error) {
+	return nil, g.err
 }
 
 func validRow(line int, addr string) houses.ImportRow {

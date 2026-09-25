@@ -13,12 +13,14 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"dommax/internal/app"
 )
 
 const (
 	// maxCache — сколько ответов держать в памяти; при переполнении кэш очищается целиком.
 	maxCache = 2000
-	// city — пилот в Москве (ADR-002): адрес реестра дополняется городом.
+	// city — Москва: адрес реестра дополняется городом.
 	city = "Москва"
 )
 
@@ -39,6 +41,8 @@ type Nominatim struct {
 type result struct {
 	lat, lon float64
 	address  string
+	district string
+	inMoscow bool
 	ok       bool
 }
 
@@ -67,9 +71,65 @@ type place struct {
 }
 
 type address struct {
-	Road        string `json:"road"`
-	Pedestrian  string `json:"pedestrian"`
-	HouseNumber string `json:"house_number"`
+	Road         string `json:"road"`
+	Pedestrian   string `json:"pedestrian"`
+	HouseNumber  string `json:"house_number"`
+	Suburb       string `json:"suburb"`
+	CityDistrict string `json:"city_district"`
+	Municipality string `json:"municipality"`
+	County       string `json:"county"`
+	City         string `json:"city"`
+	Town         string `json:"town"`
+	Village      string `json:"village"`
+	State        string `json:"state"`
+	Country      string `json:"country"`
+	ISO          string `json:"ISO3166-2-lvl4"`
+}
+
+func isMoscow(p place, lat, lon float64) bool {
+	inBBox := lat >= 55.10 && lat <= 56.10 && lon >= 36.80 && lon <= 38.00
+	a := p.Address
+	if strings.Contains(a.State, "Московская область") || a.ISO == "RU-MOS" {
+		return false
+	}
+	nameMatch := a.City == "Москва" || a.State == "Москва" ||
+		strings.Contains(a.State, "Москва") || a.ISO == "RU-MOW"
+	return inBBox && (nameMatch || (a.State == "" && a.City == ""))
+}
+
+// CleanDistrictName очищает название района Москвы от служебных слов.
+func CleanDistrictName(raw string) string {
+	d := strings.TrimSpace(raw)
+	for _, prefix := range []string{
+		"муниципальный округ ", "Муниципальный округ ",
+		"район ", "Район ",
+		"поселение ", "Поселение ",
+		"городское поселение ",
+	} {
+		d = strings.TrimPrefix(d, prefix)
+	}
+	for _, suffix := range []string{
+		" район", " Район",
+		" муниципальный округ",
+	} {
+		d = strings.TrimSuffix(d, suffix)
+	}
+	return strings.TrimSpace(d)
+}
+
+func extractDistrict(a address) string {
+	for _, candidate := range []string{a.Suburb, a.Municipality, a.CityDistrict, a.County} {
+		d := CleanDistrictName(candidate)
+		if d != "" && !strings.Contains(strings.ToLower(d), "административный округ") {
+			return d
+		}
+	}
+	for _, candidate := range []string{a.CityDistrict, a.Suburb} {
+		if d := CleanDistrictName(candidate); d != "" {
+			return d
+		}
+	}
+	return "Центральный"
 }
 
 // Geocode ищет координаты дома по адресу реестра («Ореховый бульвар, 15»).
@@ -97,7 +157,12 @@ func (n *Nominatim) Geocode(ctx context.Context, addr string) (lat, lon float64,
 
 // Reverse возвращает короткий адрес точки: «улица, дом» или только улицу.
 func (n *Nominatim) Reverse(ctx context.Context, lat, lon float64) (string, bool, error) {
-	// Округление до 4 знаков — около 10 м: соседние точки берутся из кэша.
+	gh, ok, err := n.ReverseHouse(ctx, lat, lon)
+	return gh.Address, ok, err
+}
+
+// ReverseHouse определяет адрес дома, район и принадлежность к Москве по координатам.
+func (n *Nominatim) ReverseHouse(ctx context.Context, lat, lon float64) (app.GeoHouse, bool, error) {
 	la, lo := strconv.FormatFloat(lat, 'f', 4, 64), strconv.FormatFloat(lon, 'f', 4, 64)
 	r, err := n.cached(ctx, "r:"+la+","+lo, "/reverse", url.Values{"lat": {la}, "lon": {lo}, "zoom": {"18"}},
 		func(body []byte) (result, error) {
@@ -115,9 +180,76 @@ func (n *Nominatim) Reverse(ctx context.Context, lat, lon float64) (string, bool
 			if p.Address.HouseNumber != "" {
 				road += ", " + p.Address.HouseNumber
 			}
-			return result{address: road, ok: true}, nil
+			latF, _ := strconv.ParseFloat(p.Lat, 64)
+			lonF, _ := strconv.ParseFloat(p.Lon, 64)
+			if latF == 0 {
+				latF = lat
+			}
+			if lonF == 0 {
+				lonF = lon
+			}
+			return result{
+				lat:      latF,
+				lon:      lonF,
+				address:  road,
+				district: extractDistrict(p.Address),
+				inMoscow: isMoscow(p, latF, lonF),
+				ok:       true,
+			}, nil
 		})
-	return r.address, r.ok, err
+	if err != nil || !r.ok {
+		return app.GeoHouse{}, false, err
+	}
+	return app.GeoHouse{
+		Address:  r.address,
+		District: r.district,
+		Lat:      r.lat,
+		Lon:      r.lon,
+		InMoscow: r.inMoscow,
+	}, true, nil
+}
+
+// SearchHouses ищет дома по текстовому запросу в Москве.
+func (n *Nominatim) SearchHouses(ctx context.Context, query string) ([]app.GeoHouse, error) {
+	q := strings.TrimSpace(query)
+	if !strings.HasPrefix(strings.ToLower(q), "москва") {
+		q = city + ", " + q
+	}
+	body, err := n.fetchRaw(ctx, "/search", url.Values{"q": {q}, "limit": {"5"}, "countrycodes": {"ru"}})
+	if err != nil {
+		return nil, err
+	}
+	var places []place
+	if err := json.Unmarshal(body, &places); err != nil {
+		return nil, err
+	}
+	var out []app.GeoHouse
+	for _, p := range places {
+		road := p.Address.Road
+		if road == "" {
+			road = p.Address.Pedestrian
+		}
+		if road == "" || p.Address.HouseNumber == "" {
+			continue
+		}
+		road += ", " + p.Address.HouseNumber
+		latF, err1 := strconv.ParseFloat(p.Lat, 64)
+		lonF, err2 := strconv.ParseFloat(p.Lon, 64)
+		if err1 != nil || err2 != nil {
+			continue
+		}
+		if !isMoscow(p, latF, lonF) {
+			continue
+		}
+		out = append(out, app.GeoHouse{
+			Address:  road,
+			District: extractDistrict(p.Address),
+			Lat:      latF,
+			Lon:      lonF,
+			InMoscow: true,
+		})
+	}
+	return out, nil
 }
 
 // cached отдаёт ответ из кэша или запрашивает его, соблюдая паузу между запросами.
@@ -128,23 +260,8 @@ func (n *Nominatim) cached(ctx context.Context, key, path string, params url.Val
 		n.mu.Unlock()
 		return r, nil
 	}
-	// Очередь по времени: каждый запрос бронирует свой слот, ждёт его без блокировки остальных.
-	slot := time.Now()
-	if n.next.After(slot) {
-		slot = n.next
-	}
-	n.next = slot.Add(n.MinGap)
 	n.mu.Unlock()
 
-	if wait := time.Until(slot); wait > 0 {
-		timer := time.NewTimer(wait)
-		defer timer.Stop()
-		select {
-		case <-ctx.Done():
-			return result{}, ctx.Err()
-		case <-timer.C:
-		}
-	}
 	r, err := n.fetch(ctx, path, params, parse)
 	if err != nil {
 		return result{}, err
@@ -158,7 +275,24 @@ func (n *Nominatim) cached(ctx context.Context, key, path string, params url.Val
 	return r, nil
 }
 
-func (n *Nominatim) fetch(ctx context.Context, path string, params url.Values, parse func([]byte) (result, error)) (result, error) {
+func (n *Nominatim) fetchRaw(ctx context.Context, path string, params url.Values) ([]byte, error) {
+	n.mu.Lock()
+	slot := time.Now()
+	if n.next.After(slot) {
+		slot = n.next
+	}
+	n.next = slot.Add(n.MinGap)
+	n.mu.Unlock()
+
+	if wait := time.Until(slot); wait > 0 {
+		timer := time.NewTimer(wait)
+		defer timer.Stop()
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		case <-timer.C:
+		}
+	}
 	u := n.base.JoinPath(path)
 	params.Set("format", "jsonv2")
 	params.Set("addressdetails", "1")
@@ -166,18 +300,22 @@ func (n *Nominatim) fetch(ctx context.Context, path string, params url.Values, p
 	u.RawQuery = params.Encode()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, u.String(), nil)
 	if err != nil {
-		return result{}, err
+		return nil, err
 	}
 	req.Header.Set("User-Agent", n.userAgent)
 	resp, err := n.client.Do(req)
 	if err != nil {
-		return result{}, err
+		return nil, err
 	}
 	defer resp.Body.Close()
 	if resp.StatusCode != http.StatusOK {
-		return result{}, fmt.Errorf("geocoder %s: status %d", path, resp.StatusCode)
+		return nil, fmt.Errorf("geocoder %s: status %d", path, resp.StatusCode)
 	}
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	return io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+}
+
+func (n *Nominatim) fetch(ctx context.Context, path string, params url.Values, parse func([]byte) (result, error)) (result, error) {
+	body, err := n.fetchRaw(ctx, path, params)
 	if err != nil {
 		return result{}, err
 	}

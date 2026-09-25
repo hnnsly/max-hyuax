@@ -381,3 +381,39 @@ func (q *Queries) UpsertHouse(ctx context.Context, arg UpsertHouseParams) (bool,
 	err := row.Scan(&created)
 	return created, err
 }
+
+const upsertOrganization = `-- name: UpsertOrganization :exec
+INSERT INTO organizations (id, type, name, phone_office, phone_dispatcher, phone_emergency, schedule, source)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+ON CONFLICT (id) DO UPDATE SET
+    name = EXCLUDED.name,
+    phone_office = EXCLUDED.phone_office,
+    phone_dispatcher = EXCLUDED.phone_dispatcher,
+    phone_emergency = EXCLUDED.phone_emergency,
+    schedule = EXCLUDED.schedule
+`
+
+type UpsertOrganizationParams struct {
+	ID              string
+	Type            string
+	Name            string
+	PhoneOffice     string
+	PhoneDispatcher string
+	PhoneEmergency  string
+	Schedule        string
+	Source          string
+}
+
+func (q *Queries) UpsertOrganization(ctx context.Context, arg UpsertOrganizationParams) error {
+	_, err := q.db.Exec(ctx, upsertOrganization,
+		arg.ID,
+		arg.Type,
+		arg.Name,
+		arg.PhoneOffice,
+		arg.PhoneDispatcher,
+		arg.PhoneEmergency,
+		arg.Schedule,
+		arg.Source,
+	)
+	return err
+}

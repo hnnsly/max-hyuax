@@ -221,17 +221,31 @@ func (h *Handler) onLocation(ctx context.Context, to maxapi.Target, from maxapi.
 		return err
 	}
 	list, err := h.svc.Houses.Nearest(ctx, lat, lon)
+	if errors.Is(err, houses.ErrOutsideMoscow) || (err == nil && len(list) == 0) {
+		return h.outsideMoscowReply(ctx, to)
+	}
 	if err != nil {
 		return err
-	}
-	if len(list) == 0 {
-		return h.send(ctx, to, "Рядом не нашлось домов из сервиса. Пока он работает в одном районе Москвы.")
 	}
 	var rows [][]maxapi.Button
 	for _, hs := range list[:min(3, len(list))] {
 		rows = append(rows, []maxapi.Button{maxapi.CallbackButton(hs.Address, pack(cbHouse, hs.ID))})
 	}
 	_, err = h.max.Send(ctx, to, maxapi.NewMessage{Text: "Выберите свой дом:", Attachments: []maxapi.Attachment{maxapi.Keyboard(rows...)}})
+	return err
+}
+
+func (h *Handler) outsideMoscowReply(ctx context.Context, to maxapi.Target) error {
+	sampleHouses, _ := h.svc.Houses.Search(ctx, "Ореховый")
+	var rows [][]maxapi.Button
+	for _, hs := range sampleHouses[:min(3, len(sampleHouses))] {
+		rows = append(rows, []maxapi.Button{maxapi.CallbackButton(hs.Address, pack(cbHouse, hs.ID))})
+	}
+	rows = append(rows, []maxapi.Button{maxapi.OpenAppButton("Найти московский дом", h.botName, "")})
+
+	msg := "Вы находитесь за пределами Москвы. Сервис сейчас работает по всей Москве.\n\n" +
+		"Вы можете найти московский дом по адресу или выбрать один из примеров для проверки:"
+	_, err := h.max.Send(ctx, to, maxapi.NewMessage{Text: msg, Attachments: []maxapi.Attachment{maxapi.Keyboard(rows...)}})
 	return err
 }
 

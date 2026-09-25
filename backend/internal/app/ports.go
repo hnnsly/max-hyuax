@@ -77,9 +77,20 @@ type HouseRepo interface {
 	ByOrganization(ctx context.Context, orgID string) ([]house.House, error)
 	// OrganizationsInDistrict — организации, у которых есть дома в районе, по названию.
 	OrganizationsInDistrict(ctx context.Context, district string) ([]house.Organization, error)
+	// UpsertOrganization создаёт или обновляет организацию (например, районное отделение ГБУ «Жилищник»).
+	UpsertOrganization(ctx context.Context, o house.Organization) error
 	// Upsert создаёт или обновляет дом по id и добавляет недостающие подъезды и объекты с QR-кодами
 	// (лифт и свет в подъезде, кровля, мусоропровод). created — дома раньше не было.
 	Upsert(ctx context.Context, h house.House) (created bool, err error)
+}
+
+// GeoHouse — дом, найденный геокодером OpenStreetMap.
+type GeoHouse struct {
+	Address  string // «улица, дом»
+	District string // название района («Тверской», «Басманный» и т.п.)
+	Lat      float64
+	Lon      float64
+	InMoscow bool // находится ли точка в границах Москвы
 }
 
 // Geocoder — геокодер на открытых данных (ADR-016). Не нашёл — ok = false без ошибки.
@@ -88,6 +99,10 @@ type Geocoder interface {
 	Geocode(ctx context.Context, address string) (lat, lon float64, ok bool, err error)
 	// Reverse — короткий адрес точки: «улица, дом».
 	Reverse(ctx context.Context, lat, lon float64) (address string, ok bool, err error)
+	// ReverseHouse определяет точный дом, район и принадлежность к Москве по координатам.
+	ReverseHouse(ctx context.Context, lat, lon float64) (GeoHouse, bool, error)
+	// SearchHouses ищет дома по текстовому запросу в границах Москвы.
+	SearchHouses(ctx context.Context, query string) ([]GeoHouse, error)
 }
 
 type UserRepo interface {

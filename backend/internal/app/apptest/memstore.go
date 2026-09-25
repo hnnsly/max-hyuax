@@ -317,6 +317,11 @@ func (r houseRepo) Organization(_ context.Context, id string) (house.Organizatio
 	return o, nil
 }
 
+func (r houseRepo) UpsertOrganization(_ context.Context, o house.Organization) error {
+	r.s.Orgs[o.ID] = o
+	return nil
+}
+
 func (r houseRepo) Entrances(context.Context, string) ([]house.Entrance, error) { return nil, nil }
 
 func (r houseRepo) Objects(_ context.Context, houseID string) ([]house.AssetObject, error) {

@@ -153,6 +153,9 @@ func (h *handlers) nearestHouses(c fiber.Ctx) error {
 		return app.ErrInvalidInput
 	}
 	list, err := h.Houses.Nearest(c.Context(), lat, lon)
+	if errors.Is(err, houses.ErrOutsideMoscow) {
+		return c.JSON([]houseDTO{})
+	}
 	if err != nil {
 		return err
 	}

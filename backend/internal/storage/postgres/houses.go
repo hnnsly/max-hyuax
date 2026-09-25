@@ -39,6 +39,19 @@ func (r houseRepo) OrganizationsInDistrict(ctx context.Context, district string)
 	return mapSlice(rows, toOrganization), err
 }
 
+func (r houseRepo) UpsertOrganization(ctx context.Context, o house.Organization) error {
+	return r.q.UpsertOrganization(ctx, sqlcdb.UpsertOrganizationParams{
+		ID:              o.ID,
+		Type:            string(o.Type),
+		Name:            o.Name,
+		PhoneOffice:     o.PhoneOffice,
+		PhoneDispatcher: o.PhoneDispatcher,
+		PhoneEmergency:  o.PhoneEmergency,
+		Schedule:        o.Schedule,
+		Source:          "auto",
+	})
+}
+
 func toOrganization(o sqlcdb.Organization) house.Organization {
 	return house.Organization{
 		ID:              o.ID,

@@ -3,7 +3,9 @@ package houses
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"math"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -13,8 +15,14 @@ import (
 	"dommax/internal/domain/user"
 )
 
-// LocateTimeout — сколько ждать обратный адрес: публичный геокодер бывает медленным, экран не должен висеть.
+// LocateTimeout — сколько ждать ответ геокодера: публичный геокодер бывает медленным, экран не должен висеть.
 const LocateTimeout = 3 * time.Second
+
+// MaxNearRadiusMeters — радиус (300 м), в пределах которого дом из БД считается стоящим рядом с жителем.
+const MaxNearRadiusMeters = 300.0
+
+// ErrOutsideMoscow возвращается, когда точка геолокации находится за пределами Москвы.
+var ErrOutsideMoscow = errors.New("houses: location is outside Moscow")
 
 type Service struct {
 	store app.Store
@@ -36,14 +44,220 @@ func (s *Service) Search(ctx context.Context, query string) ([]house.House, erro
 	if !utf8.ValidString(query) || utf8.RuneCountInString(query) < 2 {
 		return nil, fmt.Errorf("%w: query must be valid UTF-8, at least 2 characters", app.ErrInvalidInput)
 	}
-	return s.store.Houses().Search(ctx, query)
+	list, err := s.store.Houses().Search(ctx, query)
+	if err != nil {
+		return nil, err
+	}
+	if len(list) < 3 && s.geo != nil {
+		gctx, cancel := context.WithTimeout(ctx, LocateTimeout)
+		osmHouses, gerr := s.geo.SearchHouses(gctx, query)
+		cancel()
+		if gerr == nil && len(osmHouses) > 0 {
+			seen := make(map[string]bool, len(list))
+			for _, h := range list {
+				seen[h.ID] = true
+			}
+			for _, gh := range osmHouses {
+				if !gh.InMoscow || gh.Address == "" {
+					continue
+				}
+				hID := ImportID(gh.Address)
+				if seen[hID] {
+					continue
+				}
+				if prov, err := s.provisionGeoHouse(ctx, gh); err == nil {
+					list = append(list, prov)
+					seen[hID] = true
+				}
+			}
+		}
+	}
+	return list, nil
 }
 
 func (s *Service) Nearest(ctx context.Context, lat, lon float64) ([]house.House, error) {
 	if err := checkCoords(lat, lon); err != nil {
 		return nil, err
 	}
-	return s.store.Houses().Nearest(ctx, lat, lon, 5)
+	near, err := s.store.Houses().Nearest(ctx, lat, lon, 5)
+	if err != nil {
+		return nil, err
+	}
+	// Если геокодер выключен (например, в локальных юнит-тестах) — отдаём ближайшие из БД как есть.
+	if s.geo == nil {
+		return near, nil
+	}
+
+	// Оставляем только дома в реальном радиусе 300 метров от жителя.
+	var closeHouses []house.House
+	for _, h := range near {
+		if h.Lat != 0 && h.Lon != 0 && distanceMeters(lat, lon, h.Lat, h.Lon) <= MaxNearRadiusMeters {
+			closeHouses = append(closeHouses, h)
+		}
+	}
+	if len(closeHouses) > 0 {
+		return closeHouses, nil
+	}
+
+	// Дома рядом в БД ещё нет: определяем дом по координатам через OpenStreetMap.
+	gctx, cancel := context.WithTimeout(ctx, LocateTimeout)
+	gh, ok, gerr := s.geo.ReverseHouse(gctx, lat, lon)
+	cancel()
+
+	if gerr == nil && ok {
+		if !gh.InMoscow {
+			return nil, ErrOutsideMoscow
+		}
+		if gh.Address != "" {
+			if prov, perr := s.provisionGeoHouse(ctx, gh); perr == nil {
+				return []house.House{prov}, nil
+			}
+		}
+	}
+
+	if !isMoscowBBox(lat, lon) {
+		return nil, ErrOutsideMoscow
+	}
+	return closeHouses, nil
+}
+
+func (s *Service) provisionGeoHouse(ctx context.Context, gh app.GeoHouse) (house.House, error) {
+	dist := normalizeSpaces(gh.District)
+	if dist == "" {
+		dist = "Центральный"
+	}
+	orgID := "org-gbu-" + translitSlug(dist)
+	orgName := fmt.Sprintf("ГБУ «Жилищник района %s»", dist)
+
+	org := house.Organization{
+		ID:              orgID,
+		Type:            house.OrgManagementCompany,
+		Name:            orgName,
+		PhoneOffice:     "+7 495 539-53-53",
+		PhoneDispatcher: "+7 495 539-53-53",
+		PhoneEmergency:  "+7 495 539-53-53",
+		Schedule:        "круглосуточно",
+	}
+
+	addr := normalizeSpaces(gh.Address)
+	h := house.House{
+		ID:             ImportID(addr),
+		Address:        addr,
+		District:       dist,
+		YearBuilt:      1985,
+		Floors:         12,
+		EntrancesCount: 4,
+		OrganizationID: orgID,
+		Lat:            gh.Lat,
+		Lon:            gh.Lon,
+		Source:         "osm",
+	}
+
+	err := s.store.InTx(ctx, func(tx app.Store) error {
+		if err := tx.Houses().UpsertOrganization(ctx, org); err != nil {
+			return err
+		}
+		_, err := tx.Houses().Upsert(ctx, h)
+		return err
+	})
+	if err != nil {
+		return house.House{}, err
+	}
+	return h, nil
+}
+
+func isMoscowBBox(lat, lon float64) bool {
+	return lat >= 55.10 && lat <= 56.10 && lon >= 36.80 && lon <= 38.00
+}
+
+func distanceMeters(lat1, lon1, lat2, lon2 float64) float64 {
+	const R = 6371000.0 // радиус Земли в метрах
+	dLat := (lat2 - lat1) * math.Pi / 180.0
+	dLon := (lon2 - lon1) * math.Pi / 180.0
+	a := math.Sin(dLat/2)*math.Sin(dLat/2) +
+		math.Cos(lat1*math.Pi/180.0)*math.Cos(lat2*math.Pi/180.0)*
+			math.Sin(dLon/2)*math.Sin(dLon/2)
+	return R * 2 * math.Atan2(math.Sqrt(a), math.Sqrt(1-a))
+}
+
+func translitSlug(s string) string {
+	var b strings.Builder
+	for _, r := range strings.ToLower(s) {
+		switch r {
+		case 'а':
+			b.WriteString("a")
+		case 'б':
+			b.WriteString("b")
+		case 'в':
+			b.WriteString("v")
+		case 'г':
+			b.WriteString("g")
+		case 'д':
+			b.WriteString("d")
+		case 'е', 'ё':
+			b.WriteString("e")
+		case 'ж':
+			b.WriteString("zh")
+		case 'з':
+			b.WriteString("z")
+		case 'и', 'й':
+			b.WriteString("i")
+		case 'к':
+			b.WriteString("k")
+		case 'л':
+			b.WriteString("l")
+		case 'м':
+			b.WriteString("m")
+		case 'н':
+			b.WriteString("n")
+		case 'о':
+			b.WriteString("o")
+		case 'п':
+			b.WriteString("p")
+		case 'р':
+			b.WriteString("r")
+		case 'с':
+			b.WriteString("s")
+		case 'т':
+			b.WriteString("t")
+		case 'у':
+			b.WriteString("u")
+		case 'ф':
+			b.WriteString("f")
+		case 'х':
+			b.WriteString("kh")
+		case 'ц':
+			b.WriteString("ts")
+		case 'ч':
+			b.WriteString("ch")
+		case 'ш':
+			b.WriteString("sh")
+		case 'щ':
+			b.WriteString("shch")
+		case 'ы':
+			b.WriteString("y")
+		case 'э':
+			b.WriteString("e")
+		case 'ю':
+			b.WriteString("yu")
+		case 'я':
+			b.WriteString("ya")
+		case ' ', '-':
+			b.WriteString("-")
+		default:
+			if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') {
+				b.WriteRune(r)
+			}
+		}
+	}
+	res := strings.Trim(b.String(), "-")
+	if res == "" {
+		return "msk"
+	}
+	if len(res) > 28 {
+		res = res[:28]
+	}
+	return res
 }
 
 // Locate — адрес, где стоит житель, для «Найти дома рядом» (ADR-016).

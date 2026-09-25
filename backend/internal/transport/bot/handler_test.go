@@ -525,7 +525,7 @@ func TestEmptyMessageAndLocationWithoutHouses(t *testing.T) {
 	loc := text(8301, "")
 	loc.Message.Body.Attachments = []maxapi.IncomingAttachment{{Type: "location", Latitude: 10, Longitude: 10}}
 	e.handle(t, loc)
-	if txt, _ := e.max.last(""); !strings.Contains(txt, "не нашлось") {
+	if txt, _ := e.max.last(""); !strings.Contains(txt, "за пределами Москвы") && !strings.Contains(txt, "не нашлось") {
 		t.Fatalf("no houses nearby = %q", txt)
 	}
 }

@@ -18,6 +18,16 @@ SELECT * FROM houses WHERE id = @id;
 -- name: GetOrganization :one
 SELECT * FROM organizations WHERE id = @id;
 
+-- name: UpsertOrganization :exec
+INSERT INTO organizations (id, type, name, phone_office, phone_dispatcher, phone_emergency, schedule, source)
+VALUES (@id, @type, @name, @phone_office, @phone_dispatcher, @phone_emergency, @schedule, @source)
+ON CONFLICT (id) DO UPDATE SET
+    name = EXCLUDED.name,
+    phone_office = EXCLUDED.phone_office,
+    phone_dispatcher = EXCLUDED.phone_dispatcher,
+    phone_emergency = EXCLUDED.phone_emergency,
+    schedule = EXCLUDED.schedule;
+
 -- name: ListEntrances :many
 SELECT * FROM entrances WHERE house_id = @house_id ORDER BY number;
 
