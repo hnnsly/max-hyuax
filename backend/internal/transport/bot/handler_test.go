@@ -3,7 +3,11 @@ package bot_test
 import (
 	"bytes"
 	"context"
+	"crypto/hmac"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json/jsontext"
+	"encoding/json/v2"
 	"fmt"
 	"image"
 	"image/jpeg"
@@ -96,7 +100,10 @@ func findButton(t *testing.T, bs []maxapi.Button, text string) maxapi.Button {
 	return maxapi.Button{}
 }
 
-const botName = "t105_hakaton_max_bot"
+const (
+	botName      = "t105_hakaton_max_bot"
+	testBotToken = "test-bot-token"
+)
 
 type env struct {
 	store  *apptest.MemStore
@@ -116,7 +123,7 @@ func newEnvWithLLM(t *testing.T, llm hints.LLM) env {
 	now := func() time.Time { return time.Date(2026, 9, 24, 10, 0, 0, 0, time.UTC) }
 	n := 0
 	svc := bot.Services{
-		Auth:           auth.NewService(s, auth.Config{Now: now}),
+		Auth:           auth.NewService(s, auth.Config{Now: now, BotToken: testBotToken}),
 		Issues:         issues.NewService(s, issues.Config{Now: now, NewID: func() string { n++; return fmt.Sprintf("i-%d", n) }, ConsentVersion: "v1"}),
 		Houses:         houses.NewService(s, nil),
 		Hints:          hints.NewService(llm, time.Second, slog.New(slog.NewTextHandler(io.Discard, nil))),
@@ -622,5 +629,56 @@ func TestMyAndHouseCommands(t *testing.T) {
 	e.handle(t, text(7001, "/house"))
 	if txt, _ := e.max.last(""); !strings.Contains(txt, "+7 495 000-17-02") || !strings.Contains(txt, "Ореховый бульвар, 17к2") {
 		t.Fatalf("/house = %q", txt)
+	}
+}
+
+// Свет бывает в каждом подъезде: бот спрашивает, в каком, и заявка получает место.
+func TestReportAsksEntrance(t *testing.T) {
+	e := newEnv(t)
+	e.resident(8801, true)
+	e.store.Objects = []house.AssetObject{
+		{ID: "h-1-e1-light", HouseID: "h-1", EntranceID: "h-1-e1", Category: "lighting", Label: "подъезд 1, лестничная клетка"},
+		{ID: "h-1-e2-light", HouseID: "h-1", EntranceID: "h-1-e2", Category: "lighting", Label: "подъезд 2, лестничная клетка"},
+	}
+	e.handle(t, text(8801, "Не горит свет на лестнице"))
+	_, bs := e.max.last("")
+	e.handle(t, press(8801, "cb1", findButton(t, bs, "Отправить").Payload))
+	txt, bs := e.max.last("cb1")
+	if !strings.Contains(txt, "Где именно") {
+		t.Fatalf("place question = %q", txt)
+	}
+	e.handle(t, press(8801, "cb2", findButton(t, bs, "Подъезд 2, лестничная клетка").Payload))
+	if txt, bs := e.max.last("cb2"); !strings.Contains(txt, "отправлена") || findButton(t, bs, "Оставить телефон для мастера").Type != "request_contact" {
+		t.Fatalf("after place = %q %+v", txt, bs)
+	}
+	is, err := e.issues.Get(t.Context(), "i-1")
+	if err != nil || is.ObjectID() != "h-1-e2-light" || is.Description() != "Не горит свет на лестнице" {
+		t.Fatalf("issue = %+v, err = %v", is, err)
+	}
+}
+
+// Телефон для мастера из кнопки контакта: подпись MAX проверяется, пересланный контакт без неё не подходит.
+func TestContactSharesPhone(t *testing.T) {
+	e := newEnv(t)
+	u := e.resident(8901, true)
+	vcf := "BEGIN:VCARD\r\nVERSION:3.0\r\nTEL;TYPE=cell:79990000123\r\nEND:VCARD\r\n"
+	mac := hmac.New(sha256.New, []byte(testBotToken))
+	mac.Write([]byte(vcf))
+	contact := func(hash string) maxapi.Update {
+		m := text(8901, "")
+		payload, _ := json.Marshal(map[string]string{"vcf_info": vcf, "hash": hash})
+		m.Message.Body.Attachments = []maxapi.IncomingAttachment{{Type: "contact", Payload: jsontext.Value(payload)}}
+		return m
+	}
+	e.handle(t, contact(""))
+	if txt, _ := e.max.last(""); !strings.Contains(txt, "Не получилось подтвердить") {
+		t.Fatalf("contact without hash = %q", txt)
+	}
+	e.handle(t, contact(hex.EncodeToString(mac.Sum(nil))))
+	if txt, _ := e.max.last(""); !strings.Contains(txt, "Телефон сохранён") {
+		t.Fatalf("contact = %q", txt)
+	}
+	if saved, _ := e.store.Users().Get(t.Context(), u.ID); saved.Phone != "+79990000123" {
+		t.Fatalf("phone = %q", saved.Phone)
 	}
 }

@@ -112,6 +112,8 @@ func (h *Handler) onMessage(ctx context.Context, m *maxapi.Message) error {
 		switch a.Type {
 		case "location":
 			return h.onLocation(ctx, to, m.Sender, a.Latitude, a.Longitude)
+		case "contact":
+			return h.onContact(ctx, to, m.Sender, a)
 		case "image":
 			urls = append(urls, a.PhotoURL())
 		}
@@ -464,7 +466,14 @@ func (h *Handler) callbackReply(ctx context.Context, cb *maxapi.Callback) (maxap
 			return h.join(ctx, u, rest)
 		}
 		category, desc, _ := strings.Cut(rest, ":")
-		return h.report(ctx, u, category, desc)
+		// Лифт и свет бывают в каждом подъезде: сначала спросим, где именно.
+		if answer, asked, err := h.askPlace(ctx, u, category, desc); asked || err != nil {
+			return answer, err
+		}
+		return h.report(ctx, u, category, "", desc)
+
+	case cbPlace:
+		return h.placeChosen(ctx, u, rest)
 	}
 	return maxapi.CallbackAnswer{Notification: "Эта кнопка устарела. Напишите о проблеме ещё раз."}, nil
 }
@@ -487,12 +496,17 @@ func (h *Handler) confirmRepair(ctx context.Context, u user.User, issueID string
 	return maxapi.CallbackAnswer{}, err
 }
 
-func (h *Handler) report(ctx context.Context, u user.User, category, desc string) (maxapi.CallbackAnswer, error) {
-	is, err := h.svc.Issues.Report(ctx, u, issues.ReportInput{HouseID: u.HouseID, Category: category, Description: desc})
+func (h *Handler) report(ctx context.Context, u user.User, category, objectID, desc string) (maxapi.CallbackAnswer, error) {
+	is, err := h.svc.Issues.Report(ctx, u, issues.ReportInput{HouseID: u.HouseID, Category: category, ObjectID: objectID, Description: desc})
 	if err != nil {
 		return maxapi.CallbackAnswer{}, err
 	}
-	return replace(fmt.Sprintf("Заявка № %d отправлена в УК. Карточка со статусом придёт следующим сообщением и будет обновляться.", is.Number())), nil
+	m := maxapi.NewMessage{Text: fmt.Sprintf("Заявка № %d отправлена в УК. Карточка со статусом придёт следующим сообщением и будет обновляться.", is.Number())}
+	if !u.PhoneShared() {
+		m.Text += "\n\nЕсли мастеру нужно попасть в квартиру, оставьте телефон: его увидит только УК, соседи номер не видят."
+		m.Attachments = []maxapi.Attachment{maxapi.Keyboard([]maxapi.Button{maxapi.ContactButton("Оставить телефон для мастера")})}
+	}
+	return maxapi.CallbackAnswer{Message: &m}, nil
 }
 
 func (h *Handler) join(ctx context.Context, u user.User, issueID string) (maxapi.CallbackAnswer, error) {

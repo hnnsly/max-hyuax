@@ -119,6 +119,10 @@ func OpenAppButton(text, bot, payload string) Button {
 
 func GeoButton(text string) Button { return Button{Type: "request_geo_location", Text: text} }
 
+// ContactButton просит у пользователя его номер из аккаунта MAX (dev-max docs-api/index.md,
+// «Кнопка request_contact»): в чат придёт вложение contact с подписью hash.
+func ContactButton(text string) Button { return Button{Type: "request_contact", Text: text} }
+
 type CallbackAnswer struct {
 	Message      *NewMessage `json:"message,omitzero"`
 	Notification string      `json:"notification,omitempty"`
@@ -145,4 +149,20 @@ func (a IncomingAttachment) PhotoURL() string {
 		return ""
 	}
 	return p.URL
+}
+
+// Contact — vCard и подпись из вложения contact, которое присылает кнопка request_contact.
+// ok = false, если это не контакт или подписи нет (контакт переслали из телефонной книги).
+func (a IncomingAttachment) Contact() (vcf, hash string, ok bool) {
+	if a.Type != "contact" || len(a.Payload) == 0 {
+		return "", "", false
+	}
+	var p struct {
+		VCF  string `json:"vcf_info"`
+		Hash string `json:"hash"`
+	}
+	if json.Unmarshal(a.Payload, &p) != nil || p.VCF == "" || p.Hash == "" {
+		return "", "", false
+	}
+	return p.VCF, p.Hash, true
 }

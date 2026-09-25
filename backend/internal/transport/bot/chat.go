@@ -20,6 +20,7 @@ const (
 	cbMenu   = "m" // m:<пункт> — пункт главного меню
 	cbIssue  = "i" // i:<issue_id> — карточка заявки в чате
 	cbReopen = "r" // r:<issue_id> — «не починили», дальше бот ждёт комментарий
+	cbPlace  = "p" // p:<object_id> или p:- — место проблемы; описание ждёт в app.BotPending
 
 	menuMine  = "mine"
 	menuNow   = "now" // открытые заявки дома
@@ -27,6 +28,7 @@ const (
 
 	// Действия, которые ждут следующего сообщения жителя (app.BotPending).
 	pendReopen = "reopen"
+	pendPlace  = "place" // Ref — категория, Text — описание проблемы
 
 	// pendingTTL — сколько бот ждёт текст после своего вопроса; дальше сообщение снова считается проблемой.
 	pendingTTL = 10 * time.Minute
@@ -141,6 +143,8 @@ func (h *Handler) showIssue(ctx context.Context, to maxapi.Target, u user.User, 
 		})
 	case !is.Status().Closed() && !is.HasParticipant(u.ID) && u.CanTakePart() && u.HouseID == is.HouseID():
 		rows = append(rows, []maxapi.Button{maxapi.CallbackButton("Это и у меня", pack(cbJoin, is.ID()))})
+	case !is.Status().Closed() && is.HasParticipant(u.ID) && !u.PhoneShared():
+		rows = append(rows, []maxapi.Button{maxapi.ContactButton("Оставить телефон для мастера")})
 	}
 	rows = append(rows, []maxapi.Button{
 		maxapi.OpenAppButton("Открыть в приложении", h.botName, "i_"+is.ID()),
@@ -215,4 +219,68 @@ func (h *Handler) onPending(ctx context.Context, to maxapi.Target, u user.User, 
 			is.Number(), dayMonth(is.Deadline())))
 	}
 	return false, nil
+}
+
+// askPlace спрашивает подъезд, если у дома несколько объектов этой категории (лифт, свет).
+// Описание не помещается в данные кнопки, поэтому ждёт в app.BotPending.
+func (h *Handler) askPlace(ctx context.Context, u user.User, category, desc string) (maxapi.CallbackAnswer, bool, error) {
+	d, err := h.svc.Houses.Get(ctx, u.HouseID)
+	if err != nil {
+		return maxapi.CallbackAnswer{}, false, err
+	}
+	var rows [][]maxapi.Button
+	for _, o := range d.Objects {
+		if o.Category == category && o.EntranceID != "" {
+			rows = append(rows, []maxapi.Button{maxapi.CallbackButton(truncate(capitalizeRU(o.Label), 40), pack(cbPlace, o.ID))})
+		}
+	}
+	if len(rows) < 2 {
+		return maxapi.CallbackAnswer{}, false, nil
+	}
+	err = h.svc.Pending.Set(ctx, u.ID, app.BotPending{Action: pendPlace, Ref: category, Text: desc, ExpiresAt: h.svc.Now().Add(pendingTTL)})
+	if err != nil {
+		return maxapi.CallbackAnswer{}, false, err
+	}
+	rows = append(rows, []maxapi.Button{maxapi.CallbackButton("Не знаю или во всём доме", pack(cbPlace, "-"))})
+	m := maxapi.NewMessage{Text: "Где именно? Так УК быстрее найдёт место, а соседи из того же подъезда увидят заявку.", Attachments: []maxapi.Attachment{maxapi.Keyboard(rows...)}}
+	return maxapi.CallbackAnswer{Message: &m}, true, nil
+}
+
+// placeChosen отправляет заявку с выбранным местом.
+func (h *Handler) placeChosen(ctx context.Context, u user.User, objectID string) (maxapi.CallbackAnswer, error) {
+	p, ok, err := h.svc.Pending.Take(ctx, u.ID, h.svc.Now())
+	if err != nil {
+		return maxapi.CallbackAnswer{}, err
+	}
+	if !ok || p.Action != pendPlace {
+		return replace("Этот вопрос устарел. Напишите о проблеме ещё раз."), nil
+	}
+	if objectID == "-" {
+		objectID = ""
+	}
+	// Вдруг по этому месту заявка уже есть: лучше присоединиться, чем плодить дубль.
+	if similar, err := h.svc.Issues.FindSimilar(ctx, u.HouseID, p.Ref, objectID); err == nil && len(similar) > 0 && objectID != "" {
+		return h.join(ctx, u, similar[0].ID())
+	}
+	return h.report(ctx, u, p.Ref, objectID, p.Text)
+}
+
+// onContact сохраняет телефон для мастера из кнопки «Оставить телефон для мастера».
+func (h *Handler) onContact(ctx context.Context, to maxapi.Target, from maxapi.User, a maxapi.IncomingAttachment) error {
+	u, err := h.resident(ctx, from)
+	if err != nil {
+		return err
+	}
+	vcf, hash, ok := a.Contact()
+	if ok {
+		_, err = h.svc.Auth.SharePhoneFromBot(ctx, u, vcf, hash)
+	}
+	if !ok || errors.Is(err, app.ErrInvalidInput) {
+		return h.sendKeyboard(ctx, to, "Не получилось подтвердить номер. Нажмите кнопку ниже: пересланный контакт или номер текстом не подходят.",
+			[]maxapi.Button{maxapi.ContactButton("Оставить телефон для мастера")})
+	}
+	if err != nil {
+		return err
+	}
+	return h.send(ctx, to, "Телефон сохранён. Его увидит только управляющая компания по вашим открытым заявкам, соседи номер не видят. Убрать номер можно в приложении.")
 }

@@ -152,6 +152,17 @@ func (s *Service) SharePhone(ctx context.Context, u user.User, c Contact) (user.
 	return u, s.store.Users().Save(ctx, u)
 }
 
+// SharePhoneFromBot сохраняет телефон из кнопки «Поделиться контактом» в чате с ботом.
+// Подпись MAX подтверждает, что номер привязан к аккаунту того, кто его прислал.
+func (s *Service) SharePhoneFromBot(ctx context.Context, u user.User, vcf, hash string) (user.User, error) {
+	phone, err := VerifyBotContact(vcf, hash, s.cfg.BotToken)
+	if err != nil {
+		return u, fmt.Errorf("%w: %w", app.ErrInvalidInput, err)
+	}
+	u.SharePhone(phone)
+	return u, s.store.Users().Save(ctx, u)
+}
+
 // HidePhone стирает телефон: УК больше не видит его ни по одной заявке.
 func (s *Service) HidePhone(ctx context.Context, u user.User) (user.User, error) {
 	u.HidePhone()

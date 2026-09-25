@@ -3,6 +3,7 @@ package auth
 import (
 	"crypto/hmac"
 	"crypto/sha256"
+	"encoding/base64"
 	"encoding/hex"
 	"errors"
 	"fmt"
@@ -59,4 +60,40 @@ func VerifyContact(c Contact, maxUserID int64, botToken string, now time.Time) (
 		return "", fmt.Errorf("%w: %w", ErrInvalidContact, err)
 	}
 	return phone, nil
+}
+
+// VerifyBotContact проверяет контакт из кнопки request_contact в чате с ботом
+// (dev-max/docs-api/index.md, «Кнопка request_contact»): hash = HMAC-SHA256 от vcf_info
+// с токеном бота, а экранированные «\r\n» в vcf_info перед хешированием — настоящие переносы строк.
+// Кодировка хеша в документации не указана: принимаются hex любого регистра и base64.
+// Возвращает номер из строки TEL, нормализованный к «+цифры».
+func VerifyBotContact(vcf, hash, botToken string) (string, error) {
+	if botToken == "" || vcf == "" || hash == "" {
+		return "", fmt.Errorf("%w: vcf_info, hash and bot token are required", ErrInvalidContact)
+	}
+	vcf = strings.ReplaceAll(vcf, `\r\n`, "\r\n")
+	mac := hmac.New(sha256.New, []byte(botToken))
+	mac.Write([]byte(vcf))
+	sum := mac.Sum(nil)
+	candidates := []string{hex.EncodeToString(sum), base64.StdEncoding.EncodeToString(sum), base64.RawURLEncoding.EncodeToString(sum)}
+	valid := false
+	for _, c := range candidates {
+		if hmac.Equal([]byte(c), []byte(hash)) || hmac.Equal([]byte(c), []byte(strings.ToLower(hash))) {
+			valid = true
+		}
+	}
+	if !valid {
+		return "", fmt.Errorf("%w: signature mismatch", ErrInvalidContact)
+	}
+	for line := range strings.Lines(vcf) {
+		name, value, ok := strings.Cut(strings.TrimSpace(line), ":")
+		if ok && strings.HasPrefix(strings.ToUpper(name), "TEL") {
+			phone, err := user.NormalizePhone(value)
+			if err != nil {
+				return "", fmt.Errorf("%w: %w", ErrInvalidContact, err)
+			}
+			return phone, nil
+		}
+	}
+	return "", fmt.Errorf("%w: no TEL in vcard", ErrInvalidContact)
 }
