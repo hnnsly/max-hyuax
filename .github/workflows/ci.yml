@@ -1,11 +1,10 @@
-# Пайплайн: проверки на каждый push/PR + автодеплой на VPS при push в master.
+# Пайплайн CI/CD: валидация → сборка образов в GHCR → деплой через Ansible.
 #
-# Что нужно настроить один раз (GitHub → Settings → Secrets and variables → Actions → New repository secret):
-#   VPS_HOST     — IP или домен сервера
-#   VPS_USER     — пользователь для SSH (с правом запускать docker)
-#   VPS_SSH_KEY  — приватный ключ (весь текст, включая BEGIN/END); публичная часть — в ~/.ssh/authorized_keys на VPS
-#   DEPLOY_PATH  — путь к клону репозитория на VPS, например /opt/dom-max
-# Пока секретов нет, job deploy просто пропускается (см. условие if ниже), проверки работают.
+# Секреты GitHub Actions (Settings → Secrets and variables → Actions):
+#   SSH_PRIVATE_KEY        — приватный SSH-ключ для доступа к VPS (PEM или base64)
+#   ANSIBLE_VAULT_PASSWORD — пароль для расшифровки deploy/ansible/vault.yml
+#   DEPLOY_USER            — (опционально) логин для ghcr.io на VPS, по умолчанию github.actor
+#   DEPLOY_TOKEN           — (опционально) PAT с правом read:packages, по умолчанию GITHUB_TOKEN
 
 name: ci
 
@@ -13,22 +12,25 @@ on:
   push:
     branches: [master]
   pull_request:
-  # Кнопка «Run workflow» во вкладке Actions: ручной передеплой без нового коммита.
   workflow_dispatch:
 
-# Новый пуш в ту же ветку отменяет устаревший прогон проверок.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  REGISTRY_HOST: "ghcr.io"
+
 jobs:
-  backend:
-    name: backend (go test)
+  # -------------------------------------------------------------------------
+  # 1. Валидация: линтинг (gofmt, go vet), тесты, покрытие и компиляция
+  # -------------------------------------------------------------------------
+  validate-backend:
+    name: validate backend
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: backend
-    # Postgres для интеграционных тестов: каждый прогон создаёт в нём свою временную базу.
     services:
       postgres:
         image: postgres:18.6
@@ -46,53 +48,53 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      # Версия Go берётся из backend/go.mod (go 1.27, toolchain go1.27.1) — вручную не дублируем.
       - uses: actions/setup-go@v5
         with:
           go-version-file: backend/go.mod
           cache-dependency-path: backend/go.sum
 
-      # gofmt -l печатает неотформатированные файлы; непустой вывод = ошибка.
       - name: gofmt
-        run: test -z "$(gofmt -l .)" || { gofmt -l .; exit 1; }
+        run: |
+          test -z "$(gofmt -l cmd internal)" || (echo "Unformatted code detected:" && gofmt -l cmd internal && exit 1)
 
       - name: go vet
         run: go vet ./...
 
-      # Live-тесты (тег live) ходят в настоящий MAX API и здесь не запускаются.
-      - name: go test
+      - name: go test (unit)
         run: go test -race -count=1 ./...
 
-      # Репозитории и сквозной сценарий API на настоящем Postgres (тег integration) + профиль покрытия.
-      - name: go test (integration, coverage)
+      - name: go test (integration & coverage)
         env:
           DATABASE_URL: postgres://dommax:dommax@localhost:5432/dommax?sslmode=disable
-        run: go test -tags integration -count=1 -coverpkg=./internal/... -coverprofile=coverage.out ./...
+        run: go test -v -tags integration -count=1 -coverpkg=./internal/... -coverprofile=coverage.out ./...
 
-      # Порог покрытия: всего ≥ 80%, каждый пакет domain и app ≥ 80% (tools/covercheck).
       - name: coverage threshold
         run: go run ./tools/covercheck -profile coverage.out
 
-  miniapp:
-    name: miniapp (build)
+      - name: go build
+        run: CGO_ENABLED=0 go build -v ./...
+
+      - name: upload coverage artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-coverage
+          path: backend/coverage.out
+          retention-days: 7
+
+  validate-miniapp:
+    name: validate miniapp
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
-      # Мини-приложения в репозитории пока нет: шаги ниже включатся сами, когда появится miniapp/package.json.
-      - name: check miniapp exists
-        id: exists
-        run: echo "found=$([ -f miniapp/package.json ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
-
       - uses: actions/setup-node@v4
-        if: steps.exists.outputs.found == 'true'
         with:
           node-version: 24
           cache: npm
           cache-dependency-path: miniapp/package-lock.json
 
       - name: npm ci, typecheck, test, build
-        if: steps.exists.outputs.found == 'true'
         working-directory: miniapp
         run: |
           npm ci
@@ -100,43 +102,138 @@ jobs:
           npm run test:cover
           npm run build
 
-  deploy:
-    name: deploy to VPS
-    needs: [backend, miniapp]
-    # Только master (push или ручной запуск) и только если секреты заданы.
+  # -------------------------------------------------------------------------
+  # 2. Сборка и публикация Docker-образов в GitHub Container Registry (GHCR)
+  # -------------------------------------------------------------------------
+  build:
+    name: build images
+    needs: [validate-backend, validate-miniapp]
     if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
-    # Два деплоя одновременно не пускаем; текущий не отменяем, чтобы не оборвать docker compose.
+    permissions:
+      contents: read
+      packages: write
+    env:
+      BUILDX_NO_DEFAULT_ATTESTATIONS: "1"
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login "${{ env.REGISTRY_HOST }}" -u "${{ github.actor }}" --password-stdin
+
+      - name: Build and push API & Web images
+        run: |
+          IMAGE_BASE=$(echo "${{ env.REGISTRY_HOST }}/${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          SHA_TAG="${GITHUB_SHA::8}"
+
+          echo "Building API image: ${IMAGE_BASE}/api:${SHA_TAG} and ${IMAGE_BASE}/api:latest"
+          docker pull "${IMAGE_BASE}/api:latest" || true
+          docker build \
+            --cache-from "${IMAGE_BASE}/api:latest" \
+            -t "${IMAGE_BASE}/api:${SHA_TAG}" \
+            -t "${IMAGE_BASE}/api:latest" \
+            ./backend
+          docker push "${IMAGE_BASE}/api:${SHA_TAG}"
+          docker push "${IMAGE_BASE}/api:latest"
+
+          echo "Building Web image: ${IMAGE_BASE}/web:${SHA_TAG} and ${IMAGE_BASE}/web:latest"
+          docker pull "${IMAGE_BASE}/web:latest" || true
+          docker build \
+            --cache-from "${IMAGE_BASE}/web:latest" \
+            -f deploy/web.Dockerfile \
+            -t "${IMAGE_BASE}/web:${SHA_TAG}" \
+            -t "${IMAGE_BASE}/web:latest" \
+            .
+          docker push "${IMAGE_BASE}/web:${SHA_TAG}"
+          docker push "${IMAGE_BASE}/web:latest"
+
+  # -------------------------------------------------------------------------
+  # 3. Деплой через Ansible Playbook
+  # -------------------------------------------------------------------------
+  deploy:
+    name: deploy via ansible
+    needs: [build]
+    if: github.ref == 'refs/heads/master' && github.event_name != 'pull_request'
+    runs-on: ubuntu-latest
     concurrency:
       group: deploy
       cancel-in-progress: false
+    permissions:
+      contents: read
+      packages: read
+    env:
+      ANSIBLE_HOST_KEY_CHECKING: "False"
+      DEPLOY_ENV: "prod"
     steps:
-      - name: check secrets
+      - uses: actions/checkout@v4
+
+      - name: Check SSH secret
         id: secrets
         env:
-          HOST: ${{ secrets.VPS_HOST }}
-        run: echo "ready=$([ -n "$HOST" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
+          SSH_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+        run: echo "ready=$([ -n "$SSH_KEY" ] && echo true || echo false)" >> "$GITHUB_OUTPUT"
 
-      # Заходим на VPS по SSH и обновляем код до коммита, который сейчас проверили.
-      # Сборка образов идёт на сервере (docker compose --build): registry пока не заводим.
-      - name: ssh deploy
+      - name: Install OpenSSH and Ansible
         if: steps.secrets.outputs.ready == 'true'
-        uses: appleboy/ssh-action@v1.2.0
-        with:
-          host: ${{ secrets.VPS_HOST }}
-          username: ${{ secrets.VPS_USER }}
-          key: ${{ secrets.VPS_SSH_KEY }}
-          command_timeout: 15m
-          script: |
-            set -eu
-            cd "${{ secrets.DEPLOY_PATH }}"
-            git fetch --depth 1 origin ${{ github.sha }}
-            git reset --hard ${{ github.sha }}
-            # deploy/.env на сервере не трогаем: DOMAIN и секреты живут там.
-            docker compose -f deploy/compose.yaml up -d --build --remove-orphans
-            docker image prune -f
-            docker compose -f deploy/compose.yaml ps
+        run: |
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends openssh-client
+          pip install --no-cache-dir ansible-core
 
-      - name: deploy skipped
+      - name: Prepare SSH key and Ansible Vault
+        if: steps.secrets.outputs.ready == 'true'
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          ANSIBLE_VAULT_PASSWORD: ${{ secrets.ANSIBLE_VAULT_PASSWORD }}
+        run: |
+          chmod 755 deploy/ansible
+          mkdir -p ~/.ssh
+          if echo "$SSH_PRIVATE_KEY" | grep -q "BEGIN"; then
+            echo "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/id_rsa
+          else
+            echo "$SSH_PRIVATE_KEY" | base64 -d > ~/.ssh/id_rsa
+          fi
+          chmod 600 ~/.ssh/id_rsa
+
+          if [ -n "$ANSIBLE_VAULT_PASSWORD" ]; then
+            printf '%s' "$ANSIBLE_VAULT_PASSWORD" > deploy/ansible/.vault-pass
+            chmod 600 deploy/ansible/.vault-pass
+          fi
+
+      - name: Run Ansible Playbook
+        if: steps.secrets.outputs.ready == 'true'
+        env:
+          ANSIBLE_CONFIG: ${{ github.workspace }}/deploy/ansible/ansible.cfg
+          DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
+          DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
+          FALLBACK_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          cd deploy/ansible
+          IMAGE_BASE=$(echo "${{ env.REGISTRY_HOST }}/${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
+          SHA_TAG="${GITHUB_SHA::8}"
+
+          if [ -f .vault-pass ]; then
+            VAULT_ARG="--vault-password-file .vault-pass"
+          else
+            VAULT_ARG=""
+          fi
+
+          ansible-playbook \
+            -i "localhost," \
+            playbook.yml \
+            ${VAULT_ARG} \
+            -e "deploy_environment=${DEPLOY_ENV}" \
+            -e "release_registry=${IMAGE_BASE}" \
+            -e "registry_host=${{ env.REGISTRY_HOST }}" \
+            -e "registry_username=${DEPLOY_USER:-${{ github.actor }}}" \
+            -e "registry_token=${DEPLOY_TOKEN:-${FALLBACK_TOKEN}}" \
+            -e "image_tag=${SHA_TAG}"
+
+      - name: Clean up sensitive files
+        if: always()
+        run: |
+          rm -f deploy/ansible/.vault-pass ~/.ssh/id_rsa
+
+      - name: Deploy skipped notice
         if: steps.secrets.outputs.ready != 'true'
-        run: echo "::notice::Секреты VPS_* не заданы, деплой пропущен. Инструкция — PRIVET_OT_CLAUDE_FOR_DEVOPS.md"
+        run: echo "::notice::Секрет SSH_PRIVATE_KEY не задан, шаг деплоя пропущен."

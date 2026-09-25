@@ -1,0 +1,12 @@
+# Пример конфигурации деплоя (скопируйте в vault.yml и зашифруйте через ansible-vault encrypt)
+prod:
+  deploy_host: "vps.example.com"
+  deploy_user: "ansible"
+  deploy_port: 22
+  deploy_path: "/opt/max"
+  bind_ip: "127.0.0.1"
+  host_port: 10380
+  # Имя docker-сети для Postgres и сервисов
+  docker_network: "postgres-max"
+  container_name_api: "max-api"
+  container_name_web: "max-web"

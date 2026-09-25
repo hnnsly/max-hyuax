@@ -1,0 +1,40 @@
+services:
+  web:
+    image: "{{ release_registry }}/web:{{ image_tag }}"
+    container_name: "{{ env_config.container_name_web | default('max-web') }}"
+    restart: unless-stopped
+    ports:
+      - "{{ env_config.bind_ip | default('127.0.0.1') }}:{{ env_config.host_port | default(10380) }}:80"
+    env_file:
+      - .env
+    environment:
+      # За внешним прокси Caddy слушает обычный HTTP на 80 порту без выпуска собственного TLS
+      - DOMAIN=http://
+    volumes:
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - api
+    networks:
+      - {{ env_config.docker_network | default('postgres-max') }}
+
+  api:
+    image: "{{ release_registry }}/api:{{ image_tag }}"
+    container_name: "{{ env_config.container_name_api | default('max-api') }}"
+    restart: unless-stopped
+    env_file:
+      - .env
+    volumes:
+      - photos:/data/photos
+    networks:
+      - {{ env_config.docker_network | default('postgres-max') }}
+
+volumes:
+  photos:
+  caddy_data:
+  caddy_config:
+
+networks:
+  {{ env_config.docker_network | default('postgres-max') }}:
+    name: {{ env_config.docker_network | default('postgres-max') }}
+    driver: bridge
