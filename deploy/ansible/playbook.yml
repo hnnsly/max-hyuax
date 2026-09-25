@@ -38,8 +38,9 @@
 
     - name: Log in to container registry
       ansible.builtin.shell: |
-        set -euo pipefail
         echo "{{ registry_token }}" | docker login "{{ registry_host }}" -u "{{ registry_username }}" --password-stdin
+      args:
+        executable: /bin/bash
       no_log: false
       changed_when: false
       when: (registry_token | default('') | length) > 0
@@ -52,27 +53,31 @@
 
     - name: Pull container images
       ansible.builtin.shell: |
-        set -euo pipefail
-        cd "{{ target_deploy_path }}"
         docker compose pull
+      args:
+        chdir: "{{ target_deploy_path }}"
+        executable: /bin/bash
       changed_when: true
 
     - name: Start services via Docker Compose
       ansible.builtin.shell: |
-        set -euo pipefail
-        cd "{{ target_deploy_path }}"
         docker compose up -d --remove-orphans
+      args:
+        chdir: "{{ target_deploy_path }}"
+        executable: /bin/bash
       changed_when: true
 
     - name: Clean up unused docker images
       ansible.builtin.shell: |
-        set -euo pipefail
         docker image prune -f
+      args:
+        executable: /bin/bash
       changed_when: false
 
     - name: Check container status
       ansible.builtin.shell: |
-        set -euo pipefail
-        cd "{{ target_deploy_path }}"
         docker compose ps
+      args:
+        chdir: "{{ target_deploy_path }}"
+        executable: /bin/bash
       changed_when: false
