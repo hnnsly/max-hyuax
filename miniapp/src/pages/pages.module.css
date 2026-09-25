@@ -8,14 +8,14 @@
   padding: 10px 10px 10px 14px;
 }
 .orgName {
-  font-size: 16px;
+  font-size: var(--fs-body);
   font-weight: 650;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .orgNote {
-  font-size: 13.5px;
+  font-size: var(--fs-caption);
   color: var(--text-2);
 }
 .callButton {
@@ -49,12 +49,12 @@
 .cardPlace {
   margin: 4px 0 0;
   font-family: var(--font-cond);
-  font-size: 15px;
+  font-size: var(--fs-secondary);
   color: var(--text-2);
 }
 .cardDescription {
   margin: 8px 0 0;
-  font-size: 15px;
+  font-size: var(--fs-secondary);
   line-height: 1.35;
 }
 .figures {
@@ -83,7 +83,7 @@
 .figureAccent { color: var(--enamel-text); }
 .figureLate { color: var(--surik); }
 .figureLabel {
-  font-size: 12.5px;
+  font-size: var(--fs-caption);
   color: var(--text-2);
 }
 .figureDivider {
@@ -100,7 +100,7 @@
 }
 .escalateTitle {
   margin: 0;
-  font-size: 16px;
+  font-size: var(--fs-body);
   font-weight: 700;
   color: var(--surik);
 }
@@ -113,7 +113,7 @@
 .blockTitle {
   margin: 0;
   font-family: var(--font-cond);
-  font-size: 17px;
+  font-size: var(--fs-body);
   font-weight: 700;
 }
 .keyValue {
@@ -121,13 +121,13 @@
   grid-template-columns: 110px minmax(0, 1fr);
   gap: 4px 12px;
   margin: 0;
-  font-size: 15px;
+  font-size: var(--fs-secondary);
 }
 .keyValue dt { color: var(--text-3); }
 .keyValue dd { margin: 0; }
 .basis {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--fs-caption);
   color: var(--text-3);
   line-height: 1.35;
 }
@@ -154,7 +154,7 @@
 .tlItem { display: contents; }
 .tlWhen {
   font-family: var(--font-cond);
-  font-size: 12.5px;
+  font-size: var(--fs-caption);
   color: var(--text-3);
   text-align: right;
   padding-top: 1px;
@@ -183,12 +183,12 @@
   flex-direction: column;
   gap: 7px;
   padding-bottom: 14px;
-  font-size: 15px;
+  font-size: var(--fs-secondary);
 }
 .quote {
   border-left: 3px solid var(--enamel);
   padding: 2px 0 2px 10px;
-  font-size: 14.5px;
+  font-size: var(--fs-secondary);
   color: var(--text-2);
   line-height: 1.35;
 }
@@ -197,7 +197,7 @@
   border-radius: var(--radius-control);
   background: var(--control);
   color: var(--text-2);
-  font-size: 15.5px;
+  font-size: var(--fs-secondary);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -219,13 +219,13 @@
 }
 .text {
   margin: 0;
-  font-size: 16px;
+  font-size: var(--fs-body);
   line-height: 1.4;
   color: var(--text-2);
 }
 .hint {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--fs-caption);
   color: var(--text-3);
   line-height: 1.35;
 }
@@ -253,7 +253,7 @@
   font-variant-numeric: tabular-nums;
 }
 .kpiLabel {
-  font-size: 12.5px;
+  font-size: var(--fs-caption);
   color: var(--text-3);
 }
 .groupTitle {
@@ -262,7 +262,7 @@
   gap: 10px;
   margin: 4px 2px 0;
   font-family: var(--font-cond);
-  font-size: 15px;
+  font-size: var(--fs-secondary);
   font-weight: 700;
 }
 .groupTitle::after {
@@ -294,7 +294,7 @@
   gap: 12px;
   min-height: 52px;
   padding: 8px 14px;
-  font-size: 17px;
+  font-size: var(--fs-body);
   cursor: pointer;
 }
 .radio + .radio { border-top: 1px solid var(--separator); }
@@ -313,7 +313,7 @@
   background: var(--surface-card);
   color: var(--text);
   font: inherit;
-  font-size: 16px;
+  font-size: var(--fs-body);
   resize: vertical;
 }
 .sheetText:focus-visible {
@@ -327,7 +327,7 @@
   align-items: center;
   gap: 6px;
   margin: -4px 0 0;
-  font-size: 13.5px;
+  font-size: var(--fs-caption);
   color: var(--surik);
 }
 .sheetText:user-invalid + .fieldError { display: flex; }
@@ -342,7 +342,7 @@
 }
 .orgCardName {
   margin: 0;
-  font-size: 17px;
+  font-size: var(--fs-body);
   font-weight: 650;
 }
 .orgFigures {
@@ -359,7 +359,7 @@
   gap: 2px;
 }
 .orgFigures dt {
-  font-size: 12.5px;
+  font-size: var(--fs-caption);
   color: var(--text-3);
 }
 .orgFigures dd {
@@ -370,8 +370,9 @@
   line-height: 1;
   font-variant-numeric: tabular-nums;
 }
-/* Узкий экран: цифры в два ряда, подписи не переносятся по буквам. */
-@container (width < 300px) {
+/* Узкий экран: цифры в два ряда, подписи не переносятся по буквам. Порог с запасом
+   под подписи 14 px: «просрочено» не помещается в четверть карточки телефона. */
+@container (width < 360px) {
   .orgFigures { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
@@ -387,7 +388,7 @@
   justify-content: space-between;
   gap: 4px 12px;
   padding: 10px 0;
-  font-size: 16px;
+  font-size: var(--fs-body);
 }
 .contact + .contact { border-top: 1px solid var(--separator); }
 .contactPhone {
@@ -418,7 +419,7 @@
   padding: 10px 12px;
   background: none;
   font: inherit;
-  font-size: 15px;
+  font-size: var(--fs-secondary);
   color: var(--surik);
   cursor: pointer;
 }
@@ -433,7 +434,7 @@
   gap: 8px;
   margin: 0;
   padding-left: 18px;
-  font-size: 15px;
+  font-size: var(--fs-secondary);
   line-height: 1.35;
   color: var(--text-2);
 }

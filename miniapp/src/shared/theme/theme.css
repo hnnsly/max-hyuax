@@ -26,6 +26,11 @@ body {
   --font-cond: 'Sofia Sans Condensed Variable', 'Sofia Sans Variable', 'Arial Narrow', system-ui, sans-serif;
   --font-plate: 'Sofia Sans Extra Condensed Variable', 'Sofia Sans Condensed Variable', 'Arial Narrow', system-ui, sans-serif;
 
+  /* Шкала текста (DESIGN-SYSTEM §3.2). Мельче 14 px на экране текста нет: подписи тоже читают люди 60+. */
+  --fs-caption: 14px; /* подписи под цифрами, мета, подсказки */
+  --fs-secondary: 16px; /* детали и вторичный текст */
+  --fs-body: 17px; /* основной текст, строки, кнопки */
+
   --enamel: #1b3f94;
   --enamel-pressed: #142f70;
   --enamel-edge: #122b66;

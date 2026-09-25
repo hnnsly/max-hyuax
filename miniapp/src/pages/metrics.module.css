@@ -19,7 +19,7 @@
 }
 .compare { text-align: right; }
 .label {
-  font-size: 14.5px;
+  font-size: var(--fs-secondary);
   color: var(--text-2);
 }
 .figure {
@@ -41,21 +41,21 @@
 .bigUnit,
 .compareText {
   font-family: var(--font-cond);
-  font-size: 17px;
+  font-size: var(--fs-body);
   font-weight: 650;
   color: var(--text-2);
 }
-.compareText { font-size: 15px; }
+.compareText { font-size: var(--fs-secondary); }
 .good { color: var(--stencil-green); }
 .bad { color: var(--surik); }
 .same { color: var(--text-2); }
 .hint {
   margin: 0;
-  font-size: 12.5px;
+  font-size: var(--fs-caption);
   color: var(--text-3);
 }
 .empty {
-  font-size: 15px;
+  font-size: var(--fs-secondary);
   color: var(--text-2);
 }
 
@@ -73,7 +73,7 @@
   align-items: flex-end;
   padding-bottom: 14px;
   font-family: var(--font-cond);
-  font-size: 11px;
+  font-size: var(--fs-caption);
   color: var(--text-3);
 }
 .plot {
@@ -120,7 +120,7 @@
   right: 0;
   bottom: 3px;
   font-family: var(--font-cond);
-  font-size: 10.5px;
+  font-size: var(--fs-caption);
   color: var(--enamel-text);
 }
 .days {
@@ -129,7 +129,7 @@
   gap: 6px;
   align-items: end;
   font-family: var(--font-cond);
-  font-size: 11px;
+  font-size: var(--fs-caption);
   line-height: 1;
   color: var(--text-3);
   text-align: center;
@@ -146,7 +146,7 @@
   gap: 8px;
 }
 .text {
-  font-size: 16px;
+  font-size: var(--fs-body);
   line-height: 1.25;
 }
 .compareRows {
@@ -157,7 +157,7 @@
 }
 .rowLabel {
   font-family: var(--font-cond);
-  font-size: 13px;
+  font-size: var(--fs-caption);
   color: var(--text-2);
 }
 .squares {
@@ -178,7 +178,7 @@
 .rowText {
   min-width: 0;
   margin-left: 4px;
-  font-size: 13px;
+  font-size: var(--fs-caption);
   line-height: 1.25;
   color: var(--text-2);
 }
@@ -199,7 +199,7 @@
   display: flex;
   flex-wrap: wrap;
   gap: 6px 14px;
-  font-size: 12.5px;
+  font-size: var(--fs-caption);
   color: var(--text-2);
 }
 .legend span {
@@ -217,6 +217,6 @@
 
 .note {
   margin: 0;
-  font-size: 12.5px;
+  font-size: var(--fs-caption);
   color: var(--text-3);
 }

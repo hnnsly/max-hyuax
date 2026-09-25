@@ -10,7 +10,7 @@
   padding: 7px 12px 8px;
   background: var(--control);
   font: inherit;
-  font-size: 14.5px;
+  font-size: var(--fs-secondary);
   color: var(--text);
   cursor: pointer;
 }
@@ -25,7 +25,7 @@
 }
 .hint {
   margin: 0;
-  font-size: 12.5px;
+  font-size: var(--fs-caption);
   color: var(--text-3);
 }
 
@@ -145,7 +145,7 @@
 }
 .qrError {
   font-family: var(--font-cond);
-  font-size: 12px;
+  font-size: var(--fs-caption);
   color: var(--ink-3);
   text-align: center;
 }

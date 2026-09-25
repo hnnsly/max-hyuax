@@ -12,7 +12,7 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
-  font-size: 12.5px;
+  font-size: var(--fs-caption);
   color: var(--text-3);
 }
 .step::before {
@@ -37,17 +37,17 @@
 .sub {
   margin: 4px 0 0;
   font-family: var(--font-cond);
-  font-size: 15px;
+  font-size: var(--fs-secondary);
   color: var(--text-2);
 }
 .label {
   margin: 0;
-  font-size: 15px;
+  font-size: var(--fs-secondary);
   font-weight: 650;
 }
 .help {
   margin: 0;
-  font-size: 13px;
+  font-size: var(--fs-caption);
   color: var(--text-3);
   line-height: 1.35;
 }
@@ -68,7 +68,7 @@
 }
 .hintText {
   margin: 0;
-  font-size: 14px;
+  font-size: var(--fs-caption);
   line-height: 1.35;
   color: var(--text-2);
 }
@@ -82,7 +82,7 @@
   padding: 8px 12px;
   background: var(--control);
   font: inherit;
-  font-size: 14.5px;
+  font-size: var(--fs-secondary);
   font-weight: 650;
   color: var(--enamel-text);
   cursor: pointer;
@@ -109,7 +109,7 @@
   background: var(--surface-card);
   color: var(--text);
   font: inherit;
-  font-size: 15px;
+  font-size: var(--fs-secondary);
   cursor: pointer;
 }
 .tile[aria-pressed='true'] {
@@ -131,7 +131,7 @@
   background: var(--surface-card);
   color: var(--text);
   font: inherit;
-  font-size: 14px;
+  font-size: var(--fs-caption);
   cursor: pointer;
 }
 .chip[aria-pressed='true'] {
@@ -149,7 +149,7 @@
   background: var(--surface-card);
   color: var(--text);
   font: inherit;
-  font-size: 16px;
+  font-size: var(--fs-body);
   line-height: 1.35;
   resize: vertical;
 }
@@ -163,7 +163,7 @@
   padding: 10px 12px;
   border-left: 3px solid var(--enamel);
   background: var(--surface-secondary);
-  font-size: 14px;
+  font-size: var(--fs-caption);
   line-height: 1.35;
   color: var(--text-2);
 }
@@ -185,7 +185,7 @@
 }
 .dupNote {
   margin: 0;
-  font-size: 15px;
+  font-size: var(--fs-secondary);
   color: var(--text-2);
 }
 .mini {
@@ -208,7 +208,7 @@
 }
 .miniTitle {
   margin: 0;
-  font-size: 17px;
+  font-size: var(--fs-body);
   font-weight: 650;
 }
 

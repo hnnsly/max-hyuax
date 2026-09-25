@@ -33,6 +33,11 @@
   --font-ui: "Sofia Sans", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-plate: "Sofia Sans Extra Condensed", "Sofia Sans", "Arial Narrow", system-ui, sans-serif;
 
+  /* Шкала текста: мельче 14 px на экране нет */
+  --fs-caption: 14px;
+  --fs-secondary: 16px;
+  --fs-body: 17px;
+
   /* Фирменная краска и состояния (светлая тема) */
   --enamel: #1b3f94;            /* таблички, основная кнопка */
   --enamel-pressed: #142f70;
