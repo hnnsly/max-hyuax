@@ -4,8 +4,10 @@ import (
 	"cmp"
 	"errors"
 	"fmt"
+	"net/url"
 	"regexp"
 	"strconv"
+	"strings"
 
 	"dommax/internal/storage/files"
 	"dommax/internal/storage/maxapi"
@@ -39,10 +41,53 @@ func (c config) WebhookURL() string { return "https://" + c.Domain + "/webhook/m
 // Формат секрета webhook задан документацией POST /subscriptions.
 var webhookSecretRe = regexp.MustCompile(`^[a-zA-Z0-9_-]{5,256}$`)
 
+// buildDatabaseURL собирает DSN из отдельных переменных (POSTGRES_*/DB_*) или возвращает DATABASE_URL.
+func buildDatabaseURL(getenv func(string) string) string {
+	clean := func(keys ...string) string {
+		for _, k := range keys {
+			if v := strings.Trim(strings.TrimSpace(getenv(k)), `"'`); v != "" {
+				return v
+			}
+		}
+		return ""
+	}
+
+	host := clean("POSTGRES_HOST", "POSTGRESQL_HOST", "DB_HOST")
+	user := clean("POSTGRES_USER", "POSTGRESQL_USER", "DB_USER")
+	pass := clean("POSTGRES_PASSWORD", "POSTGRESQL_PASSWORD", "DB_PASSWORD")
+	name := clean("POSTGRES_DB", "POSTGRESQL_DB", "DB_NAME")
+
+	if host != "" || user != "" || name != "" {
+		host = cmp.Or(host, "localhost")
+		port := cmp.Or(clean("POSTGRES_PORT", "POSTGRESQL_PORT", "DB_PORT"), "5432")
+		user = cmp.Or(user, "dommax")
+		name = cmp.Or(name, "dommax")
+		ssl := clean("POSTGRES_SSLMODE", "POSTGRES_SSL", "DB_SSLMODE")
+		if ssl == "" || ssl == "false" {
+			ssl = "disable"
+		} else if ssl == "true" {
+			ssl = "require"
+		}
+
+		u := url.URL{
+			Scheme: "postgres",
+			User:   url.UserPassword(user, pass),
+			Host:   fmt.Sprintf("%s:%s", host, port),
+			Path:   name,
+		}
+		q := u.Query()
+		q.Set("sslmode", ssl)
+		u.RawQuery = q.Encode()
+		return u.String()
+	}
+
+	return clean("DATABASE_URL")
+}
+
 // loadConfig читает переменные окружения через getenv и собирает все ошибки сразу.
 func loadConfig(getenv func(string) string) (config, error) {
 	c := config{
-		DatabaseURL:    getenv("DATABASE_URL"),
+		DatabaseURL:    buildDatabaseURL(getenv),
 		HTTPAddr:       cmp.Or(getenv("HTTP_ADDR"), ":8080"),
 		SessionSecret:  getenv("SESSION_SECRET"),
 		ConsentVersion: cmp.Or(getenv("CONSENT_VERSION"), "v1"),
@@ -53,10 +98,10 @@ func loadConfig(getenv func(string) string) (config, error) {
 		MaxAPIURL:      cmp.Or(getenv("MAX_API_URL"), maxapi.DefaultBaseURL),
 		MaxCAFile:      getenv("MAX_API_CA_FILE"),
 		S3: files.S3Config{
-			Endpoint:  getenv("S3_ENDPOINT"),
-			AccessKey: getenv("S3_ACCESS_KEY"),
-			SecretKey: getenv("S3_SECRET_KEY"),
-			Bucket:    cmp.Or(getenv("S3_BUCKET"), "photos"),
+			Endpoint:  cmp.Or(getenv("S3_ENDPOINT"), getenv("MINIO_ENDPOINT")),
+			AccessKey: cmp.Or(getenv("S3_ACCESS_KEY"), getenv("MINIO_ACCESS_KEY_ID"), getenv("MINIO_ROOT_USER")),
+			SecretKey: cmp.Or(getenv("S3_SECRET_KEY"), getenv("MINIO_SECRET_ACCESS_KEY"), getenv("MINIO_ROOT_PASSWORD")),
+			Bucket:    cmp.Or(getenv("S3_BUCKET"), getenv("MINIO_BUCKET"), "photos"),
 		},
 		PhotosDir:   cmp.Or(getenv("PHOTOS_DIR"), "data/photos"),
 		GeocoderURL: getenv("GEOCODER_URL"),
@@ -79,7 +124,7 @@ func loadConfig(getenv func(string) string) (config, error) {
 	parseBool("S3_USE_SSL", &c.S3.UseSSL)
 
 	if c.DatabaseURL == "" {
-		errs = append(errs, errors.New("DATABASE_URL is required"))
+		errs = append(errs, errors.New("DATABASE_URL or POSTGRES_HOST/DB_HOST is required"))
 	}
 	if len(c.SessionSecret) < 16 {
 		errs = append(errs, errors.New("SESSION_SECRET must be at least 16 characters"))

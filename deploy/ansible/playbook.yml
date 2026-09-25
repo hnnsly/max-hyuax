@@ -28,7 +28,7 @@
     - vault.yml
   vars:
     env_config: "{{ lookup('ansible.builtin.vars', deploy_environment | default('prod')) }}"
-    target_deploy_path: "{{ env_config.deploy_path | default('/opt/dom-max') }}"
+    target_deploy_path: "{{ env_config.deploy_path | default('/opt/max') }}"
   tasks:
     - name: Ensure deployment directory exists
       ansible.builtin.file:

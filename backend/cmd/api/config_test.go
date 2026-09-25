@@ -28,6 +28,44 @@ func TestConfigRequiresSecrets(t *testing.T) {
 	}
 }
 
+func TestConfigSeparateDatabaseParams(t *testing.T) {
+	m := map[string]string{
+		"POSTGRES_HOST":     "db.internal",
+		"POSTGRES_PORT":     "5433",
+		"POSTGRES_USER":     "myuser",
+		"POSTGRES_PASSWORD": "mypassword",
+		"POSTGRES_DB":       "mydb",
+		"POSTGRES_SSLMODE":  "require",
+		"SESSION_SECRET":    "0123456789abcdef",
+	}
+	c, err := loadConfig(env(m))
+	if err != nil {
+		t.Fatalf("loadConfig: %v", err)
+	}
+	want := "postgres://myuser:mypassword@db.internal:5433/mydb?sslmode=require"
+	if c.DatabaseURL != want {
+		t.Fatalf("got DatabaseURL = %q, want %q", c.DatabaseURL, want)
+	}
+
+	// Проверка с префиксом DB_*
+	m2 := map[string]string{
+		"DB_HOST":        "127.0.0.1",
+		"DB_PORT":        "5432",
+		"DB_USER":        "user2",
+		"DB_PASSWORD":    "pass2",
+		"DB_NAME":        "dommax",
+		"SESSION_SECRET": "0123456789abcdef",
+	}
+	c2, err := loadConfig(env(m2))
+	if err != nil {
+		t.Fatalf("loadConfig: %v", err)
+	}
+	want2 := "postgres://user2:pass2@127.0.0.1:5432/dommax?sslmode=disable"
+	if c2.DatabaseURL != want2 {
+		t.Fatalf("got DatabaseURL = %q, want %q", c2.DatabaseURL, want2)
+	}
+}
+
 // Без S3_ENDPOINT фото пишутся на диск; с ним нужны ключи доступа, бакет по умолчанию photos.
 func TestConfigS3(t *testing.T) {
 	c, err := loadConfig(env(base()))

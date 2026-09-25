@@ -3,8 +3,8 @@
 # Секреты GitHub Actions (Settings → Secrets and variables → Actions):
 #   SSH_PRIVATE_KEY        — приватный SSH-ключ для доступа к VPS (PEM или base64)
 #   ANSIBLE_VAULT_PASSWORD — пароль для расшифровки deploy/ansible/vault.yml
-#   DEPLOY_USER            — (опционально) логин для ghcr.io на VPS, по умолчанию github.actor
-#   DEPLOY_TOKEN           — (опционально) PAT с правом read:packages, по умолчанию GITHUB_TOKEN
+#   DEPLOY_TOKEN           — PAT с правом read:packages для логина в ghcr.io на VPS
+#   DEPLOY_USER            — (опционально) логин на GitHub, по умолчанию github.actor
 
 name: ci
 
@@ -161,7 +161,6 @@ jobs:
       cancel-in-progress: false
     permissions:
       contents: read
-      packages: read
     env:
       ANSIBLE_HOST_KEY_CHECKING: "False"
       DEPLOY_ENV: "prod"
@@ -203,7 +202,6 @@ jobs:
       - name: Run Ansible Playbook
         if: steps.secrets.outputs.ready == 'true'
         env:
-          ANSIBLE_CONFIG: ${{ github.workspace }}/deploy/ansible/ansible.cfg
           DEPLOY_USER: ${{ secrets.DEPLOY_USER }}
           DEPLOY_TOKEN: ${{ secrets.DEPLOY_TOKEN }}
           FALLBACK_TOKEN: ${{ secrets.GITHUB_TOKEN }}
