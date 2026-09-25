@@ -219,6 +219,24 @@ paths:
         "200": { $ref: "#/components/responses/User" }
         "404": { $ref: "#/components/responses/Error" }
 
+  /me/role:
+    post:
+      tags: [me]
+      summary: Переключить роль текущего пользователя для проверки кабинетов
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [role]
+              properties:
+                role: { type: string, enum: [resident, chairman, uk_operator, district], example: chairman }
+      responses:
+        "200": { $ref: "#/components/responses/User" }
+        "401": { $ref: "#/components/responses/Error" }
+        "422": { $ref: "#/components/responses/Error" }
+
   /houses:
     get:
       tags: [houses]
@@ -334,6 +352,25 @@ paths:
                 properties:
                   object: { $ref: "#/components/schemas/AssetObject" }
                   house: { $ref: "#/components/schemas/House" }
+        "404": { $ref: "#/components/responses/Error" }
+
+  /objects/{code}/sticker.pdf:
+    get:
+      tags: [houses]
+      summary: Печатная QR-наклейка объекта формата A6 (PDF)
+      description: |
+        Генерирует PDF-наклейку формата A6 с адресной табличкой, векторным QR-кодом объекта и телефоном АДС УК.
+        Доступно без заголовка авторизации для скачивания через WebApp.downloadFile в MAX.
+      security: []
+      parameters:
+        - { name: code, in: path, required: true, schema: { type: string }, example: h-17k2-e2-lift }
+        - { name: qr, in: query, required: false, schema: { type: string }, description: Матрица QR-кода (строки из 0 и 1 через точку) }
+      responses:
+        "200":
+          description: Печатная наклейка A6 (PDF)
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
         "404": { $ref: "#/components/responses/Error" }
 
   /issues/similar:

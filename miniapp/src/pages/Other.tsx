@@ -8,13 +8,14 @@ import type { GeoPlace, House } from '../shared/api/types';
 import { isClosed } from '../shared/api/types';
 import { useResource } from '../shared/api/useResource';
 import { bridge, BOT_NAME } from '../shared/bridge/bridge';
-import { calendarDaysBetween } from '../shared/lib/format';
+import { calendarDaysBetween, splitAddress } from '../shared/lib/format';
 import { groupQueue } from '../shared/lib/model';
 import { IssueList } from '../shared/ui/IssueRow';
 import { EmptyState, ErrorState, Island, Loading, Screen, Section, useToast } from '../shared/ui/Layout';
 import { Segmented } from '../shared/ui/Segmented';
 import s from './pages.module.css';
 import { StickersView } from './Stickers';
+import st from './stickers.module.css';
 import { UkMetricsView } from './UkMetrics';
 
 /** Выбор дома: поиск по адресу или ближайшие по геопозиции браузера. */
@@ -178,14 +179,17 @@ export function UkQueue() {
     <Screen title="Кабинет УК">
       <Segmented label="Раздел кабинета УК" items={ukTabs} value={tab} onChange={choose} />
       {tab === 'queue' ? <QueueView /> : tab === 'metrics' ? <UkMetricsView /> : <StickersView />}
+      <RoleSwitcher />
     </Screen>
   );
 }
 
-/** Очередь УК: сводка и заявки по срочности; статус меняется в карточке заявки. */
+/** Очередь УК: сводка, фильтры по дому и категории, заявки по срочности; статус меняется в карточке заявки. */
 function QueueView() {
   const { push } = useRouter();
   const res = useResource(() => api.ukQueue(), []);
+  const [houseFilter, setHouseFilter] = useState('');
+  const [catFilter, setCatFilter] = useState('');
   const now = new Date();
   return (
     <>
@@ -195,7 +199,20 @@ function QueueView() {
         <ErrorState title="Не удалось загрузить очередь" message={res.error?.message ?? ''} onRetry={res.reload} />
       ) : (
         (() => {
-          const open = res.data.filter((i) => !isClosed(i.status));
+          const housesMap = new Map<string, string>();
+          const catsMap = new Map<string, string>();
+          for (const item of res.data) {
+            if (item.house_id && item.address && !housesMap.has(item.house_id)) {
+              housesMap.set(item.house_id, splitAddress(item.address).number || item.address);
+            }
+            if (item.category && !catsMap.has(item.category)) {
+              catsMap.set(item.category, item.category_title || item.category);
+            }
+          }
+          const filtered = res.data.filter(
+            (i) => (!houseFilter || i.house_id === houseFilter) && (!catFilter || i.category === catFilter),
+          );
+          const open = filtered.filter((i) => !isClosed(i.status));
           const overdue = open.filter((i) => i.overdue).length;
           const today = open.filter((i) => !i.overdue && calendarDaysBetween(now, i.deadline) <= 0).length;
           return (
@@ -216,10 +233,34 @@ function QueueView() {
                   </div>
                 </div>
               </Island>
-              {res.data.length === 0 ? (
-                <EmptyState title="Заявок нет" text="Когда жители сообщат о проблеме, она появится здесь." />
+              {housesMap.size > 1 && (
+                <div className={st.chips} role="group" aria-label="Фильтр по дому">
+                  <button type="button" className={st.chip} aria-pressed={houseFilter === ''} onClick={() => setHouseFilter('')}>
+                    Все дома
+                  </button>
+                  {[...housesMap.entries()].map(([id, label]) => (
+                    <button key={id} type="button" className={st.chip} aria-pressed={houseFilter === id} onClick={() => setHouseFilter(id)}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {catsMap.size > 1 && (
+                <div className={st.chips} role="group" aria-label="Фильтр по категории">
+                  <button type="button" className={st.chip} aria-pressed={catFilter === ''} onClick={() => setCatFilter('')}>
+                    Все категории
+                  </button>
+                  {[...catsMap.entries()].map(([code, title]) => (
+                    <button key={code} type="button" className={st.chip} aria-pressed={catFilter === code} onClick={() => setCatFilter(code)}>
+                      {title}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {filtered.length === 0 ? (
+                <EmptyState title="Заявок нет" text="По выбранному фильтру заявок не найдено." />
               ) : (
-                groupQueue(res.data, now).map((g) => (
+                groupQueue(filtered, now).map((g) => (
                   <section key={g.title} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
                     <h2 className={`${s.groupTitle} ${g.late ? s.groupLate : ''}`}>{g.title}</h2>
                     <IssueList issues={g.items} now={now} showAddress onOpen={(id) => push({ name: 'issue', id })} />
@@ -230,6 +271,71 @@ function QueueView() {
           );
         })()
       )}
+    </>
+  );
+}
+
+/** Быстрое переключение роли внутри мини-приложения (для демонстрации и проверки всех кабинетов). */
+export function RoleSwitcher() {
+  const user = useUser();
+  const { setUser, loginDemo } = useSession();
+  const { reset } = useRouter();
+  const [busy, setBusy] = useState(false);
+
+  const active: DemoRole =
+    user.role === 'uk_operator'
+      ? 'uk_operator'
+      : user.role === 'district'
+        ? 'district'
+        : user.chairman
+          ? 'chairman'
+          : 'resident';
+
+  const roles: { id: DemoRole; label: string }[] = [
+    { id: 'resident', label: 'Житель' },
+    { id: 'chairman', label: 'Председатель' },
+    { id: 'uk_operator', label: 'Сотрудник УК' },
+    { id: 'district', label: 'Управа района' },
+  ];
+
+  const select = async (role: DemoRole) => {
+    if (role === active || busy) return;
+    if (!bridge.inMax()) {
+      loginDemo(role);
+      return;
+    }
+    setBusy(true);
+    try {
+      const updated = await api.switchRole(role);
+      setUser(updated);
+      if (updated.role === 'uk_operator') reset({ name: 'uk' });
+      else if (updated.role === 'district') reset({ name: 'district' });
+      else if (updated.house_id) reset({ name: 'home' });
+      else reset({ name: 'houseSearch' });
+    } catch {
+      /* игнорируем при сбое сети */
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <>
+      <Section title="Роль для проверки" />
+      <div className={st.chips} role="group" aria-label="Роль пользователя">
+        {roles.map((r) => (
+          <button
+            key={r.id}
+            type="button"
+            className={st.chip}
+            disabled={busy}
+            aria-pressed={active === r.id}
+            onClick={() => select(r.id)}
+          >
+            {r.label}
+          </button>
+        ))}
+      </div>
     </>
   );
 }

@@ -180,6 +180,57 @@ func (s *Service) SetRole(ctx context.Context, u user.User, role user.Role, orgI
 	u.Role = role
 	u.OrganizationID = orgID
 	u.ChairmanHouseID = chairmanHouseID
+	if role != user.RoleDistrict {
+		u.District = ""
+	}
+	return u, s.store.Users().Save(ctx, u)
+}
+
+// SwitchRole переключает роль текущего пользователя по имени роли (resident, chairman, uk_operator, district),
+// автоматически подставляя дом, УК или район его выбранного дома.
+func (s *Service) SwitchRole(ctx context.Context, u user.User, target string) (user.User, error) {
+	switch target {
+	case "chairman", "председатель":
+		if u.HouseID == "" {
+			u.HouseID = "h-17k2"
+		}
+		u.Role = user.RoleResident
+		u.OrganizationID = ""
+		u.District = ""
+		u.ChairmanHouseID = u.HouseID
+	case "uk", "uk_operator", "operator", "ук", "оператор":
+		orgID := "org-orekh"
+		if u.HouseID != "" {
+			if h, err := s.store.Houses().Get(ctx, u.HouseID); err == nil && h.OrganizationID != "" {
+				orgID = h.OrganizationID
+			}
+		}
+		u.Role = user.RoleOperator
+		u.OrganizationID = orgID
+		u.District = ""
+		u.ChairmanHouseID = ""
+	case "district", "район", "управа":
+		district := "Зябликово"
+		if u.HouseID != "" {
+			if h, err := s.store.Houses().Get(ctx, u.HouseID); err == nil && h.District != "" {
+				district = h.District
+			}
+		}
+		u.Role = user.RoleDistrict
+		u.District = district
+		u.OrganizationID = ""
+		u.ChairmanHouseID = ""
+	case "resident", "resident_2", "житель":
+		if u.HouseID == "" {
+			u.HouseID = "h-17k2"
+		}
+		u.Role = user.RoleResident
+		u.OrganizationID = ""
+		u.District = ""
+		u.ChairmanHouseID = ""
+	default:
+		return u, fmt.Errorf("%w: unknown role %q", app.ErrInvalidInput, target)
+	}
 	return u, s.store.Users().Save(ctx, u)
 }
 

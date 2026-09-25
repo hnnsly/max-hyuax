@@ -180,9 +180,9 @@ func (is *Issue) MarkOverdue(now time.Time) error {
 	return nil
 }
 
-// IsOverdue сообщает, что срок ответа прошёл, а заявка всё ещё открыта.
+// IsOverdue сообщает, что срок ответа прошёл (или просрочка уже была зафиксирована до возврата), а заявка всё ещё открыта.
 func (is *Issue) IsOverdue(now time.Time) bool {
-	return !is.status.Closed() && now.After(is.deadline)
+	return !is.status.Closed() && (now.After(is.deadline) || !is.overdueAt.IsZero())
 }
 
 func (is *Issue) HasParticipant(userID int64) bool {

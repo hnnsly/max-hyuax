@@ -546,6 +546,57 @@ func (h *handlers) houseReportPDF(c fiber.Ctx) error {
 	return c.Send(out)
 }
 
+func (h *handlers) switchMyRole(c fiber.Ctx) error {
+	var in struct {
+		Role string `json:"role"`
+	}
+	if err := bind(c, &in); err != nil {
+		return err
+	}
+	u, err := h.Auth.SwitchRole(c.Context(), currentUser(c), in.Role)
+	if err != nil {
+		return err
+	}
+	return c.JSON(toUserDTO(u, h.ConsentVersion))
+}
+
+func (h *handlers) objectStickerPDF(c fiber.Ctx) error {
+	code := c.Params("code")
+	obj, hs, err := h.Houses.ByQRCode(c.Context(), code)
+	if err != nil {
+		return err
+	}
+	d, err := h.Houses.Get(c.Context(), hs.ID)
+	if err != nil {
+		return err
+	}
+	var entranceNum int
+	for _, e := range d.Entrances {
+		if e.ID == obj.EntranceID {
+			entranceNum = e.Number
+			break
+		}
+	}
+	out, err := pdf.StickerPDF(pdf.StickerDocument{
+		Address:         d.House.Address,
+		Organization:    d.Organization.Name,
+		PhoneDispatcher: d.Organization.PhoneDispatcher,
+		Category:        obj.Category,
+		Label:           obj.Label,
+		EntranceNumber:  entranceNum,
+		QRCode:          obj.QRCode,
+		QRMatrix:        c.Query("qr"),
+		GeneratedAt:     h.Now(),
+	})
+	if err != nil {
+		return err
+	}
+	c.Set(fiber.HeaderContentType, "application/pdf")
+	c.Set(fiber.HeaderContentDisposition, fmt.Sprintf(`attachment; filename="sticker-%s.pdf"`, code))
+	c.Set(fiber.HeaderCacheControl, "no-store")
+	return c.Send(out)
+}
+
 // maxPhotosPerUpload — сколько фото принимается за один запрос.
 const maxPhotosPerUpload = 3
 

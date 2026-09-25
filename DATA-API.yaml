@@ -114,6 +114,17 @@ checks:
       body: object
       required_fields: [object.id, object.category, object.label, house.id, house.address]
 
+  - id: object_sticker_pdf
+    name: Печатная QR-наклейка объекта формата A6 (PDF)
+    method: GET
+    path: /objects/{code}/sticker.pdf
+    role: none
+    params:
+      path: { code: h-17k2-e2-lift }
+    expect:
+      status: [200]
+      content_type: application/pdf
+
   - id: similar_issues
     name: Проверка на дубль перед подачей
     method: GET

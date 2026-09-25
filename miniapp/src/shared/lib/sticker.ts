@@ -29,6 +29,12 @@ export function qrPath(text: string): { size: number; d: string } {
   return { size, d };
 }
 
+/** Строка матрицы QR-кода (строки из 0 и 1 через точку) для векторной отрисовки в PDF на сервере. */
+export function qrMatrixString(text: string): string {
+  const { data } = encode(text, { ecc: 'M', border: 1 });
+  return data.map((row) => row.map((cell) => (cell ? '1' : '0')).join('')).join('.');
+}
+
 export interface StickerCopy {
   plate: string; // крупное слово на табличке
   question: string;

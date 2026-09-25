@@ -13,6 +13,7 @@ import { DemoMark, EmptyState, ErrorState, Facts, Island, Loading, Screen, Secti
 import { HousePlate } from '../shared/ui/Plate';
 import { Sheet } from '../shared/ui/Sheet';
 import { HouseCouncil } from './Council';
+import { RoleSwitcher } from './Other';
 import s from './pages.module.css';
 
 /** Главный экран жителя: табличка дома, УК, открытые проблемы дома, мои заявки. */
@@ -119,6 +120,7 @@ export function Home() {
         />
         <CellSimple title="Другой дом" showChevron onClick={() => push({ name: 'houseSearch' })} />
       </CellList>
+      <RoleSwitcher />
       <button type="button" className={s.dangerLink} onClick={() => setDeleting(true)}>
         Удалить аккаунт
       </button>

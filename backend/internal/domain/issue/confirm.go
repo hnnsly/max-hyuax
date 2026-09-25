@@ -61,7 +61,9 @@ func (is *Issue) Reopen(userID int64, comment string, at, newDeadline time.Time)
 	}
 	is.answer(Answer{UserID: userID, Fixed: false, DoneAt: is.statusAt, At: at})
 	is.status, is.statusAt, is.statusComment = StatusInProgress, at, ""
-	is.deadline, is.overdueAt, is.reopenedAt = newDeadline, time.Time{}, at
+	// Если заявка уже была просрочена до отметки «выполнено», overdueAt сохраняется:
+	// фиктивное закрытие не позволяет УК сбросить просрочку и лишить жителя обращения в ГЖИ.
+	is.deadline, is.reopenedAt = newDeadline, at
 	is.answers = nil // круг ответов закончен: следующий начнётся с нового «выполнено»
 	is.record(Event{Kind: EventReopened, UserID: userID, Status: is.status, Comment: comment, At: at})
 	return nil

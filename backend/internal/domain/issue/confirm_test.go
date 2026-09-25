@@ -161,3 +161,26 @@ func TestRestoreKeepsAnswersOfCurrentRound(t *testing.T) {
 		t.Fatal("restored answers are not new")
 	}
 }
+
+// Если УК допустила просрочку, а потом отметила «выполнено», возврат жителем («не починили»)
+// не сбрасывает отметку просрочки: УК не может уйти от просрочки фиктивным закрытием.
+func TestReopenPreservesOverdueMark(t *testing.T) {
+	is := newIssue(t)
+	late := deadline.Add(2 * time.Hour)
+	if err := is.MarkOverdue(late); err != nil {
+		t.Fatalf("MarkOverdue: %v", err)
+	}
+	doneAt := late.Add(time.Hour)
+	for _, st := range []issue.Status{issue.StatusAccepted, issue.StatusDone} {
+		if err := is.ChangeStatus(st, "Якобы починили", doneAt); err != nil {
+			t.Fatal(err)
+		}
+	}
+	reopenAt := doneAt.Add(time.Hour)
+	if err := is.Reopen(1001, "Ничего не сделали", reopenAt, reopenAt.Add(48*time.Hour)); err != nil {
+		t.Fatalf("Reopen: %v", err)
+	}
+	if is.OverdueAt().IsZero() || !is.IsOverdue(reopenAt) {
+		t.Fatalf("overdue mark must be preserved on reopen: overdueAt=%v, isOverdue=%v", is.OverdueAt(), is.IsOverdue(reopenAt))
+	}
+}

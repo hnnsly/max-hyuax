@@ -178,15 +178,18 @@ func (q *Queries) MarkUpdateProcessed(ctx context.Context, key string) (int64, e
 
 const updateUser = `-- name: UpdateUser :exec
 UPDATE users
-SET max_user_id     = $1,
-    first_name      = $2,
-    phone           = $3,
-    house_id        = NULLIF($4::text, ''),
-    chairman_house_id = NULLIF($5::text, ''),
-    consent_version = $6,
-    consent_at      = $7,
-    deleted_at      = $8
-WHERE id = $9
+SET max_user_id       = $1,
+    first_name        = $2,
+    phone             = $3,
+    house_id          = NULLIF($4::text, ''),
+    role              = $5,
+    organization_id   = NULLIF($6::text, ''),
+    district          = $7,
+    chairman_house_id = NULLIF($8::text, ''),
+    consent_version   = $9,
+    consent_at        = $10,
+    deleted_at        = $11
+WHERE id = $12
 `
 
 type UpdateUserParams struct {
@@ -194,6 +197,9 @@ type UpdateUserParams struct {
 	FirstName       string
 	Phone           string
 	HouseID         string
+	Role            string
+	OrganizationID  string
+	District        string
 	ChairmanHouseID string
 	ConsentVersion  string
 	ConsentAt       *time.Time
@@ -207,6 +213,9 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) error {
 		arg.FirstName,
 		arg.Phone,
 		arg.HouseID,
+		arg.Role,
+		arg.OrganizationID,
+		arg.District,
 		arg.ChairmanHouseID,
 		arg.ConsentVersion,
 		arg.ConsentAt,

@@ -14,14 +14,17 @@ RETURNING *;
 
 -- name: UpdateUser :exec
 UPDATE users
-SET max_user_id     = @max_user_id,
-    first_name      = @first_name,
-    phone           = @phone,
-    house_id        = NULLIF(@house_id::text, ''),
+SET max_user_id       = @max_user_id,
+    first_name        = @first_name,
+    phone             = @phone,
+    house_id          = NULLIF(@house_id::text, ''),
+    role              = @role,
+    organization_id   = NULLIF(@organization_id::text, ''),
+    district          = @district,
     chairman_house_id = NULLIF(@chairman_house_id::text, ''),
-    consent_version = @consent_version,
-    consent_at      = @consent_at,
-    deleted_at      = @deleted_at
+    consent_version   = @consent_version,
+    consent_at        = @consent_at,
+    deleted_at        = @deleted_at
 WHERE id = @id;
 
 -- name: MarkUpdateProcessed :execrows

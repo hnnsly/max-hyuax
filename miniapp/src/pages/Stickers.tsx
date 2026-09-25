@@ -1,13 +1,13 @@
 import { Button } from '@maxhub/max-ui';
-import { Printer } from '@phosphor-icons/react';
+import { FilePdf, Printer } from '@phosphor-icons/react';
 import { useState } from 'react';
 import { api } from '../shared/api/client';
 import type { AssetObject, HouseDetails } from '../shared/api/types';
 import { useResource } from '../shared/api/useResource';
 import { appLink, bridge, BOT_NAME } from '../shared/bridge/bridge';
 import { capitalize, splitAddress } from '../shared/lib/format';
-import { objectStartParam, qrPath, stickerCopy } from '../shared/lib/sticker';
-import { EmptyState, ErrorState, Island, Loading } from '../shared/ui/Layout';
+import { objectStartParam, qrMatrixString, qrPath, stickerCopy } from '../shared/lib/sticker';
+import { EmptyState, ErrorState, Island, Loading, useToast } from '../shared/ui/Layout';
 import s from './stickers.module.css';
 
 /** Наклейки с QR-кодами для объектов домов УК: выбор дома и объекта, превью, печать A6. */
@@ -40,6 +40,7 @@ export function StickersView() {
 function HouseStickers({ houseId }: { houseId: string }) {
   const res = useResource(() => api.house(houseId), [houseId]);
   const [objectId, setObjectId] = useState('');
+  const [toast, showToast] = useToast();
 
   if (res.loading && !res.data) return <Loading />;
   if (res.error || !res.data) {
@@ -50,6 +51,12 @@ function HouseStickers({ houseId }: { houseId: string }) {
     return <EmptyState title="Нет объектов с QR-кодами" text="Объекты дома с QR-кодами добавляет администратор сервиса." />;
   }
   const object = house.objects.find((o) => o.id === objectId) ?? house.objects[0]!;
+  const param = objectStartParam(object.qr_code);
+  const downloadPDF = () => {
+    const qr = param ? qrMatrixString(appLink(param)) : '';
+    const url = `/api/v1/objects/${encodeURIComponent(object.qr_code)}/sticker.pdf${qr ? `?qr=${encodeURIComponent(qr)}` : ''}`;
+    bridge.download(url, `sticker-${object.qr_code}.pdf`).catch(() => showToast('Не удалось скачать наклейку'));
+  };
   return (
     <>
       <div className={s.chips} role="group" aria-label="Объект">
@@ -66,16 +73,16 @@ function HouseStickers({ houseId }: { houseId: string }) {
       <Island style={{ overflow: 'hidden' }}>
         <Sticker house={house} object={object} />
       </Island>
-      {bridge.canPrint() ? (
-        <>
-          <Button variant="primary" size="large" stretched iconBefore={<Printer size={20} />} onClick={() => window.print()}>
-            Распечатать
-          </Button>
-          <p className={s.hint}>Формат A6, для кабины лифта или двери подъезда.</p>
-        </>
-      ) : (
-        <p className={s.hint}>Формат A6, для кабины лифта или двери подъезда. Печать доступна, если открыть кабинет УК в MAX на компьютере.</p>
+      <Button variant="primary" size="large" stretched iconBefore={<FilePdf size={20} />} onClick={downloadPDF}>
+        Скачать наклейку (PDF A6)
+      </Button>
+      {bridge.canPrint() && (
+        <Button variant="secondary" size="medium" stretched iconBefore={<Printer size={18} />} onClick={() => window.print()}>
+          Распечатать из браузера
+        </Button>
       )}
+      <p className={s.hint}>Формат A6 с векторным QR-кодом, для кабины лифта или двери подъезда.</p>
+      {toast}
     </>
   );
 }

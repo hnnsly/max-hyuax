@@ -571,36 +571,44 @@ func (h *Handler) switchRole(ctx context.Context, to maxapi.Target, from maxapi.
 		}
 		return h.send(ctx, to, "Вам назначена роль: Председатель совета дома.\n\nТеперь в меню /polls вам доступна «Папка предложений», а при поступлении идей от соседей бот будет присылать их вам с кнопками ответа.")
 	case "uk", "operator", "ук", "оператор":
-		orgID := "org-orekh"
-		if u.HouseID != "" {
-			if houseDetails, err := h.svc.Houses.Get(ctx, u.HouseID); err == nil && houseDetails.Organization.ID != "" {
-				orgID = houseDetails.Organization.ID
-			}
-		}
-		if _, err := h.svc.Auth.SetRole(ctx, u, user.RoleOperator, orgID, ""); err != nil {
+		if _, err := h.svc.Auth.SwitchRole(ctx, u, "uk_operator"); err != nil {
 			return err
 		}
 		return h.sendKeyboard(ctx, to, "Вам назначена роль: Сотрудник управляющей компании.\n\nОткройте мини-приложение, чтобы увидеть очередь заявок домов и дашборд метрик.", []maxapi.Button{
 			maxapi.OpenAppButton("Открыть кабинет УК", h.botName, ""),
 		})
+	case "district", "район", "управа":
+		u, err := h.svc.Auth.SwitchRole(ctx, u, "district")
+		if err != nil {
+			return err
+		}
+		return h.sendKeyboard(ctx, to, fmt.Sprintf("Вам назначена роль: Управа района (%s).\n\nОткройте мини-приложение, чтобы увидеть сравнение УК района и просроченные заявки.", u.District), []maxapi.Button{
+			maxapi.OpenAppButton("Открыть кабинет района", h.botName, ""),
+		})
 	case "resident", "житель":
-		if _, err := h.svc.Auth.SetRole(ctx, u, user.RoleResident, "", ""); err != nil {
+		if _, err := h.svc.Auth.SwitchRole(ctx, u, "resident"); err != nil {
 			return err
 		}
 		return h.send(ctx, to, "Роль сброшена: обычный житель дома.")
 	default:
 		current := "житель"
-		if u.Role == user.RoleOperator {
+		switch {
+		case u.Role == user.RoleOperator:
 			current = "сотрудник управляющей компании"
-		} else if u.ChairmanHouseID != "" {
+		case u.Role == user.RoleDistrict:
+			current = "управа района"
+		case u.ChairmanHouseID != "":
 			current = "председатель совета дома"
 		}
 		msg := fmt.Sprintf("Ваша текущая роль: %s.\n\nВыберите роль для переключения:", current)
-		return h.sendKeyboard(ctx, to, msg, []maxapi.Button{
-			maxapi.CallbackButton("Стать председателем", pack(cbRole, "chairman")),
-			maxapi.CallbackButton("Стать сотрудником УК", pack(cbRole, "uk")),
-			maxapi.CallbackButton("Обычный житель", pack(cbRole, "resident")),
+		_, err := h.max.Send(ctx, to, maxapi.NewMessage{
+			Text: msg,
+			Attachments: []maxapi.Attachment{maxapi.Keyboard(
+				[]maxapi.Button{maxapi.CallbackButton("Стать председателем", pack(cbRole, "chairman")), maxapi.CallbackButton("Стать сотрудником УК", pack(cbRole, "uk"))},
+				[]maxapi.Button{maxapi.CallbackButton("Управа района", pack(cbRole, "district")), maxapi.CallbackButton("Обычный житель", pack(cbRole, "resident"))},
+			)},
 		})
+		return err
 	}
 }
 

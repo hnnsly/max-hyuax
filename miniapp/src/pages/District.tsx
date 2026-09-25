@@ -6,6 +6,7 @@ import { plural } from '../shared/lib/format';
 import { rankDistrict } from '../shared/lib/metrics';
 import { IssueList } from '../shared/ui/IssueRow';
 import { EmptyState, ErrorState, Island, Loading, Screen, Section } from '../shared/ui/Layout';
+import { RoleSwitcher } from './Other';
 import s from './pages.module.css';
 
 /**
@@ -92,6 +93,7 @@ export function District() {
         {metrics.sample_data && 'Пример данных. '}
         Счётчики за {period}, первый ответ считается как медиана за 7 дней. УК считается целиком, со всеми своими домами.
       </p>
+      <RoleSwitcher />
     </Screen>
   );
 }

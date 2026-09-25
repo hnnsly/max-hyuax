@@ -37,12 +37,19 @@ func (r userRepo) Create(ctx context.Context, u user.User) (user.User, error) {
 }
 
 func (r userRepo) Save(ctx context.Context, u user.User) error {
+	role := string(u.Role)
+	if role == "" {
+		role = string(user.RoleResident)
+	}
 	return r.q.UpdateUser(ctx, sqlcdb.UpdateUserParams{
 		ID:              u.ID,
 		MaxUserID:       pgtype.Int8{Int64: u.MaxUserID, Valid: u.MaxUserID != 0},
 		FirstName:       u.FirstName,
 		Phone:           u.Phone,
 		HouseID:         u.HouseID,
+		Role:            role,
+		OrganizationID:  u.OrganizationID,
+		District:        u.District,
 		ChairmanHouseID: u.ChairmanHouseID,
 		ConsentVersion:  u.ConsentVersion,
 		ConsentAt:       timePtr(u.ConsentAt),

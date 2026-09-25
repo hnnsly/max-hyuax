@@ -70,6 +70,7 @@ export const api = {
   me: () => request<User>('GET', '/me'),
   acceptConsent: (version: string) => request<User>('POST', '/me/consent', { version }),
   setHouse: (houseId: string) => request<User>('POST', '/me/house', { house_id: houseId }),
+  switchRole: (role: string) => request<User>('POST', '/me/role', { role }),
   deleteAccount: () => request<void>('DELETE', '/me'),
   sharePhone: (c: { phone: string; auth_date: string; hash: string }) => request<User>('POST', '/me/phone', c),
   districtMetrics: () => request<DistrictMetrics>('GET', '/district/metrics'),

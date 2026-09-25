@@ -746,11 +746,12 @@ func TestRoleSwitch(t *testing.T) {
 	// Без аргументов показывает меню выбора ролей
 	e.handle(t, text(9901, "/role"))
 	txt, bs := e.max.last("")
-	if !strings.Contains(txt, "Ваша текущая роль") || len(bs) != 3 {
+	if !strings.Contains(txt, "Ваша текущая роль") || len(bs) != 4 {
 		t.Fatalf("/role = %q %+v", txt, bs)
 	}
 	findButton(t, bs, "Стать председателем")
 	findButton(t, bs, "Стать сотрудником УК")
+	findButton(t, bs, "Управа района")
 
 	// Переключение на председателя
 	e.handle(t, text(9901, "/role chairman"))
