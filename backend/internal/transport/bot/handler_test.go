@@ -739,3 +739,49 @@ func TestCouncilInChat(t *testing.T) {
 		t.Fatalf("results = %q", txt)
 	}
 }
+
+func TestRoleSwitch(t *testing.T) {
+	e := newEnv(t)
+	e.resident(9901, true)
+	// Без аргументов показывает меню выбора ролей
+	e.handle(t, text(9901, "/role"))
+	txt, bs := e.max.last("")
+	if !strings.Contains(txt, "Ваша текущая роль") || len(bs) != 3 {
+		t.Fatalf("/role = %q %+v", txt, bs)
+	}
+	findButton(t, bs, "Стать председателем")
+	findButton(t, bs, "Стать сотрудником УК")
+
+	// Переключение на председателя
+	e.handle(t, text(9901, "/role chairman"))
+	txt, _ = e.max.last("")
+	if !strings.Contains(txt, "Председатель совета") {
+		t.Fatalf("/role chairman = %q", txt)
+	}
+	u, _ := e.store.Users().ByMaxID(t.Context(), 9901)
+	if u.ChairmanHouseID != "h-1" {
+		t.Fatalf("chairman house id = %q, want h-1", u.ChairmanHouseID)
+	}
+
+	// Переключение на УК
+	e.handle(t, text(9901, "/role uk"))
+	txt, bs = e.max.last("")
+	if !strings.Contains(txt, "Сотрудник управляющей компании") || len(bs) != 1 {
+		t.Fatalf("/role uk = %q %+v", txt, bs)
+	}
+	u, _ = e.store.Users().ByMaxID(t.Context(), 9901)
+	if u.Role != user.RoleOperator {
+		t.Fatalf("role = %q, want operator", u.Role)
+	}
+
+	// Сброс на жителя
+	e.handle(t, text(9901, "/role resident"))
+	txt, _ = e.max.last("")
+	if !strings.Contains(txt, "обычный житель") {
+		t.Fatalf("/role resident = %q", txt)
+	}
+	u, _ = e.store.Users().ByMaxID(t.Context(), 9901)
+	if u.Role != user.RoleResident || u.ChairmanHouseID != "" {
+		t.Fatalf("role = %q, chairman = %q", u.Role, u.ChairmanHouseID)
+	}
+}

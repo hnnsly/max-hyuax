@@ -30,13 +30,14 @@ import (
 // не хранит черновики и переживает перезапуск.
 const (
 	PayloadReport = "report"
-	cbHouse       = "h" // h:<house_id> — выбрать дом
-	cbNew         = "n" // n:<category>:<text> — создать заявку
-	cbPick        = "k" // k:<text> — выбрать категорию
-	cbJoin        = "j" // j:<issue_id> — «это и у меня»
-	cbConsent     = "c" // c:<payload> — согласие, затем исходное действие
-	cbConfirm     = "f" // f:<issue_id> — «починили» в сообщении о выполнении
-	maxTextRunes  = 300 // длиннее — удобнее оформить в форме мини-приложения
+	cbHouse       = "h"    // h:<house_id> — выбрать дом
+	cbNew         = "n"    // n:<category>:<text> — создать заявку
+	cbPick        = "k"    // k:<text> — выбрать категорию
+	cbJoin        = "j"    // j:<issue_id> — «это и у меня»
+	cbConsent     = "c"    // c:<payload> — согласие, затем исходное действие
+	cbConfirm     = "f"    // f:<issue_id> — «починили» в сообщении о выполнении
+	cbRole        = "role" // role:<chairman|uk|resident> — сменить тестовую роль
+	maxTextRunes  = 300    // длиннее — удобнее оформить в форме мини-приложения
 )
 
 // Messenger — часть Bot API, которая нужна обработчику.
@@ -80,6 +81,7 @@ var Commands = []maxapi.Command{
 	{Name: "my", Description: "Мои заявки"},
 	{Name: "house", Description: "Мой дом и контакты УК"},
 	{Name: "polls", Description: "Совет дома и опросы"},
+	{Name: "role", Description: "Сменить роль (председатель, УК, житель)"},
 	{Name: "help", Description: "Как это работает"},
 }
 
@@ -129,7 +131,7 @@ func (h *Handler) onMessage(ctx context.Context, m *maxapi.Message) error {
 		return nil
 	}
 	if cmd, ok := strings.CutPrefix(txt, "/"); ok {
-		cmd, _, _ = strings.Cut(cmd, " ")
+		cmd, arg, _ := strings.Cut(cmd, " ")
 		switch cmd {
 		case "new":
 			return h.askProblem(ctx, to, m.Sender)
@@ -143,6 +145,8 @@ func (h *Handler) onMessage(ctx context.Context, m *maxapi.Message) error {
 			return h.menu(ctx, to)
 		case "polls":
 			return h.councilMenu(ctx, to, m.Sender)
+		case "role":
+			return h.switchRole(ctx, to, m.Sender, arg)
 		}
 		return h.greet(ctx, to, "")
 	}
@@ -456,6 +460,8 @@ func (h *Handler) callbackReply(ctx context.Context, cb *maxapi.Callback) (maxap
 		return h.acceptProposal(ctx, u, rest)
 	case cbDecline:
 		return h.askDeclineAnswer(ctx, u, rest)
+	case cbRole:
+		return h.onRoleCallback(ctx, cb.User, rest)
 
 	case cbPick:
 		var rows [][]maxapi.Button
@@ -547,6 +553,63 @@ func (h *Handler) join(ctx context.Context, u user.User, issueID string) (maxapi
 		return maxapi.CallbackAnswer{}, err
 	}
 	return replace(fmt.Sprintf("Вы присоединились к заявке № %d. Карточка со статусом придёт следующим сообщением.", is.Number())), nil
+}
+
+func (h *Handler) switchRole(ctx context.Context, to maxapi.Target, from maxapi.User, arg string) error {
+	u, err := h.resident(ctx, from)
+	if err != nil {
+		return err
+	}
+	arg = strings.ToLower(strings.TrimSpace(arg))
+	switch arg {
+	case "chairman", "председатель":
+		if u.HouseID == "" {
+			return h.send(ctx, to, "Сначала выберите свой дом в /menu или отправьте геопозицию, чтобы стать председателем своего дома.")
+		}
+		if _, err := h.svc.Auth.SetRole(ctx, u, user.RoleResident, "", u.HouseID); err != nil {
+			return err
+		}
+		return h.send(ctx, to, "Вам назначена роль: Председатель совета дома.\n\nТеперь в меню /polls вам доступна «Папка предложений», а при поступлении идей от соседей бот будет присылать их вам с кнопками ответа.")
+	case "uk", "operator", "ук", "оператор":
+		orgID := "org-orekh"
+		if u.HouseID != "" {
+			if houseDetails, err := h.svc.Houses.Get(ctx, u.HouseID); err == nil && houseDetails.Organization.ID != "" {
+				orgID = houseDetails.Organization.ID
+			}
+		}
+		if _, err := h.svc.Auth.SetRole(ctx, u, user.RoleOperator, orgID, ""); err != nil {
+			return err
+		}
+		return h.sendKeyboard(ctx, to, "Вам назначена роль: Сотрудник управляющей компании.\n\nОткройте мини-приложение, чтобы увидеть очередь заявок домов и дашборд метрик.", []maxapi.Button{
+			maxapi.OpenAppButton("Открыть кабинет УК", h.botName, ""),
+		})
+	case "resident", "житель":
+		if _, err := h.svc.Auth.SetRole(ctx, u, user.RoleResident, "", ""); err != nil {
+			return err
+		}
+		return h.send(ctx, to, "Роль сброшена: обычный житель дома.")
+	default:
+		current := "житель"
+		if u.Role == user.RoleOperator {
+			current = "сотрудник управляющей компании"
+		} else if u.ChairmanHouseID != "" {
+			current = "председатель совета дома"
+		}
+		msg := fmt.Sprintf("Ваша текущая роль: %s.\n\nВыберите роль для переключения:", current)
+		return h.sendKeyboard(ctx, to, msg, []maxapi.Button{
+			maxapi.CallbackButton("Стать председателем", pack(cbRole, "chairman")),
+			maxapi.CallbackButton("Стать сотрудником УК", pack(cbRole, "uk")),
+			maxapi.CallbackButton("Обычный житель", pack(cbRole, "resident")),
+		})
+	}
+}
+
+func (h *Handler) onRoleCallback(ctx context.Context, from maxapi.User, role string) (maxapi.CallbackAnswer, error) {
+	to := maxapi.ToUser(from.UserID)
+	if err := h.switchRole(ctx, to, from, role); err != nil {
+		return maxapi.CallbackAnswer{}, err
+	}
+	return maxapi.CallbackAnswer{Notification: "Роль изменена"}, nil
 }
 
 func (h *Handler) greet(ctx context.Context, to maxapi.Target, startPayload string) error {

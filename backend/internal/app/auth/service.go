@@ -175,6 +175,14 @@ func (s *Service) DeleteAccount(ctx context.Context, u user.User) error {
 	return s.store.Users().Save(ctx, u)
 }
 
+// SetRole переключает роль пользователя для тестирования и администрирования.
+func (s *Service) SetRole(ctx context.Context, u user.User, role user.Role, orgID, chairmanHouseID string) (user.User, error) {
+	u.Role = role
+	u.OrganizationID = orgID
+	u.ChairmanHouseID = chairmanHouseID
+	return u, s.store.Users().Save(ctx, u)
+}
+
 func (s *Service) issue(u user.User) Session {
 	exp := s.cfg.Now().Add(s.cfg.SessionTTL)
 	return Session{Token: signToken(s.cfg.SessionSecret, u.ID, exp), ExpiresAt: exp, User: u}
