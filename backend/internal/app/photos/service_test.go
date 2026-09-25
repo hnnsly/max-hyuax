@@ -140,6 +140,10 @@ func TestNoPhotosForClosedIssue(t *testing.T) {
 	if _, err := f.svc.Add(t.Context(), f.anna, f.is.ID(), jpg(t)); !errors.Is(err, issue.ErrClosed) {
 		t.Fatalf("closed: err = %v, want ErrClosed", err)
 	}
+	// Оператор УК может приложить фото-подтверждение выполненного ремонта и к заявке в статусе done.
+	if _, err := f.svc.Add(t.Context(), f.oper, f.is.ID(), jpg(t)); err != nil {
+		t.Fatalf("operator add proof to done issue: %v", err)
+	}
 }
 
 // Один плохой файл в пачке отклоняет всю пачку: повтор не создаст дублей уже сохранённых.

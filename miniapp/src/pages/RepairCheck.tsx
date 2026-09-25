@@ -7,6 +7,7 @@ import { bridge } from '../shared/bridge/bridge';
 import { dayMonth } from '../shared/lib/format';
 import { repairCheck } from '../shared/lib/model';
 import { Island } from '../shared/ui/Layout';
+import { PhotoSlots } from '../shared/ui/Photos';
 import { Sheet } from '../shared/ui/Sheet';
 import s from './pages.module.css';
 
@@ -76,6 +77,7 @@ export function RepairCheck({ issue, onChanged, onToast }: { issue: Issue; onCha
  */
 function ReopenSheet({ open, issueId, onClose, onDone }: { open: boolean; issueId: string; onClose: () => void; onDone: (i: Issue) => void }) {
   const [comment, setComment] = useState('');
+  const [files, setFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
@@ -84,8 +86,13 @@ function ReopenSheet({ open, issueId, onClose, onDone }: { open: boolean; issueI
     setBusy(true);
     setError('');
     try {
-      onDone(await api.reopenRepair(issueId, comment.trim()));
+      const changed = await api.reopenRepair(issueId, comment.trim());
+      if (files.length > 0) {
+        await api.uploadPhotos(issueId, files);
+      }
       setComment('');
+      setFiles([]);
+      onDone(changed);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Не получилось вернуть заявку в работу');
     } finally {
@@ -138,6 +145,12 @@ function ReopenSheet({ open, issueId, onClose, onDone }: { open: boolean; issueI
         <p id="reopen-error" className={s.fieldError}>
           <WarningCircle size={16} weight="bold" aria-hidden="true" /> {EMPTY_COMMENT}
         </p>
+        <div>
+          <div className={s.blockTitle} style={{ marginBottom: 8 }}>
+            Фото неисправности (по желанию)
+          </div>
+          <PhotoSlots files={files} onChange={setFiles} onError={setError} />
+        </div>
         <p id="reopen-hint" className={s.hint}>
           Заявка вернётся в работу с новым сроком. Комментарий появится в хронологии заявки без вашего имени.
         </p>

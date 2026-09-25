@@ -67,7 +67,8 @@ func (s *Service) Add(ctx context.Context, u user.User, issueID string, raws ...
 	if err != nil {
 		return nil, err
 	}
-	if is.Status().Closed() {
+	// Оператор ответственной УК может приложить фото выполненного ремонта и к заявке в статусе «выполнено».
+	if is.Status().Closed() && !(u.Role == user.RoleOperator && is.Status() == issue.StatusDone) {
 		return nil, issue.ErrClosed
 	}
 	// Быстрая проверка до тяжёлого декодирования; окончательная — в транзакции.

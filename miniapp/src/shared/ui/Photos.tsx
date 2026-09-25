@@ -136,9 +136,19 @@ function Thumb({ photo, label, onOpen }: { photo: Photo; label: string; onOpen: 
   );
 }
 
-/** Фото заявки в карточке: видят участники и УК; добавить можно, пока заявка открыта. */
-export function IssuePhotos({ issueId, canAdd, onToast }: { issueId: string; canAdd: boolean; onToast: (msg: string) => void }) {
-  const res = useResource(() => api.photos(issueId), [issueId]);
+/** Фото заявки в карточке: видят участники и УК; добавить можно, пока заявка открыта (УК — и после «выполнено»). */
+export function IssuePhotos({
+  issueId,
+  reloadKey,
+  canAdd,
+  onToast,
+}: {
+  issueId: string;
+  reloadKey?: string;
+  canAdd: boolean;
+  onToast: (msg: string) => void;
+}) {
+  const res = useResource(() => api.photos(issueId), [issueId, reloadKey]);
   const [busy, setBusy] = useState(false);
   const [open, setOpen] = useState<{ url: string; photo: Photo } | null>(null);
   const [removing, setRemoving] = useState(false);

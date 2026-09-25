@@ -11,7 +11,7 @@ import { calendarDaysBetween, capitalize, dayMonth, dotDateTime, plural } from '
 import { buildTimeline, nextStatuses, shareText } from '../shared/lib/model';
 import { ErrorState, Island, Loading, Screen, useToast } from '../shared/ui/Layout';
 import { IssuePlate, Stamp, statusLabel } from '../shared/ui/Plate';
-import { IssuePhotos } from '../shared/ui/Photos';
+import { IssuePhotos, PhotoSlots } from '../shared/ui/Photos';
 import { Sheet } from '../shared/ui/Sheet';
 import { Rail } from '../shared/ui/Rail';
 import s from './pages.module.css';
@@ -231,6 +231,19 @@ export function IssueCard({ id, flash }: { id: string; flash?: string }) {
         </Island>
       )}
 
+      {canSeePhotos && (
+        <Island>
+          <div className={s.block}>
+            <IssuePhotos
+              issueId={issue.id}
+              reloadKey={issue.status_at}
+              canAdd={!closed || (ownUK && issue.status === 'done')}
+              onToast={showToast}
+            />
+          </div>
+        </Island>
+      )}
+
       <RepairCheck issue={issue} onChanged={() => res.reload()} onToast={showToast} />
       {issue.contacts && issue.contacts.length > 0 && <ResidentContacts contacts={issue.contacts} />}
       {/* У закрытой заявки блок остаётся, только чтобы убрать уже оставленный телефон. */}
@@ -247,14 +260,6 @@ export function IssueCard({ id, flash }: { id: string; flash?: string }) {
           {issue.basis && <p className={s.basis}>{issue.basis}</p>}
         </div>
       </Island>
-
-      {canSeePhotos && (
-        <Island>
-          <div className={s.block}>
-            <IssuePhotos issueId={issue.id} canAdd={!closed} onToast={showToast} />
-          </div>
-        </Island>
-      )}
 
       {timeline.length > 0 && (
         <Island>
@@ -281,11 +286,12 @@ export function IssueCard({ id, flash }: { id: string; flash?: string }) {
   );
 }
 
-/** Смена статуса оператором УК (холст UkStatus): отказ требует причину для жителей. */
+/** Смена статуса оператором УК (холст UkStatus): отказ требует причину для жителей; при выполнении можно приложить фото. */
 function StatusSheet({ open, issue, onClose, onSaved }: { open: boolean; issue: Issue; onClose: () => void; onSaved: (i: Issue) => void }) {
   const options = nextStatuses(issue.status);
   const [to, setTo] = useState<Status>(options[0] ?? 'accepted');
   const [comment, setComment] = useState('');
+  const [files, setFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
   const n = issue.participant_count;
@@ -296,8 +302,12 @@ function StatusSheet({ open, issue, onClose, onSaved }: { open: boolean; issue: 
     setBusy(true);
     setError('');
     try {
+      if (!rejecting && files.length > 0) {
+        await api.uploadPhotos(issue.id, files);
+      }
       onSaved(await api.changeStatus(issue.id, to, comment.trim()));
       setComment('');
+      setFiles([]);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Не удалось сохранить статус');
     } finally {
@@ -329,6 +339,14 @@ function StatusSheet({ open, issue, onClose, onSaved }: { open: boolean; issue: 
           required={rejecting}
           onChange={(e) => setComment(e.target.value)}
         />
+        {!rejecting && (
+          <div>
+            <div className={s.blockTitle} style={{ marginBottom: 8 }}>
+              {to === 'done' ? 'Фото выполненного ремонта (по желанию)' : 'Приложить фото (по желанию)'}
+            </div>
+            <PhotoSlots files={files} onChange={setFiles} onError={setError} />
+          </div>
+        )}
         <p className={s.hint}>
           {rejecting
             ? 'Обязательно. Жители увидят причину в карточке.'
