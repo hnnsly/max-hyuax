@@ -24,6 +24,7 @@ var (
 	ErrAlreadyAnswered = errors.New("proposal already answered")
 	ErrPollClosed      = errors.New("poll closed")
 	ErrAlreadyVoted    = errors.New("already voted")
+	ErrPollExists      = errors.New("proposal already has a poll")
 )
 
 type Status string

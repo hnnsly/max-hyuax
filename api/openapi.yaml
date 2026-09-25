@@ -918,7 +918,7 @@ components:
               type: string
               enum: [unauthorized, consent_required, forbidden, not_found, already_joined, issue_closed,
                      invalid_transition, not_overdue, too_many_photos, not_done, window_closed, already_answered,
-                     already_voted, poll_closed,
+                     already_voted, poll_closed, poll_exists,
                      photo_too_large, unsupported_media, reason_required, comment_required, invalid_contact,
                      invalid_input, http_error, internal]
             message: { type: string, description: Текст для показа жителю }

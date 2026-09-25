@@ -2,6 +2,9 @@ package postgres
 
 import (
 	"context"
+	"errors"
+
+	"github.com/jackc/pgx/v5/pgconn"
 
 	"dommax/internal/app"
 	"dommax/internal/domain/council"
@@ -44,10 +47,15 @@ func (r councilRepo) AddPoll(ctx context.Context, p council.Poll) error {
 	if p.ProposalID != "" {
 		proposalID = new(p.ProposalID)
 	}
-	return r.q.InsertPoll(ctx, sqlcdb.InsertPollParams{
+	err := r.q.InsertPoll(ctx, sqlcdb.InsertPollParams{
 		ID: p.ID, HouseID: p.HouseID, ProposalID: proposalID, Question: p.Question,
 		Options: p.Options, CreatedAt: p.CreatedAt, ClosesAt: p.ClosesAt,
 	})
+	// Уникальный индекс polls_proposal_idx: по предложению уже открыт опрос.
+	if pgErr, ok := errors.AsType[*pgconn.PgError](err); ok && pgErr.Code == "23505" {
+		return council.ErrPollExists
+	}
+	return err
 }
 
 func (r councilRepo) GetPoll(ctx context.Context, id string) (council.Poll, error) {

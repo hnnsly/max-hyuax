@@ -160,6 +160,8 @@ func classifyCouncil(err error) (int, string, string, bool) {
 		return fiber.StatusConflict, "already_answered", "На это предложение уже ответили", true
 	case errors.Is(err, council.ErrAlreadyVoted):
 		return fiber.StatusConflict, "already_voted", "Вы уже проголосовали в этом опросе", true
+	case errors.Is(err, council.ErrPollExists):
+		return fiber.StatusConflict, "poll_exists", "По этому предложению опрос уже открыт", true
 	case errors.Is(err, council.ErrPollClosed):
 		return fiber.StatusConflict, "poll_closed", "Опрос уже закончился", true
 	case errors.Is(err, council.ErrInvalid):

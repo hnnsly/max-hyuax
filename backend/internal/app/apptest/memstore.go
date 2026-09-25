@@ -589,6 +589,11 @@ func (r councilRepo) proposals(keep func(council.Proposal) bool, limit int) []co
 func (r councilRepo) AddPoll(_ context.Context, p council.Poll) error {
 	r.s.mu.Lock()
 	defer r.s.mu.Unlock()
+	for _, old := range r.s.council.polls {
+		if p.ProposalID != "" && old.ProposalID == p.ProposalID {
+			return council.ErrPollExists // как уникальный индекс в Postgres
+		}
+	}
 	r.s.council.polls = append(r.s.council.polls, p)
 	return nil
 }

@@ -53,6 +53,9 @@ func TestCouncilFlow(t *testing.T) {
 		"proposal_id": pid, "question": "Где повесить доску?", "options": []string{"У лифта", "У почтовых ящиков"},
 	}), 201, "create poll")
 	pollID := poll.body["id"].(string)
+	expect(t, call(t, "POST", "/api/v1/council/polls", nina, map[string]any{
+		"proposal_id": pid, "question": "Где повесить доску?", "options": []string{"А", "Б"},
+	}), 409, "second poll for the same proposal")
 	if poll.body["open"] != true || poll.body["my_vote"] != nil || len(poll.body["options"].([]any)) != 2 {
 		t.Fatalf("poll = %v", poll.body)
 	}

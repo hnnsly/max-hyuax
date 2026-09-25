@@ -85,6 +85,10 @@ func (s *Service) Reply(ctx context.Context, u user.User, id string, status coun
 	if !u.IsChairmanOf(p.HouseID) {
 		return council.Proposal{}, app.ErrNotFound
 	}
+	// Ответ председателя — такие же данные жителя, как предложение: без согласия нельзя.
+	if !u.HasConsent(s.cfg.ConsentVersion) {
+		return council.Proposal{}, app.ErrConsentRequired
+	}
 	if err := p.Reply(status, answer, s.cfg.Now()); err != nil {
 		return council.Proposal{}, err
 	}
@@ -101,6 +105,9 @@ func (s *Service) Reply(ctx context.Context, u user.User, id string, status coun
 func (s *Service) CreatePoll(ctx context.Context, u user.User, in PollInput) (PollView, error) {
 	if !u.IsChairmanOf(u.ChairmanHouseID) {
 		return PollView{}, app.ErrForbidden
+	}
+	if !u.HasConsent(s.cfg.ConsentVersion) {
+		return PollView{}, app.ErrConsentRequired
 	}
 	if in.ProposalID != "" {
 		p, err := s.store.Council().GetProposal(ctx, in.ProposalID)

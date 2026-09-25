@@ -67,6 +67,14 @@ func TestProposalFlow(t *testing.T) {
 	if _, err := svc.Reply(ctx, chairman(4, "h-2"), p.ID, council.StatusAccepted, ""); !errors.Is(err, app.ErrNotFound) {
 		t.Fatalf("Reply by other chairman err = %v", err)
 	}
+	ninaNoConsent := nina
+	ninaNoConsent.ConsentVersion = ""
+	if _, err := svc.Reply(ctx, ninaNoConsent, p.ID, council.StatusAccepted, ""); !errors.Is(err, app.ErrConsentRequired) {
+		t.Fatalf("Reply without consent err = %v", err)
+	}
+	if _, err := svc.CreatePoll(ctx, ninaNoConsent, appcouncil.PollInput{Question: "Вопрос к дому?", Options: []string{"За", "Против"}, Days: 7}); !errors.Is(err, app.ErrConsentRequired) {
+		t.Fatalf("CreatePoll without consent err = %v", err)
+	}
 	got, err := svc.Reply(ctx, nina, p.ID, council.StatusDeclined, "Места нет, предложу УК стойку во дворе")
 	if err != nil || got.Status != council.StatusDeclined || !got.AnsweredAt.Equal(now) {
 		t.Fatalf("Reply = %+v, %v", got, err)
@@ -96,6 +104,10 @@ func TestPollFlow(t *testing.T) {
 	poll, err := svc.CreatePoll(ctx, nina, in)
 	if err != nil || poll.HouseID != "h-1" || poll.Mine != -1 || len(poll.Votes) != 2 || !poll.Open {
 		t.Fatalf("CreatePoll = %+v, %v", poll, err)
+	}
+
+	if _, err := svc.CreatePoll(ctx, nina, in); !errors.Is(err, council.ErrPollExists) {
+		t.Fatalf("second poll for the same proposal err = %v", err)
 	}
 
 	v, err := svc.Vote(ctx, anna, poll.ID, 0)
