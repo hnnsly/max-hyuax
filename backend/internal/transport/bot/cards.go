@@ -73,10 +73,13 @@ func RenderCard(c cards.Card, botName string) maxapi.NewMessage {
 	return maxapi.NewMessage{
 		Text:   strings.TrimRight(b.String(), "\n"),
 		Format: "markdown",
-		Attachments: []maxapi.Attachment{maxapi.Keyboard([]maxapi.Button{
-			maxapi.OpenAppButton("Открыть заявку", botName, "i_"+c.IssueID),
-			maxapi.LinkButton("Поделиться", shareURL(c, botName)),
-		})},
+		Attachments: []maxapi.Attachment{maxapi.Keyboard(
+			[]maxapi.Button{
+				maxapi.OpenAppButton("Открыть заявку", botName, "i_"+c.IssueID),
+				maxapi.LinkButton("Поделиться", shareURL(c, botName)),
+			},
+			menuBelowRow(),
+		)},
 	}
 }
 
@@ -131,7 +134,7 @@ func RenderNotice(kind app.NotificationKind, c cards.Card, botName string) maxap
 	return maxapi.NewMessage{
 		Text:        strings.TrimRight(b.String(), "\n"),
 		Format:      "markdown",
-		Attachments: []maxapi.Attachment{maxapi.Keyboard(rows...)},
+		Attachments: []maxapi.Attachment{maxapi.Keyboard(append(rows, menuBelowRow())...)},
 	}
 }
 

@@ -96,7 +96,8 @@ func TestRenderNotices(t *testing.T) {
 		t.Errorf("final text:\n%s", done.Text)
 	}
 	// Житель отвечает прямо из сообщения: «Починили» — кнопкой, «Не починили» — в карточке, где пишется комментарий.
-	if labels := buttonLabels(done); !slices.Equal(labels, []string{"Починили", "Не починили", "Открыть заявку"}) {
+	// «Меню» есть под каждым уведомлением: меню приходит новым сообщением, уведомление остаётся.
+	if labels := buttonLabels(done); !slices.Equal(labels, []string{"Починили", "Не починили", "Открыть заявку", "Меню"}) {
 		t.Errorf("done buttons = %v", labels)
 	}
 	c.Status, c.Comment = issue.StatusRejected, "Не наш участок"
@@ -104,7 +105,7 @@ func TestRenderNotices(t *testing.T) {
 	if !strings.Contains(rej.Text, "отклонена") || !strings.Contains(rej.Text, "Причина: Не наш участок") {
 		t.Errorf("rejected text:\n%s", rej.Text)
 	}
-	if labels := buttonLabels(rej); !slices.Equal(labels, []string{"Открыть заявку"}) {
+	if labels := buttonLabels(rej); !slices.Equal(labels, []string{"Открыть заявку", "Меню"}) {
 		t.Errorf("rejected buttons = %v", labels)
 	}
 	c.Status, c.Comment = issue.StatusInProgress, ""

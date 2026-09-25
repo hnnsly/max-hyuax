@@ -29,6 +29,9 @@ var transitions = map[Status][]Status{
 	StatusInProgress: {StatusDone, StatusRejected},
 }
 
+// NextStatuses — куда УК может перевести заявку из статуса s: кнопки смены статуса в боте.
+func NextStatuses(s Status) []Status { return slices.Clone(transitions[s]) }
+
 var (
 	ErrInvalid        = errors.New("issue: invalid data")
 	ErrAlreadyJoined  = errors.New("issue: user already joined")

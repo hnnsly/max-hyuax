@@ -23,7 +23,6 @@ const (
 	cbAccept  = "a" // a:<proposal_id> — председатель берёт в работу
 	cbDecline = "d" // d:<proposal_id> — председатель отклоняет, ответ ждёт следующим сообщением
 
-	menuCouncil    = "council"
 	councilPropose = "propose"
 	councilMine    = "mine"
 	councilFolder  = "folder"
@@ -41,46 +40,6 @@ var proposalStatusText = map[council.Status]string{
 	council.StatusNew:      "ждёт ответа председателя",
 	council.StatusAccepted: "председатель взял в работу",
 	council.StatusDeclined: "председатель отклонил",
-}
-
-// councilMenu присылает открытые опросы дома и кнопки совета.
-func (h *Handler) councilMenu(ctx context.Context, to maxapi.Target, from maxapi.User) error {
-	u, err := h.resident(ctx, from)
-	if err != nil {
-		return err
-	}
-	if u.HouseID == "" {
-		return h.askHouse(ctx, to)
-	}
-	polls, err := h.svc.Council.Polls(ctx, u)
-	if err != nil {
-		return err
-	}
-	open := 0
-	for _, p := range polls {
-		if p.Open && open < pollsInChat {
-			open++
-			if _, err := h.max.Send(ctx, to, pollMessage(p)); err != nil {
-				return err
-			}
-		}
-	}
-	text := "Совет дома: предложения председателю и опросы соседей."
-	if open == 0 {
-		text += " Открытых опросов сейчас нет."
-	}
-	rows := [][]maxapi.Button{
-		{maxapi.CallbackButton("Предложить совету", pack(cbCouncil, councilPropose))},
-		{maxapi.CallbackButton("Мои предложения", pack(cbCouncil, councilMine))},
-	}
-	if u.IsChairmanOf(u.HouseID) {
-		rows = append(rows, []maxapi.Button{
-			maxapi.CallbackButton("Папка предложений", pack(cbCouncil, councilFolder)),
-			maxapi.CallbackButton("Создать опрос", pack(cbCouncil, councilNewPoll)),
-		})
-	}
-	_, err = h.max.Send(ctx, to, maxapi.NewMessage{Text: text, Attachments: []maxapi.Attachment{maxapi.Keyboard(rows...)}})
-	return err
 }
 
 // pollMessage — опрос: до голоса варианты кнопками, после голоса или окончания итоги.
@@ -176,87 +135,52 @@ func (h *Handler) vote(ctx context.Context, u user.User, payload, rest string) (
 	case err != nil:
 		return maxapi.CallbackAnswer{}, err
 	}
-	m := pollMessage(v)
+	m := withNav(pollMessage(v), scrCouncil)
 	return maxapi.CallbackAnswer{Message: &m}, nil
 }
 
 // consentAnswer — просьба о согласии; после «Согласен» исходная кнопка выполнится сама.
 func consentAnswer(text, payload string) maxapi.CallbackAnswer {
 	m := maxapi.NewMessage{
-		Text:        text + " Данные хранятся в России.",
-		Attachments: []maxapi.Attachment{maxapi.Keyboard([]maxapi.Button{maxapi.CallbackButton("Согласен", pack(cbConsent, payload))})},
+		Text: text + " Данные хранятся в России.",
+		Attachments: []maxapi.Attachment{maxapi.Keyboard(
+			[]maxapi.Button{maxapi.CallbackButton("Согласен", pack(cbConsent, payload))},
+			menuRow(),
+		)},
 	}
 	return maxapi.CallbackAnswer{Message: &m}
 }
 
+// councilItem — действия совета, которые ждут текст: предложение и вопрос опроса.
+// Списки открываются экранами (screens.go).
 func (h *Handler) councilItem(ctx context.Context, cb *maxapi.Callback, u user.User, item string) (maxapi.CallbackAnswer, error) {
-	to := maxapi.ToUser(cb.User.UserID)
+	var action, prompt string
 	switch item {
+	case councilMine:
+		return h.openScreen(ctx, u, scrProps)
+	case councilFolder:
+		return h.openScreen(ctx, u, scrFolder)
 	case councilPropose:
 		if u.HouseID == "" {
-			return maxapi.CallbackAnswer{Notification: "Сначала укажите дом"}, h.askHouse(ctx, to)
+			return h.openScreen(ctx, u, scrHome)
 		}
 		if !u.HasConsent(h.svc.ConsentVersion) {
 			return consentAnswer("Чтобы написать совету, нужно ваше согласие на обработку персональных данных. Председатель увидит текст без вашего имени.", cb.Payload), nil
 		}
-		if err := h.svc.Pending.Set(ctx, u.ID, app.BotPending{Action: pendPropose, ExpiresAt: h.svc.Now().Add(pendingTTL)}); err != nil {
-			return maxapi.CallbackAnswer{}, err
-		}
-		err := h.send(ctx, to, "Напишите предложение одним сообщением: что и где стоит сделать. Председатель совета увидит текст без вашего имени.")
-		return maxapi.CallbackAnswer{Notification: "Жду предложение"}, err
-
-	case councilMine:
-		list, err := h.svc.Council.MyProposals(ctx, u)
-		if err != nil {
-			return maxapi.CallbackAnswer{}, err
-		}
-		if len(list) == 0 {
-			return maxapi.CallbackAnswer{Notification: "Предложений пока нет"}, nil
-		}
-		var b strings.Builder
-		b.WriteString("**Мои предложения**")
-		for i, p := range list[:min(listLimit, len(list))] {
-			fmt.Fprintf(&b, "\n\n%d. %s\n%s", i+1, plain(truncate(p.Text, 200)), capitalizeRU(proposalStatusText[p.Status]))
-			if p.Answer != "" {
-				fmt.Fprintf(&b, ": %s", plain(p.Answer))
-			}
-		}
-		_, err = h.max.Send(ctx, to, maxapi.NewMessage{Text: b.String(), Format: "markdown"})
-		return maxapi.CallbackAnswer{Notification: "Готово"}, err
-
-	case councilFolder:
-		list, err := h.svc.Council.Folder(ctx, u)
-		if errors.Is(err, app.ErrForbidden) {
-			return maxapi.CallbackAnswer{Notification: "Папка доступна председателю совета."}, nil
-		}
-		if err != nil {
-			return maxapi.CallbackAnswer{}, err
-		}
-		fresh := 0
-		for _, p := range list {
-			if p.Status == council.StatusNew && fresh < listLimit {
-				fresh++
-				if _, err := h.max.Send(ctx, to, proposalMessage(p, h.botName)); err != nil {
-					return maxapi.CallbackAnswer{}, err
-				}
-			}
-		}
-		if fresh == 0 {
-			return maxapi.CallbackAnswer{Notification: "Новых предложений нет"}, nil
-		}
-		return maxapi.CallbackAnswer{Notification: "Новые предложения ниже"}, nil
-
+		action, prompt = pendPropose, "Напишите предложение одним сообщением: что и где стоит сделать. Председатель совета увидит текст без вашего имени."
 	case councilNewPoll:
 		if !u.IsChairmanOf(u.HouseID) {
 			return maxapi.CallbackAnswer{Notification: "Создавать опросы может только председатель совета."}, nil
 		}
-		if err := h.svc.Pending.Set(ctx, u.ID, app.BotPending{Action: pendNewPoll, ExpiresAt: h.svc.Now().Add(pendingTTL)}); err != nil {
-			return maxapi.CallbackAnswer{}, err
-		}
-		err := h.send(ctx, to, "Напишите вопрос опроса для жителей одним сообщением (например: «Установить шлагбаум на въезде во двор?»).\n\nОпрос откроется на 7 дней с вариантами «За», «Против», «Воздержался».")
-		return maxapi.CallbackAnswer{Notification: "Жду вопрос опроса"}, err
+		action, prompt = pendNewPoll, "Напишите вопрос опроса для жителей одним сообщением, например: «Установить шлагбаум на въезде во двор?»\n\nОпрос откроется на 7 дней с вариантами «За», «Против», «Воздержался»."
+	default:
+		return maxapi.CallbackAnswer{Notification: "Эта кнопка устарела."}, nil
 	}
-	return maxapi.CallbackAnswer{Notification: "Эта кнопка устарела."}, nil
+	if err := h.svc.Pending.Set(ctx, u.ID, app.BotPending{Action: action, ExpiresAt: h.svc.Now().Add(pendingTTL)}); err != nil {
+		return maxapi.CallbackAnswer{}, err
+	}
+	m := screenMsg(prompt, navRow(scrCouncil))
+	return maxapi.CallbackAnswer{Message: &m}, nil
 }
 
 // proposalMessage — новое предложение для председателя, без имени автора.
@@ -286,7 +210,11 @@ func (h *Handler) acceptProposal(ctx context.Context, u user.User, id string) (m
 	if _, err := h.svc.Council.Reply(ctx, u, id, council.StatusAccepted, ""); err != nil {
 		return replyAnswer(err)
 	}
-	return replace("Предложение взято в работу, автор получит уведомление. Вынести вопрос на опрос соседей можно в приложении."), nil
+	m, err := h.folderScreen(ctx, u)
+	if err != nil {
+		return maxapi.CallbackAnswer{}, err
+	}
+	return maxapi.CallbackAnswer{Message: &m, Notification: "Взято в работу, автор получит уведомление"}, nil
 }
 
 func (h *Handler) askDeclineAnswer(ctx context.Context, u user.User, id string) (maxapi.CallbackAnswer, error) {
@@ -294,8 +222,8 @@ func (h *Handler) askDeclineAnswer(ctx context.Context, u user.User, id string) 
 	if err != nil {
 		return maxapi.CallbackAnswer{}, err
 	}
-	err = h.send(ctx, maxapi.ToUser(u.MaxUserID), "Напишите одним сообщением, почему отклоняете. Автор увидит этот ответ.")
-	return maxapi.CallbackAnswer{Notification: "Жду ответ автору"}, err
+	m := screenMsg("Напишите одним сообщением, почему отклоняете. Автор увидит этот ответ.", navRow(scrProp, id))
+	return maxapi.CallbackAnswer{Message: &m}, nil
 }
 
 // onCouncilPending — текст предложения или ответа председателя, которого ждал бот.
@@ -334,7 +262,7 @@ func (h *Handler) onCouncilPending(ctx context.Context, to maxapi.Target, u user
 		if err != nil {
 			return err
 		}
-		_, err = h.max.Send(ctx, to, pollMessage(v))
+		_, err = h.max.Send(ctx, to, withNav(pollMessage(v), scrCouncil))
 		return err
 	}
 	return nil
@@ -349,7 +277,7 @@ func (s *CardSender) NotifyCouncil(ctx context.Context, maxUserID int64, kind ap
 			text += ": " + plain(p.Answer)
 		}
 		m = maxapi.NewMessage{Text: text, Format: "markdown", Attachments: []maxapi.Attachment{maxapi.Keyboard(
-			[]maxapi.Button{maxapi.CallbackButton("Совет дома", pack(cbMenu, menuCouncil))},
+			[]maxapi.Button{maxapi.CallbackButton("Совет дома", pack(cbMenu, scrCouncil))},
 		)}}
 	}
 	_, err := s.api.Send(ctx, maxapi.ToUser(maxUserID), m)

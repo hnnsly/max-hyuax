@@ -176,11 +176,19 @@ func (e env) resident(maxID int64, consent bool) user.User {
 
 func TestStartSendsGreetingWithEntryButtons(t *testing.T) {
 	e := newEnv(t)
+	// Новый житель без дома: приветствие сразу просит дом.
 	e.handle(t, maxapi.Update{Type: maxapi.UpdateBotStarted, ChatID: 7, User: maxapi.User{UserID: 1001}})
 	txt, bs := e.max.last("")
 	if !strings.Contains(txt, "заявк") || e.max.sent[0].to != maxapi.ToChat(7) {
 		t.Fatalf("greeting = %q to %+v", txt, e.max.sent[0].to)
 	}
+	if findButton(t, bs, "Показать дома рядом").Type != "request_geo_location" {
+		t.Fatalf("buttons = %+v", bs)
+	}
+	// Житель с домом: приветствие с главным меню.
+	e.resident(1002, true)
+	e.handle(t, maxapi.Update{Type: maxapi.UpdateBotStarted, ChatID: 7, User: maxapi.User{UserID: 1002}})
+	_, bs = e.max.last("")
 	findButton(t, bs, "Сообщить о проблеме")
 	if b := findButton(t, bs, "Открыть приложение"); b.WebApp != botName {
 		t.Fatalf("open_app = %+v", b)
@@ -220,9 +228,11 @@ func TestWithoutHouseBotAsksLocationThenBindsHouse(t *testing.T) {
 	if err != nil || u.HouseID != "h-1" {
 		t.Fatalf("user = %+v, err = %v", u, err)
 	}
-	if txt, _ := e.max.last("cb1"); !strings.Contains(txt, "Дом сохранён") || !strings.Contains(txt, "описать проблему") {
+	txt, bs := e.max.last("cb1")
+	if !strings.Contains(txt, "Дом сохранён") || !strings.Contains(txt, "Ореховый бульвар, 17к2") {
 		t.Fatalf("after house = %q", txt)
 	}
+	findButton(t, bs, "Сообщить о проблеме")
 }
 
 func TestProblemIsConfirmedThenReported(t *testing.T) {
@@ -456,9 +466,12 @@ func TestStaleAndBrokenButtonsAreExplained(t *testing.T) {
 	e := newEnv(t)
 	e.resident(8001, true)
 	cases := map[string]string{
-		"x:whatever": "устарела",
-		"h:nope":     "Не получилось",
-		"j:nope":     "не найдена",
+		"zz:whatever": "устарела",
+		"x:whatever":  "устарела",
+		"h:nope":      "Не получилось",
+		"j:nope":      "не найдена",
+		"u:nope":      "устарела",
+		"u:nope:done": "не найдена",
 	}
 	i := 0
 	for payload, want := range cases {
@@ -511,22 +524,25 @@ func TestCommandsAndReportButton(t *testing.T) {
 		t.Fatal("/new without house must ask for location")
 	}
 	e.handle(t, text(8201, "/unknown"))
-	if txt, _ := e.max.last(""); !strings.Contains(txt, "Здравствуйте") {
+	if txt, _ := e.max.last(""); !strings.Contains(txt, "Сначала выберите свой дом") {
 		t.Fatalf("unknown command = %q", txt)
 	}
+	// Кнопка из старых сообщений открывает экран на месте, новых сообщений нет.
 	sentBefore := len(e.max.sent)
 	e.handle(t, press(8201, "cb1", bot.PayloadReport))
-	if txt, _ := e.max.last("cb1"); !strings.Contains(txt, "Сначала укажите дом") || len(e.max.sent) != sentBefore+1 {
-		t.Fatalf("report without house: answer %q, sent %d", txt, len(e.max.sent)-sentBefore)
+	if _, bs := e.max.last("cb1"); findButton(t, bs, "Показать дома рядом").Type != "request_geo_location" || len(e.max.sent) != sentBefore {
+		t.Fatalf("report without house: sent %d", len(e.max.sent)-sentBefore)
 	}
 
 	e.resident(8202, true)
 	e.handle(t, text(8202, "/new"))
-	if txt, _ := e.max.last(""); !strings.Contains(txt, "Опишите проблему") {
+	txt, bs := e.max.last("")
+	if !strings.Contains(txt, "Что случилось") {
 		t.Fatalf("/new with house = %q", txt)
 	}
+	findButton(t, bs, "Свет в подъезде")
 	e.handle(t, press(8202, "cb2", bot.PayloadReport))
-	if txt, _ := e.max.last("cb2"); !strings.Contains(txt, "Опишите проблему") {
+	if txt, _ := e.max.last("cb2"); !strings.Contains(txt, "Что случилось") {
 		t.Fatalf("report with house = %q", txt)
 	}
 }
@@ -555,15 +571,21 @@ func TestMyCommandOpensIssueCardInChat(t *testing.T) {
 	e.handle(t, press(8401, "cb1", findButton(t, bs, "Отправить").Payload))
 	e.handle(t, text(8401, "/my"))
 	txt, bs := e.max.last("")
-	if !strings.Contains(txt, "Ваши заявки") || len(bs) != 1 || bs[0].Type != "callback" || !strings.HasPrefix(bs[0].Payload, "i:") {
+	if !strings.Contains(txt, "Ваши заявки") || len(bs) != 2 || bs[0].Type != "callback" || !strings.HasPrefix(bs[0].Payload, "w:issue:") {
 		t.Fatalf("/my = %q %+v", txt, bs)
 	}
+	findButton(t, bs, "Меню")
 	e.handle(t, press(8401, "cb2", bs[0].Payload))
-	card, cbs := e.max.last("")
+	card, cbs := e.max.last("cb2")
 	if !strings.Contains(card, "Заявка № 101") || !strings.Contains(card, "Хронология") || !strings.Contains(card, "заявка подана") {
 		t.Fatalf("card = %q", card)
 	}
 	findButton(t, cbs, "Открыть в приложении")
+	// «Назад» возвращает к списку, откуда открыли карточку.
+	e.handle(t, press(8401, "cb3", findButton(t, cbs, "Назад").Payload))
+	if txt, _ := e.max.last("cb3"); !strings.Contains(txt, "Ваши заявки") {
+		t.Fatalf("back = %q", txt)
+	}
 	// Автор уже участник: кнопки «Это и у меня» у него нет.
 	for _, b := range cbs {
 		if b.Text == "Это и у меня" {
@@ -578,13 +600,23 @@ func TestMenuShowsHouseIssues(t *testing.T) {
 	e.resident(8601, true)
 	e.handle(t, text(8601, "/menu"))
 	_, bs := e.max.last("")
+	sentBefore := len(e.max.sent)
 	e.handle(t, press(8601, "cb1", findButton(t, bs, "Сейчас в доме").Payload))
-	if txt, _ := e.max.last(""); !strings.Contains(txt, "нет открытых заявок") {
+	if txt, _ := e.max.last("cb1"); !strings.Contains(txt, "нет открытых заявок") {
 		t.Fatalf("empty house = %q", txt)
 	}
 	e.handle(t, press(8601, "cb2", findButton(t, bs, "Мой дом").Payload))
-	if txt, _ := e.max.last(""); !strings.Contains(txt, "Ореховый бульвар, 17к2") {
+	txt, hbs := e.max.last("cb2")
+	if !strings.Contains(txt, "Ореховый бульвар, 17к2") {
 		t.Fatalf("my house = %q", txt)
+	}
+	// Одно окно: нажатия меняют сообщение с меню, новых сообщений в чате нет.
+	if len(e.max.sent) != sentBefore {
+		t.Fatalf("menu presses sent %d new messages", len(e.max.sent)-sentBefore)
+	}
+	e.handle(t, press(8601, "cb3", findButton(t, hbs, "Меню").Payload))
+	if txt, _ := e.max.last("cb3"); !strings.Contains(txt, "Меню") {
+		t.Fatalf("back to menu = %q", txt)
 	}
 }
 
@@ -603,10 +635,11 @@ func TestReopenAsksCommentInChat(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	// «Подробнее» из уведомления присылает карточку новым сообщением: уведомление остаётся в чате.
 	e.handle(t, press(8701, "cb2", "i:i-1"))
 	_, cbs := e.max.last("")
 	e.handle(t, press(8701, "cb3", findButton(t, cbs, "Не починили").Payload))
-	if txt, _ := e.max.last(""); !strings.Contains(txt, "что осталось не так") {
+	if txt, _ := e.max.last("cb3"); !strings.Contains(txt, "что осталось не так") {
 		t.Fatalf("reopen prompt = %q", txt)
 	}
 	e.handle(t, text(8701, "На третьем этаже всё ещё темно"))
@@ -714,13 +747,15 @@ func TestCouncilInChat(t *testing.T) {
 	e.handle(t, text(9002, "/polls"))
 	_, bs = e.max.last("")
 	e.handle(t, press(9002, "cb2", findButton(t, bs, "Папка предложений").Payload))
-	prop, pbs := e.max.last("")
+	_, fbs := e.max.last("cb2")
+	e.handle(t, press(9002, "cb2a", fbs[0].Payload))
+	prop, pbs := e.max.last("cb2a")
 	if !strings.Contains(prop, "лавочку") || strings.Contains(prop, "Анна") {
 		t.Fatalf("folder item = %q", prop)
 	}
 	e.handle(t, press(9002, "cb3", findButton(t, pbs, "Взять в работу").Payload))
-	if txt, _ := e.max.last("cb3"); !strings.Contains(txt, "взято в работу") {
-		t.Fatalf("accept = %q", txt)
+	if a := e.max.answers["cb3"]; !strings.Contains(a.Notification, "Взято в работу") || !strings.Contains(a.Message.Text, "Новых предложений нет") {
+		t.Fatalf("accept = %+v", a)
 	}
 	queued = e.store.Outbox().(*apptest.MemOutbox).Pending
 	if last := queued[len(queued)-1]; last.Kind != app.NotifyProposalAnswer || last.UserID != anna.ID {
@@ -731,46 +766,65 @@ func TestCouncilInChat(t *testing.T) {
 		t.Fatal(err)
 	}
 	e.handle(t, text(9001, "/polls"))
-	poll := e.max.sent[len(e.max.sent)-2].msg
-	if !strings.Contains(poll.Text, "Ставим лавочку") {
-		t.Fatalf("poll message = %q", poll.Text)
-	}
-	e.handle(t, press(9001, "cb4", findButton(t, buttons(poll), "За").Payload))
-	if txt, _ := e.max.last("cb4"); !strings.Contains(txt, "За: 100%, ваш голос") || !strings.Contains(txt, "Всего 1 голос") {
+	_, bs = e.max.last("")
+	e.handle(t, press(9001, "cb4", findButton(t, bs, "Опрос: Ставим лавочку?").Payload))
+	_, vbs := e.max.last("cb4")
+	e.handle(t, press(9001, "cb5", findButton(t, vbs, "За").Payload))
+	txt, rbs := e.max.last("cb5")
+	if !strings.Contains(txt, "За: 100%, ваш голос") || !strings.Contains(txt, "Всего 1 голос") {
 		t.Fatalf("results = %q", txt)
 	}
+	findButton(t, rbs, "Назад")
+}
+
+// Председатель создаёт опрос из чата: вопрос ждёт следующим сообщением, опрос открывается на 7 дней.
+func TestChairmanCreatesPollInChat(t *testing.T) {
+	e := newEnv(t)
+	nina := user.User{ID: 9003, MaxUserID: 9003, Role: user.RoleResident, HouseID: "h-1", ChairmanHouseID: "h-1", ConsentVersion: "v1"}
+	e.store.AddUser(nina)
+	e.handle(t, text(9003, "/polls"))
+	_, bs := e.max.last("")
+	e.handle(t, press(9003, "cb1", findButton(t, bs, "Создать опрос").Payload))
+	e.handle(t, text(9003, "Установить шлагбаум на въезде во двор?"))
+	txt, pbs := e.max.last("")
+	if !strings.Contains(txt, "шлагбаум") {
+		t.Fatalf("poll = %q", txt)
+	}
+	findButton(t, pbs, "Воздержался")
 }
 
 func TestRoleSwitch(t *testing.T) {
 	e := newEnv(t)
 	e.resident(9901, true)
-	// Без аргументов показывает меню выбора ролей
+	// Без аргументов показывает выбор ролей.
 	e.handle(t, text(9901, "/role"))
 	txt, bs := e.max.last("")
-	if !strings.Contains(txt, "Ваша текущая роль") || len(bs) != 4 {
+	if !strings.Contains(txt, "Сейчас: житель") || len(bs) != 5 {
 		t.Fatalf("/role = %q %+v", txt, bs)
 	}
-	findButton(t, bs, "Стать председателем")
-	findButton(t, bs, "Стать сотрудником УК")
+	findButton(t, bs, "Председатель")
+	findButton(t, bs, "Сотрудник УК")
 	findButton(t, bs, "Управа района")
 
-	// Переключение на председателя
+	// Председатель: меню жителя плюс папка предложений.
 	e.handle(t, text(9901, "/role chairman"))
-	txt, _ = e.max.last("")
-	if !strings.Contains(txt, "Председатель совета") {
+	txt, bs = e.max.last("")
+	if !strings.Contains(txt, "председатель совета дома") {
 		t.Fatalf("/role chairman = %q", txt)
 	}
+	findButton(t, bs, "Папка предложений")
 	u, _ := e.store.Users().ByMaxID(t.Context(), 9901)
 	if u.ChairmanHouseID != "h-1" {
 		t.Fatalf("chairman house id = %q, want h-1", u.ChairmanHouseID)
 	}
 
-	// Переключение на УК
+	// Сотрудник УК: меню кабинета УК вместо меню жителя.
 	e.handle(t, text(9901, "/role uk"))
 	txt, bs = e.max.last("")
-	if !strings.Contains(txt, "Сотрудник управляющей компании") || len(bs) != 1 {
+	if !strings.Contains(txt, "сотрудник управляющей компании") {
 		t.Fatalf("/role uk = %q %+v", txt, bs)
 	}
+	findButton(t, bs, "Очередь заявок")
 	u, _ = e.store.Users().ByMaxID(t.Context(), 9901)
 	if u.Role != user.RoleOperator {
 		t.Fatalf("role = %q, want operator", u.Role)
@@ -799,6 +853,121 @@ func TestRoleSwitchOnlyOnDemoStand(t *testing.T) {
 	}
 	if got, _ := e.store.Users().Get(t.Context(), u.ID); got.Role != user.RoleResident {
 		t.Fatalf("role changed outside demo: %+v", got)
+	}
+}
+
+// Заявка кнопками: категория, подъезд, описание следующим сообщением. Всё в одном окне,
+// новое сообщение только с ответом на описание.
+func TestReportByButtons(t *testing.T) {
+	e := newEnv(t)
+	e.resident(9301, true)
+	e.store.Objects = []house.AssetObject{
+		{ID: "h-1-e1-light", HouseID: "h-1", EntranceID: "h-1-e1", Category: "lighting", Label: "подъезд 1, лестничная клетка"},
+		{ID: "h-1-e2-light", HouseID: "h-1", EntranceID: "h-1-e2", Category: "lighting", Label: "подъезд 2, лестничная клетка"},
+	}
+	e.handle(t, text(9301, "/menu"))
+	_, bs := e.max.last("")
+	sentBefore := len(e.max.sent)
+	e.handle(t, press(9301, "cb1", findButton(t, bs, "Сообщить о проблеме").Payload))
+	_, bs = e.max.last("cb1")
+	e.handle(t, press(9301, "cb2", findButton(t, bs, "Свет в подъезде").Payload))
+	txt, bs := e.max.last("cb2")
+	if !strings.Contains(txt, "Где именно") {
+		t.Fatalf("place = %q", txt)
+	}
+	e.handle(t, press(9301, "cb3", findButton(t, bs, "Подъезд 2, лестничная клетка").Payload))
+	txt, bs = e.max.last("cb3")
+	if !strings.Contains(txt, "УК «Ореховый квартал»") || !strings.Contains(txt, "срок ответа до") {
+		t.Fatalf("describe = %q", txt)
+	}
+	findButton(t, bs, "Отправить без описания")
+	if len(e.max.sent) != sentBefore {
+		t.Fatalf("navigation sent %d new messages", len(e.max.sent)-sentBefore)
+	}
+	e.handle(t, text(9301, "Лампа мигает третий день"))
+	txt, bs = e.max.last("")
+	if !strings.Contains(txt, "Заявка № 101 отправлена") {
+		t.Fatalf("after description = %q", txt)
+	}
+	findButton(t, bs, "Меню")
+	is, err := e.issues.Get(t.Context(), "i-1")
+	if err != nil || is.ObjectID() != "h-1-e2-light" || is.Description() != "Лампа мигает третий день" {
+		t.Fatalf("issue = %+v, err = %v", is, err)
+	}
+
+	// Без описания: у двери подъездов нет, экран места пропускается.
+	e.handle(t, press(9301, "cb4", "w:place:door"))
+	_, bs = e.max.last("cb4")
+	e.handle(t, press(9301, "cb5", findButton(t, bs, "Отправить без описания").Payload))
+	if txt, _ := e.max.last("cb5"); !strings.Contains(txt, "Заявка № 102 отправлена") {
+		t.Fatalf("without description = %q", txt)
+	}
+	// Ожидание описания снято: следующий текст снова считается новой проблемой.
+	e.handle(t, text(9301, "Не горит свет на лестнице"))
+	if txt, _ := e.max.last(""); strings.Contains(txt, "отправлена") {
+		t.Fatalf("pending was not cleared: %q", txt)
+	}
+}
+
+// Сотрудник УК в чате: очередь, карточка с кнопками допустимых статусов, «Выполнено» с комментарием.
+// Житель статус не меняет.
+func TestOperatorChangesStatusInChat(t *testing.T) {
+	e := newEnv(t)
+	e.resident(9401, true)
+	e.handle(t, text(9401, "Не горит свет на лестнице"))
+	_, bs := e.max.last("")
+	e.handle(t, press(9401, "cb1", findButton(t, bs, "Отправить").Payload))
+
+	e.handle(t, press(9401, "cb2", "u:i-1:in_progress"))
+	if txt, _ := e.max.last("cb2"); !strings.Contains(txt, "только сотрудник") {
+		t.Fatalf("resident status change = %q", txt)
+	}
+
+	e.store.AddUser(user.User{ID: 9402, MaxUserID: 9402, Role: user.RoleOperator, OrganizationID: "org-1"})
+	e.handle(t, text(9402, "/menu"))
+	_, bs = e.max.last("")
+	e.handle(t, press(9402, "cb3", findButton(t, bs, "Очередь заявок").Payload))
+	txt, bs := e.max.last("cb3")
+	if !strings.Contains(txt, "Открыто 1") {
+		t.Fatalf("queue = %q", txt)
+	}
+	e.handle(t, press(9402, "cb4", bs[0].Payload))
+	_, bs = e.max.last("cb4")
+	findButton(t, bs, "Принять")
+	e.handle(t, press(9402, "cb5", findButton(t, bs, "В работу").Payload))
+	if a := e.max.answers["cb5"]; !strings.Contains(a.Notification, "в работе") {
+		t.Fatalf("in progress = %+v", a)
+	}
+	_, bs = e.max.last("cb5")
+	e.handle(t, press(9402, "cb6", findButton(t, bs, "Выполнено").Payload))
+	_, bs = e.max.last("cb6")
+	findButton(t, bs, "Без комментария")
+	e.handle(t, text(9402, "Заменили лампы"))
+	if txt, _ := e.max.last(""); !strings.Contains(txt, "Заявка № 101") || !strings.Contains(txt, "выполнена") {
+		t.Fatalf("after comment = %q", txt)
+	}
+	is, _ := e.issues.Get(t.Context(), "i-1")
+	if is.Status() != issue.StatusDone || is.StatusComment() != "Заменили лампы" {
+		t.Fatalf("issue = %v %q", is.Status(), is.StatusComment())
+	}
+}
+
+// Управа района в чате: сводка по УК и просроченные заявки.
+func TestDistrictMenuInChat(t *testing.T) {
+	e := newEnv(t)
+	e.store.AddUser(user.User{ID: 9501, MaxUserID: 9501, Role: user.RoleDistrict, District: "Зябликово"})
+	e.handle(t, text(9501, "/menu"))
+	txt, bs := e.max.last("")
+	if !strings.Contains(txt, "Зябликово") {
+		t.Fatalf("district menu = %q", txt)
+	}
+	e.handle(t, press(9501, "cb1", findButton(t, bs, "Сводка района").Payload))
+	if txt, _ := e.max.last("cb1"); !strings.Contains(txt, "Район Зябликово") {
+		t.Fatalf("summary = %q", txt)
+	}
+	e.handle(t, press(9501, "cb2", findButton(t, bs, "Просрочено в районе").Payload))
+	if txt, _ := e.max.last("cb2"); !strings.Contains(txt, "Просроченных заявок в районе нет") {
+		t.Fatalf("overdue = %q", txt)
 	}
 }
 

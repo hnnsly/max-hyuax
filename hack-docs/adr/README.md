@@ -34,6 +34,7 @@ tags: [adr, decisions]
 | [016](016-geocoder-and-open-data.md) | Геокодер Nominatim по HTTP, атрибуция OSM (ODbL), правила публичного сервера; импорт реестра домов из CSV | accepted | 2026-09-25 |
 | [017](017-district-and-chairman-roles.md) | Роль района (только чтение, сравнение УК) и роль председателя совета | accepted | 2026-09-25 |
 | [018](018-photos-in-minio.md) | Фото в MinIO по S3 API (`minio-go`), диск запасной; AGPL сервера не касается кода | accepted | 2026-09-25 |
+| [019](019-bot-single-window.md) | Бот 2.0: одно окно (экраны заменяют сообщение), меню по роли, заявка кнопками, смена статуса УК в чате | accepted | 2026-09-26 |
 
 Статусы: `candidate` — решение нужно, не обсуждалось; `proposed` — предложено; `accepted` — принято; `superseded` — заменено.
 

@@ -82,14 +82,14 @@ var Commands = []maxapi.Command{
 	{Name: "my", Description: "Мои заявки"},
 	{Name: "house", Description: "Мой дом и контакты УК"},
 	{Name: "polls", Description: "Совет дома и опросы"},
-	{Name: "role", Description: "Сменить роль (председатель, УК, житель)"},
+	{Name: "role", Description: "Роль для проверки на демо-стенде"},
 	{Name: "help", Description: "Как это работает"},
 }
 
 const greetingText = "Здравствуйте! Я помогаю соседям сообщать о поломках в доме: лифт, свет в подъезде, протечка, отопление.\n\n" +
 	"Одна заявка на весь дом вместо десятка сообщений в чате. Я покажу, кто отвечает и до какого срока, и напишу, когда статус изменится."
 
-const helpText = "Напишите одним сообщением, что сломалось и где, например: «не горит свет на 5 этаже во втором подъезде». " +
+const helpText = "Нажмите «Сообщить о проблеме» в меню или напишите одним сообщением, что сломалось и где, например: «не горит свет на 5 этаже во втором подъезде». " +
 	"Я определю категорию, ответственного и срок и проверю, не сообщали ли уже соседи.\n\n" +
 	"Команды:\n/menu главное меню\n/new сообщить о проблеме\n/my мои заявки\n/house мой дом и контакты УК\n/polls совет дома и опросы\n\n" +
 	"Соседи видят только число сообщивших. Имя получает только управляющая компания."
@@ -97,7 +97,7 @@ const helpText = "Напишите одним сообщением, что сл�
 func (h *Handler) Handle(ctx context.Context, u maxapi.Update) error {
 	switch u.Type {
 	case maxapi.UpdateBotStarted:
-		return h.greet(ctx, target(u.ChatID, u.User.UserID), u.Payload)
+		return h.greet(ctx, target(u.ChatID, u.User.UserID), u.User, u.Payload)
 	case maxapi.UpdateMessageCreated:
 		return h.onMessage(ctx, u.Message)
 	case maxapi.UpdateMessageCallback:
@@ -133,25 +133,7 @@ func (h *Handler) onMessage(ctx context.Context, m *maxapi.Message) error {
 	}
 	if cmd, ok := strings.CutPrefix(txt, "/"); ok {
 		cmd, arg, _ := strings.Cut(cmd, " ")
-		switch cmd {
-		case "new":
-			return h.askProblem(ctx, to, m.Sender)
-		case "help":
-			return h.send(ctx, to, helpText)
-		case "my":
-			return h.myIssues(ctx, to, m.Sender)
-		case "house":
-			return h.myHouse(ctx, to, m.Sender)
-		case "menu":
-			return h.menu(ctx, to)
-		case "polls":
-			return h.councilMenu(ctx, to, m.Sender)
-		case "role":
-			return h.switchRole(ctx, to, m.Sender, arg)
-		case "start":
-			return h.greet(ctx, to, arg)
-		}
-		return h.greet(ctx, to, "")
+		return h.onCommand(ctx, to, m.Sender, cmd, arg)
 	}
 	u, err := h.resident(ctx, m.Sender)
 	if err != nil {
@@ -162,6 +144,32 @@ func (h *Handler) onMessage(ctx context.Context, m *maxapi.Message) error {
 		return err
 	}
 	return h.onProblemText(ctx, to, m.Sender, txt)
+}
+
+// onCommand — команды присылают экран новым сообщением внизу чата.
+func (h *Handler) onCommand(ctx context.Context, to maxapi.Target, from maxapi.User, cmd, arg string) error {
+	if cmd == "start" {
+		return h.greet(ctx, to, from, arg)
+	}
+	u, err := h.resident(ctx, from)
+	if err != nil {
+		return err
+	}
+	switch cmd {
+	case "help":
+		return h.send(ctx, to, helpText)
+	case "new":
+		return h.sendScreen(ctx, to, u, scrReport, "")
+	case "my":
+		return h.sendScreen(ctx, to, u, scrMine, "")
+	case "house":
+		return h.sendScreen(ctx, to, u, scrHouse, "")
+	case "polls":
+		return h.sendScreen(ctx, to, u, scrCouncil, "")
+	case "role":
+		return h.roleCommand(ctx, to, u, arg)
+	}
+	return h.sendScreen(ctx, to, u, scrHome, "")
 }
 
 func (h *Handler) resident(ctx context.Context, mu maxapi.User) (user.User, error) {
@@ -252,17 +260,6 @@ func (h *Handler) askHouse(ctx context.Context, to maxapi.Target) error {
 	return err
 }
 
-func (h *Handler) askProblem(ctx context.Context, to maxapi.Target, from maxapi.User) error {
-	u, err := h.resident(ctx, from)
-	if err != nil {
-		return err
-	}
-	if u.HouseID == "" {
-		return h.askHouse(ctx, to)
-	}
-	return h.send(ctx, to, "Опишите проблему одним сообщением: что сломалось и где.")
-}
-
 func (h *Handler) onLocation(ctx context.Context, to maxapi.Target, from maxapi.User, lat, lon float64) error {
 	if _, err := h.resident(ctx, from); err != nil {
 		return err
@@ -299,18 +296,6 @@ func (h *Handler) outsideMoscowReply(ctx context.Context, to maxapi.Target) erro
 		"Вы можете найти московский дом по адресу или выбрать один из примеров для проверки:"
 	_, err := h.max.Send(ctx, to, maxapi.NewMessage{Text: msg, Attachments: []maxapi.Attachment{maxapi.Keyboard(rows...)}})
 	return err
-}
-
-func (h *Handler) myIssues(ctx context.Context, to maxapi.Target, from maxapi.User) error {
-	u, err := h.resident(ctx, from)
-	if err != nil {
-		return err
-	}
-	list, err := h.svc.Issues.Mine(ctx, u)
-	if err != nil {
-		return err
-	}
-	return h.issueList(ctx, to, "Ваши заявки:", "Заявок пока нет. Напишите, что сломалось, и я помогу оформить заявку.", list)
 }
 
 // maxBotPhotos — сколько снимков из одного сообщения прикладывается за раз, как и в мини-приложении.
@@ -366,37 +351,6 @@ func (h *Handler) onPhotos(ctx context.Context, to maxapi.Target, from maxapi.Us
 	return h.sendKeyboard(ctx, to, done, open)
 }
 
-func (h *Handler) myHouse(ctx context.Context, to maxapi.Target, from maxapi.User) error {
-	u, err := h.resident(ctx, from)
-	if err != nil {
-		return err
-	}
-	if u.HouseID == "" {
-		return h.askHouse(ctx, to)
-	}
-	d, err := h.svc.Houses.Get(ctx, u.HouseID)
-	if err != nil {
-		return err
-	}
-	list, err := h.svc.Issues.ListByHouse(ctx, u.HouseID)
-	if err != nil {
-		return err
-	}
-	open := 0
-	for _, is := range list {
-		if !is.Status().Closed() {
-			open++
-		}
-	}
-	var b strings.Builder
-	fmt.Fprintf(&b, "Ваш дом: %s\nУК: %s\n", d.House.Address, d.Organization.Name)
-	if p := d.Organization.PhoneDispatcher; p != "" {
-		fmt.Fprintf(&b, "Диспетчерская: %s\n", p)
-	}
-	fmt.Fprintf(&b, "Открытых заявок: %d", open)
-	return h.sendKeyboard(ctx, to, b.String(), []maxapi.Button{maxapi.OpenAppButton("Открыть дом", h.botName, "")})
-}
-
 // onCallback разбирает нажатие кнопки. Ответ заменяет сообщение с кнопками.
 func (h *Handler) onCallback(ctx context.Context, cb *maxapi.Callback) error {
 	if cb == nil {
@@ -411,50 +365,59 @@ func (h *Handler) onCallback(ctx context.Context, cb *maxapi.Callback) error {
 }
 
 func (h *Handler) callbackReply(ctx context.Context, cb *maxapi.Callback) (maxapi.CallbackAnswer, error) {
-	if cb.Payload == PayloadReport {
-		u, err := h.resident(ctx, cb.User)
-		if err != nil {
-			return maxapi.CallbackAnswer{}, err
-		}
-		if u.HouseID == "" {
-			// Кнопки геопозиции нельзя приложить к ответу-уведомлению: отправляем отдельным сообщением.
-			return maxapi.CallbackAnswer{Notification: "Сначала укажите дом"}, h.askHouse(ctx, maxapi.ToUser(cb.User.UserID))
-		}
-		return maxapi.CallbackAnswer{Notification: "Опишите проблему одним сообщением: что сломалось и где."}, nil
-	}
-
-	kind, rest, _ := strings.Cut(cb.Payload, ":")
 	u, err := h.resident(ctx, cb.User)
 	if err != nil {
 		return maxapi.CallbackAnswer{}, err
 	}
+	// Кнопка из сообщений до бота 2.0: теперь это экран выбора категории.
+	if cb.Payload == PayloadReport {
+		return h.openScreen(ctx, u, scrReport)
+	}
+
+	kind, rest, _ := strings.Cut(cb.Payload, ":")
 	switch kind {
-	case cbHouse:
-		d, err := h.svc.Houses.Get(ctx, rest)
-		if err != nil {
-			return maxapi.CallbackAnswer{}, err
+	case cbWin:
+		return h.openScreen(ctx, u, rest)
+
+	case cbMenu, cbIssue:
+		// Кнопки уведомлений и живой карточки: экран приходит новым сообщением, само уведомление остаётся.
+		name, arg := rest, ""
+		if kind == cbIssue {
+			name, arg = scrIssue, rest
 		}
-		if _, err := h.svc.Auth.SetHouse(ctx, u, rest); err != nil {
+		return maxapi.CallbackAnswer{Notification: "Открыто ниже"}, h.sendScreen(ctx, maxapi.ToUser(cb.User.UserID), u, name, arg)
+
+	case cbStatus:
+		return h.changeStatus(ctx, u, rest)
+
+	case cbSkip:
+		h.dropPending(ctx, u)
+		category, object, _ := strings.Cut(rest, ":")
+		m, err := h.reportMessage(ctx, u, category, object, "")
+		switch {
+		case errors.Is(err, app.ErrConsentRequired):
+			return consentAnswer("Чтобы отправить заявку, нужно ваше согласие на обработку персональных данных.", cb.Payload), nil
+		case errors.Is(err, app.ErrInvalidInput), errors.Is(err, app.ErrNotFound), errors.Is(err, app.ErrForbidden):
+			return maxapi.CallbackAnswer{Notification: "Эта кнопка устарела. Откройте меню: /menu"}, nil
+		case err != nil:
 			return maxapi.CallbackAnswer{}, err
-		}
-		m := maxapi.NewMessage{
-			Text: fmt.Sprintf("Дом сохранён: %s.\nЕсли вы пришли из приложения, вернитесь в него: дом уже выбран.\n"+
-				"Здесь можно описать проблему одним сообщением или выбрать действие:", d.House.Address),
-			Attachments: []maxapi.Attachment{menuKeyboard(h.botName)},
 		}
 		return maxapi.CallbackAnswer{Message: &m}, nil
 
-	case cbMenu:
-		return h.menuItem(ctx, maxapi.ToUser(cb.User.UserID), cb.User, rest)
-
-	case cbIssue:
-		if err := h.showIssue(ctx, maxapi.ToUser(cb.User.UserID), u, rest); err != nil {
+	case cbHouse:
+		u, err := h.svc.Auth.SetHouse(ctx, u, rest)
+		if err != nil {
 			return maxapi.CallbackAnswer{}, err
 		}
-		return maxapi.CallbackAnswer{Notification: "Заявка открыта ниже"}, nil
+		m, err := h.homeScreen(ctx, u)
+		if err != nil {
+			return maxapi.CallbackAnswer{}, err
+		}
+		m.Text = "Дом сохранён. Если вы пришли из приложения, вернитесь в него: дом уже выбран.\n\n" + m.Text
+		return maxapi.CallbackAnswer{Message: &m}, nil
 
 	case cbReopen:
-		return h.askReopenComment(ctx, u, maxapi.ToUser(cb.User.UserID), rest)
+		return h.askReopenComment(ctx, u, rest)
 
 	case cbVote:
 		return h.vote(ctx, u, cb.Payload, rest)
@@ -465,14 +428,14 @@ func (h *Handler) callbackReply(ctx context.Context, cb *maxapi.Callback) (maxap
 	case cbDecline:
 		return h.askDeclineAnswer(ctx, u, rest)
 	case cbRole:
-		return h.onRoleCallback(ctx, cb.User, rest)
+		return h.onRoleCallback(ctx, u, rest)
 
 	case cbPick:
 		var rows [][]maxapi.Button
 		for _, r := range rules.Categories() {
 			rows = append(rows, []maxapi.Button{maxapi.CallbackButton(r.Title, pack(cbNew, r.Code, rest))})
 		}
-		m := maxapi.NewMessage{Text: "Выберите категорию:", Attachments: []maxapi.Attachment{maxapi.Keyboard(rows...)}}
+		m := screenMsg("Выберите категорию:", append(rows, menuRow())...)
 		return maxapi.CallbackAnswer{Message: &m}, nil
 
 	case cbConsent:
@@ -490,12 +453,8 @@ func (h *Handler) callbackReply(ctx context.Context, cb *maxapi.Callback) (maxap
 
 	case cbNew, cbJoin:
 		if !u.HasConsent(h.svc.ConsentVersion) {
-			m := maxapi.NewMessage{
-				Text: "Чтобы отправить заявку, нужно ваше согласие на обработку персональных данных. " +
-					"Соседи увидят только число сообщивших, имя получит только управляющая компания. Данные хранятся в России.",
-				Attachments: []maxapi.Attachment{maxapi.Keyboard([]maxapi.Button{maxapi.CallbackButton("Согласен", pack(cbConsent, cb.Payload))})},
-			}
-			return maxapi.CallbackAnswer{Message: &m}, nil
+			return consentAnswer("Чтобы отправить заявку, нужно ваше согласие на обработку персональных данных. "+
+				"Соседи увидят только число сообщивших, имя получит только управляющая компания.", cb.Payload), nil
 		}
 		if kind == cbJoin {
 			return h.join(ctx, u, rest)
@@ -536,11 +495,13 @@ func (h *Handler) report(ctx context.Context, u user.User, category, objectID, d
 	if err != nil {
 		return maxapi.CallbackAnswer{}, err
 	}
-	m := maxapi.NewMessage{Text: fmt.Sprintf("Заявка № %d отправлена в УК. Карточка со статусом придёт следующим сообщением и будет обновляться.", is.Number())}
+	text := fmt.Sprintf("Заявка № %d отправлена в УК. Карточка со статусом придёт следующим сообщением и будет обновляться.", is.Number())
+	var rows [][]maxapi.Button
 	if !u.PhoneShared() {
-		m.Text += "\n\nЕсли мастеру нужно попасть в квартиру, оставьте телефон: его увидит только УК, соседи номер не видят."
-		m.Attachments = []maxapi.Attachment{maxapi.Keyboard([]maxapi.Button{maxapi.ContactButton("Оставить телефон для мастера")})}
+		text += "\n\nЕсли мастеру нужно попасть в квартиру, оставьте телефон: его увидит только УК, соседи номер не видят."
+		rows = append(rows, []maxapi.Button{maxapi.ContactButton("Оставить телефон для мастера")})
 	}
+	m := maxapi.NewMessage{Text: text, Attachments: []maxapi.Attachment{maxapi.Keyboard(append(rows, menuRow())...)}}
 	return maxapi.CallbackAnswer{Message: &m}, nil
 }
 
@@ -559,102 +520,112 @@ func (h *Handler) join(ctx context.Context, u user.User, issueID string) (maxapi
 	return replace(fmt.Sprintf("Вы присоединились к заявке № %d. Карточка со статусом придёт следующим сообщением.", is.Number())), nil
 }
 
-func (h *Handler) switchRole(ctx context.Context, to maxapi.Target, from maxapi.User, arg string) error {
-	u, err := h.resident(ctx, from)
+// applyRole меняет роль для проверки на демо-стенде (ADR-017). text — что ответить;
+// пустой text — роль не распознана, нужно показать выбор.
+func (h *Handler) applyRole(ctx context.Context, u user.User, arg string) (user.User, string, error) {
+	if !h.svc.DemoRoles {
+		return u, "Смена роли работает только на демо-стенде для проверки. Ваша роль: житель.", nil
+	}
+	var role, text string
+	switch strings.ToLower(strings.TrimSpace(arg)) {
+	case "chairman", "председатель":
+		if u.HouseID == "" {
+			return u, "Сначала выберите свой дом: председателем становятся в совете своего дома.", nil
+		}
+		role, text = "chairman", "Роль для проверки: председатель совета дома. Предложения соседей приходят вам с кнопками ответа."
+	case "uk", "operator", "ук", "оператор":
+		role, text = "uk_operator", "Роль для проверки: сотрудник управляющей компании. Очередь и смена статусов доступны прямо в чате."
+	case "district", "район", "управа":
+		role, text = "district", "Роль для проверки: управа района."
+	case "resident", "житель":
+		role, text = "resident", "Роль сброшена: обычный житель дома."
+	default:
+		return u, "", nil
+	}
+	u, err := h.svc.Auth.SwitchRole(ctx, u, role)
+	return u, text, err
+}
+
+// roleCommand — /role [роль]: без аргумента выбор кнопками, с ролью сразу меню новой роли.
+func (h *Handler) roleCommand(ctx context.Context, to maxapi.Target, u user.User, arg string) error {
+	u, text, err := h.applyRole(ctx, u, arg)
 	if err != nil {
 		return err
 	}
-	arg = strings.ToLower(strings.TrimSpace(arg))
-	if !h.svc.DemoRoles {
-		return h.send(ctx, to, "Смена роли работает только на демо-стенде для проверки. Ваша роль: житель.")
+	switch {
+	case text == "":
+		return h.sendScreen(ctx, to, u, scrRole, "")
+	case !h.svc.DemoRoles:
+		return h.send(ctx, to, text)
 	}
-	switch arg {
-	case "chairman", "председатель":
-		if u.HouseID == "" {
-			return h.send(ctx, to, "Сначала выберите свой дом в /menu или отправьте геопозицию, чтобы стать председателем своего дома.")
-		}
-		if _, err := h.svc.Auth.SwitchRole(ctx, u, "chairman"); err != nil {
-			return err
-		}
-		return h.send(ctx, to, "Вам назначена роль: Председатель совета дома.\n\nТеперь в меню /polls вам доступна «Папка предложений», а при поступлении идей от соседей бот будет присылать их вам с кнопками ответа.")
-	case "uk", "operator", "ук", "оператор":
-		if _, err := h.svc.Auth.SwitchRole(ctx, u, "uk_operator"); err != nil {
-			return err
-		}
-		return h.sendKeyboard(ctx, to, "Вам назначена роль: Сотрудник управляющей компании.\n\nОткройте мини-приложение, чтобы увидеть очередь заявок домов и дашборд метрик.", []maxapi.Button{
-			maxapi.OpenAppButton("Открыть кабинет УК", h.botName, ""),
-		})
-	case "district", "район", "управа":
-		u, err := h.svc.Auth.SwitchRole(ctx, u, "district")
-		if err != nil {
-			return err
-		}
-		return h.sendKeyboard(ctx, to, fmt.Sprintf("Вам назначена роль: Управа района (%s).\n\nОткройте мини-приложение, чтобы увидеть сравнение УК района и просроченные заявки.", u.District), []maxapi.Button{
-			maxapi.OpenAppButton("Открыть кабинет района", h.botName, ""),
-		})
-	case "resident", "житель":
-		if _, err := h.svc.Auth.SwitchRole(ctx, u, "resident"); err != nil {
-			return err
-		}
-		return h.send(ctx, to, "Роль сброшена: обычный житель дома.")
-	default:
-		current := "житель"
-		switch {
-		case u.Role == user.RoleOperator:
-			current = "сотрудник управляющей компании"
-		case u.Role == user.RoleDistrict:
-			current = "управа района"
-		case u.ChairmanHouseID != "":
-			current = "председатель совета дома"
-		}
-		msg := fmt.Sprintf("Ваша текущая роль: %s.\n\nВыберите роль для переключения:", current)
-		_, err := h.max.Send(ctx, to, maxapi.NewMessage{
-			Text: msg,
-			Attachments: []maxapi.Attachment{maxapi.Keyboard(
-				[]maxapi.Button{maxapi.CallbackButton("Стать председателем", pack(cbRole, "chairman")), maxapi.CallbackButton("Стать сотрудником УК", pack(cbRole, "uk"))},
-				[]maxapi.Button{maxapi.CallbackButton("Управа района", pack(cbRole, "district")), maxapi.CallbackButton("Обычный житель", pack(cbRole, "resident"))},
-			)},
-		})
+	m, err := h.homeScreen(ctx, u)
+	if err != nil {
 		return err
 	}
+	m.Text = text + "\n\n" + m.Text
+	_, err = h.max.Send(ctx, to, m)
+	return err
 }
 
-func (h *Handler) onRoleCallback(ctx context.Context, from maxapi.User, role string) (maxapi.CallbackAnswer, error) {
-	to := maxapi.ToUser(from.UserID)
-	if err := h.switchRole(ctx, to, from, role); err != nil {
+func (h *Handler) onRoleCallback(ctx context.Context, u user.User, role string) (maxapi.CallbackAnswer, error) {
+	u, text, err := h.applyRole(ctx, u, role)
+	if err != nil {
 		return maxapi.CallbackAnswer{}, err
 	}
-	return maxapi.CallbackAnswer{Notification: "Роль изменена"}, nil
+	if text == "" {
+		return h.openScreen(ctx, u, scrRole)
+	}
+	m, err := h.homeScreen(ctx, u)
+	if err != nil {
+		return maxapi.CallbackAnswer{}, err
+	}
+	m.Text = text + "\n\n" + m.Text
+	return maxapi.CallbackAnswer{Message: &m, Notification: "Роль изменена"}, nil
 }
 
 // payloadGeo — диплинк ?start=geo из мини-приложения: в WebView MAX нет геолокации,
 // поэтому дом рядом выбирается кнопкой геопозиции в чате с ботом.
 const payloadGeo = "geo"
 
-func (h *Handler) greet(ctx context.Context, to maxapi.Target, startPayload string) error {
+// greet — приветствие с меню по роли. Диплинк с payload ведёт сразу в приложение.
+func (h *Handler) greet(ctx context.Context, to maxapi.Target, from maxapi.User, startPayload string) error {
 	if startPayload == payloadGeo {
 		return h.askHouse(ctx, to)
 	}
-	_, err := h.max.Send(ctx, to, maxapi.NewMessage{
-		Text:        greetingText,
-		Attachments: []maxapi.Attachment{greetKeyboard(h.botName, startPayload)},
-	})
+	if startPayload != "" {
+		_, err := h.max.Send(ctx, to, screenMsg(greetingText,
+			[]maxapi.Button{maxapi.OpenAppButton("Открыть приложение", h.botName, startPayload)},
+			menuRow(),
+		))
+		return err
+	}
+	u, err := h.resident(ctx, from)
+	if err != nil {
+		return err
+	}
+	m, err := h.homeScreen(ctx, u)
+	if err != nil {
+		return err
+	}
+	m.Text = greetingText + "\n\n" + m.Text
+	_, err = h.max.Send(ctx, to, m)
 	return err
 }
 
+// send отвечает текстом. Кнопка «Меню» под ответом возвращает к навигации, не листая чат вверх.
 func (h *Handler) send(ctx context.Context, to maxapi.Target, text string) error {
-	_, err := h.max.Send(ctx, to, maxapi.NewMessage{Text: text})
+	_, err := h.max.Send(ctx, to, maxapi.NewMessage{Text: text, Attachments: []maxapi.Attachment{maxapi.Keyboard(menuRow())}})
 	return err
 }
 
 func (h *Handler) sendKeyboard(ctx context.Context, to maxapi.Target, text string, row []maxapi.Button) error {
-	_, err := h.max.Send(ctx, to, maxapi.NewMessage{Text: text, Attachments: []maxapi.Attachment{maxapi.Keyboard(row)}})
+	_, err := h.max.Send(ctx, to, maxapi.NewMessage{Text: text, Attachments: []maxapi.Attachment{maxapi.Keyboard(row, menuRow())}})
 	return err
 }
 
-// replace — ответ на нажатие, который заменяет сообщение и убирает его кнопки.
+// replace — ответ на нажатие, который заменяет сообщение текстом с одной кнопкой «Меню».
 func replace(text string) maxapi.CallbackAnswer {
-	return maxapi.CallbackAnswer{Message: &maxapi.NewMessage{Text: text, Attachments: []maxapi.Attachment{}}}
+	return maxapi.CallbackAnswer{Message: &maxapi.NewMessage{Text: text, Attachments: []maxapi.Attachment{maxapi.Keyboard(menuRow())}}}
 }
 
 // pack собирает payload кнопки; последний параметр может содержать двоеточия.
