@@ -15,6 +15,8 @@ export interface User {
   consent_version: string;
   /** Житель оставил телефон для мастера; сам номер не приходит. */
   phone_shared: boolean;
+  /** Житель председатель совета своего дома: у него есть папка предложений. */
+  chairman?: boolean;
 }
 
 /** Участник заявки, оставивший телефон; видит только сотрудник ответственной УК. */
@@ -46,6 +48,31 @@ export interface Organization {
   phone_dispatcher?: string;
   phone_emergency?: string;
   schedule?: string;
+}
+
+export type ProposalStatus = 'new' | 'accepted' | 'declined';
+
+/** Предложение председателю совета. Автора нет в ответе ни для кого. */
+export interface Proposal {
+  id: string;
+  text: string;
+  status: ProposalStatus;
+  answer?: string;
+  created_at: string;
+  answered_at?: string;
+}
+
+/** Опрос дома без юридической силы; my_vote — номер варианта жителя или null. */
+export interface Poll {
+  id: string;
+  proposal_id?: string;
+  question: string;
+  options: { text: string; votes: number }[];
+  total: number;
+  my_vote: number | null;
+  open: boolean;
+  created_at: string;
+  closes_at: string;
 }
 
 /** Адрес точки по данным OpenStreetMap; без адреса геокодер выключен или ничего не нашёл. */

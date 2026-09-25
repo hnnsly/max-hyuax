@@ -9,9 +9,10 @@ import { bridge } from '../shared/bridge/bridge';
 import { capitalize, plural } from '../shared/lib/format';
 import { houseOpenIssues, parseStartParam } from '../shared/lib/model';
 import { IssueList } from '../shared/ui/IssueRow';
-import { DemoMark, EmptyState, ErrorState, Facts, Island, Loading, Screen, Section } from '../shared/ui/Layout';
+import { DemoMark, EmptyState, ErrorState, Facts, Island, Loading, Screen, Section, useToast } from '../shared/ui/Layout';
 import { HousePlate } from '../shared/ui/Plate';
 import { Sheet } from '../shared/ui/Sheet';
+import { HouseCouncil } from './Council';
 import s from './pages.module.css';
 
 /** Главный экран жителя: табличка дома, УК, открытые проблемы дома, мои заявки. */
@@ -19,6 +20,7 @@ export function Home() {
   const user = useUser();
   const { push } = useRouter();
   const [deleting, setDeleting] = useState(false); // открыт лист удаления аккаунта
+  const [toast, showToast] = useToast();
   const houseId = user.house_id ?? '';
   const res = useResource(async () => {
     const [house, issues, mine] = await Promise.all([api.house(houseId), api.houseIssues(houseId), api.myIssues()]);
@@ -103,6 +105,8 @@ export function Home() {
         <EmptyState title="В доме нет открытых проблем" text="Если что-то сломалось, сообщите. Соседи увидят заявку и смогут присоединиться." />
       )}
 
+      <HouseCouncil onToast={showToast} />
+
       <CellList mode="island">
         <CellSimple title="Мои заявки" showChevron after={mine.length > 0 && <Counter value={mine.length} rounded />} onClick={() => push({ name: 'mine' })} />
         <CellSimple title="Другой дом" showChevron onClick={() => push({ name: 'houseSearch' })} />
@@ -111,6 +115,7 @@ export function Home() {
         Удалить аккаунт
       </button>
       <DeleteAccountSheet open={deleting} onClose={() => setDeleting(false)} />
+      {toast}
     </Screen>
   );
 }

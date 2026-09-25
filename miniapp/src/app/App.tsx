@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import type { User } from '../shared/api/types';
 import { parseStartParam } from '../shared/lib/model';
 import { ErrorState, Screen } from '../shared/ui/Layout';
+import { CouncilFolder } from '../pages/Council'; // папка председателя совета (ADR-017)
 import { District } from '../pages/District';
 import { Home } from '../pages/Home';
 import { IssueCard } from '../pages/IssueCard';
@@ -73,6 +74,8 @@ function Pages() {
       return <UkQueue />;
     case 'district':
       return <District />;
+    case 'council':
+      return <CouncilFolder />;
   }
 }
 

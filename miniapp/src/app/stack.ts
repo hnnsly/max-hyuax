@@ -9,7 +9,8 @@ export type Route =
   | { name: 'report'; objectCode?: string; category?: string }
   | { name: 'consent' }
   | { name: 'uk' }
-  | { name: 'district' };
+  | { name: 'district' }
+  | { name: 'council' };
 
 export type StackAction = { type: 'push'; route: Route } | { type: 'back' } | { type: 'reset'; routes: Route[] };
 

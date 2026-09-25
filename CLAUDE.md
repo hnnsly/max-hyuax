@@ -5,6 +5,7 @@
 **Статус (25.09.2026):**
 - План спайка выполнен: к ядру добавлены просрочка, метрики УК, QR-наклейки, удаление аккаунта, подсказка категории (правила + Ollama), PDF-обращение в жилинспекцию, фото к заявке и материалы к сдаче (README, DATA-API.yaml, запуск одной командой).
 - По GEN_V2 сделаны части 0–5: ревью и UX-проход, подтверждение ремонта жителями, телефон для мастера (`requestContact`), кабинет района (ADR-017).
+- 25.09, вторая сессия: фото в MinIO (ADR-018), часть 6 — импорт домов из CSV и геокодер Nominatim (ADR-016), часть 7 — совет дома: предложения председателю и опросы (ADR-017).
 - Нужны деплой и проверка в MAX.
 - Сдача 30.09, заморозка кода 29.09 днём.
 
@@ -99,7 +100,7 @@ docs/                   документация продукта (ведётс�
 - **Go:** версия 1.27.1. Перед правкой Go-файла — скилл `modern-go-guidelines:use-modern-go` (`list --go-version 1.27`), после правок — диагностика gopls.
 - **Бот:** свой тонкий клиент `internal/storage/maxapi` (около 6 методов). SDK `max-bot-api-client-go` — только если он поддерживает `platform-api2` без обходных путей.
 - **LLM:** Ollama self-hosted, профиль compose `llm` (ADR-008).
-- **Auth:** `initData` → HMAC + TTL → сессия; демо-роли `resident`, `resident_2`, `uk_operator`, `district` через `POST /api/v1/auth/demo` при `DEMO_AUTH_ENABLED=true` (ADR-004, ADR-017).
+- **Auth:** `initData` → HMAC + TTL → сессия; демо-роли `resident`, `resident_2`, `chairman`, `uk_operator`, `district` через `POST /api/v1/auth/demo` при `DEMO_AUTH_ENABLED=true` (ADR-004, ADR-017).
 - **Хостинг:** российский VPS + Caddy TLS (ADR-005).
 
 ## Команды
@@ -117,7 +118,7 @@ docs/                   документация продукта (ведётс�
 - `task sqlc` — перегенерировать код запросов после правки `queries/*.sql` или миграций;
 - `task up` / `task down` / `task logs -- api` — весь стек в compose;
 - `task miniapp:install` — зависимости мини-приложения (`npm ci`);
-- `task miniapp:dev` — мини-приложение на `:5173`, `/api` проксируется на `task run`; открыть `http://localhost:5173/?demo=resident` (`resident_2`, `uk`, `district`), тема `&theme=dark`;
+- `task miniapp:dev` — мини-приложение на `:5173`, `/api` проксируется на `task run`; открыть `http://localhost:5173/?demo=resident` (`resident_2`, `chairman`, `uk`, `district`), тема `&theme=dark`;
 - `task miniapp:test` / `task miniapp:typecheck` / `task miniapp:build` — Vitest, TypeScript, сборка в `miniapp/dist`;
 - превью для агента: `.claude/launch.json`, конфигурации `api` и `miniapp`; если `:8080` занят — `api-8081` и `miniapp-8081` (прокси Vite берёт адрес из `API_PROXY`).
 

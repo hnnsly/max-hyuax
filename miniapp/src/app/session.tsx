@@ -13,6 +13,7 @@ type State =
 export const demoRoles = {
   resident: 'Житель',
   resident_2: 'Сосед',
+  chairman: 'Председатель совета',
   uk_operator: 'Сотрудник УК',
   district: 'Управа района',
 } as const;

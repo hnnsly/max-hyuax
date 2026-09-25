@@ -1,6 +1,6 @@
 // Клиент API: JSON, токен сессии, единый формат ошибок {"error": {"code", "message"}}.
 import type {
-  AppealLink, Category, CategoryHint, DistrictMetrics, GeoPlace, House, HouseDetails, Issue, IssueEvent, AssetObject, Photo, ReportInput, Session, Status, UkMetrics, User,
+  AppealLink, Category, CategoryHint, DistrictMetrics, GeoPlace, House, HouseDetails, Issue, IssueEvent, AssetObject, Photo, Poll, Proposal, ReportInput, Session, Status, UkMetrics, User,
 } from './types';
 
 export class ApiError extends Error {
@@ -74,6 +74,16 @@ export const api = {
   sharePhone: (c: { phone: string; auth_date: string; hash: string }) => request<User>('POST', '/me/phone', c),
   districtMetrics: () => request<DistrictMetrics>('GET', '/district/metrics'),
   districtOverdue: () => request<Issue[]>('GET', '/district/overdue'),
+
+  // Совет дома
+  propose: (text: string) => request<Proposal>('POST', '/proposals', { text }),
+  myProposals: () => request<Proposal[]>('GET', '/me/proposals'),
+  councilFolder: () => request<Proposal[]>('GET', '/council/proposals'),
+  replyProposal: (id: string, status: 'accepted' | 'declined', answer: string) =>
+    request<Proposal>('POST', `/council/proposals/${encodeURIComponent(id)}/reply`, { status, answer }),
+  createPoll: (input: { proposal_id?: string; question: string; options: string[]; days?: number }) => request<Poll>('POST', '/council/polls', input),
+  polls: () => request<Poll[]>('GET', '/polls'),
+  vote: (pollId: string, option: number) => request<Poll>('POST', `/polls/${encodeURIComponent(pollId)}/vote`, { option }),
   hidePhone: () => request<User>('DELETE', '/me/phone'),
   myIssues: () => request<Issue[]>('GET', '/me/issues'),
   categories: () => request<Category[]>('GET', '/categories'),

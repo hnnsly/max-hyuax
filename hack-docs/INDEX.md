@@ -102,7 +102,7 @@ tags: [index, hub]
 | [adr/015-photo-storage.md](adr/015-photo-storage.md) | фото к заявке: порт FileStore, перекодирование без EXIF, доступ участникам и УК; хранение заменено ADR-018 | superseded | 2026-09-24 |
 | [adr/016-geocoder-and-open-data.md](adr/016-geocoder-and-open-data.md) | геокодер Nominatim по HTTP (GPL не касается кода), атрибуция ODbL, 1 запрос/с и кэш, только результат уровня дома; импорт реестра из CSV | accepted | 2026-09-25 |
 | [adr/018-photos-in-minio.md](adr/018-photos-in-minio.md) | фото в MinIO по S3 API (`minio-go`), образ `coollabsio/minio`, AGPL сервера не касается кода, диск запасной | accepted | 2026-09-25 |
-| [adr/017-district-and-chairman-roles.md](adr/017-district-and-chairman-roles.md) | роль района (только чтение, сравнение УК) и роль председателя совета | accepted | 2026-09-25 |
+| [adr/017-district-and-chairman-roles.md](adr/017-district-and-chairman-roles.md) | роль района (только чтение, сравнение УК) и роль председателя совета: предложения без имени автора, опросы без юридической силы | accepted | 2026-09-25 |
 | [HANDOFF.md](HANDOFF.md) | заметка передачи: кто в работе, что сделано, следующий шаг | active | 2026-09-25 |
 | [design/canvas-v2/project/](design/canvas-v2/project/canvas.json) | утверждённый дизайн v2: 12 артбордов (житель, УК, бот, наклейка, тёмная тема, разбор системы) | accepted | 2026-09-23 |
 

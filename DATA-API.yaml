@@ -24,6 +24,7 @@ auth:
     resident: житель дома «Ореховый бульвар, 17к2»
     resident_2: сосед из того же дома
     uk_operator: сотрудник УК «Ореховый квартал»
+    chairman: председатель совета дома «Ореховый бульвар, 17к2»
     district: управа района Зябликово (только чтение)
 
 checks:
@@ -210,6 +211,28 @@ checks:
       required_fields: [first_response_median_min, prev_week_median_min, first_response_by_day, period_days,
         issues_total, reports_per_issue, closed_total, closed_on_time, confirmed_by_residents, reopened_by_residents,
         open_total, overdue_open, sample_data]
+
+  - id: house_polls
+    name: Опросы дома с итогами
+    method: GET
+    path: /polls
+    role: resident
+    expect:
+      status: [200]
+      content_type: application/json
+      body: array
+      required_fields: ["[].id", "[].question", "[].options", "[].total", "[].open", "[].closes_at"]
+
+  - id: council_folder
+    name: Папка предложений председателя без авторов
+    method: GET
+    path: /council/proposals
+    role: chairman
+    expect:
+      status: [200]
+      content_type: application/json
+      body: array
+      required_fields: ["[].id", "[].text", "[].status", "[].created_at"]
 
   - id: district_metrics
     name: Кабинет района сравнивает УК

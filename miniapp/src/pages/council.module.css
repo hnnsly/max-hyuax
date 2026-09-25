@@ -1,0 +1,117 @@
+/* Совет дома: опросы и предложения (ADR-017). Токены — hack-docs/design/tokens.css. */
+
+.poll {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px 16px;
+}
+.question {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+.meta {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-3);
+}
+
+/* Выбор варианта: вся строка — зона нажатия не меньше 44 px */
+.options {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+.option {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+/* Итоги: полоса доли, узкие цифры как в метриках */
+.result {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 12px;
+  align-items: baseline;
+  font-size: 15px;
+}
+.resultShare {
+  font-family: var(--font-cond);
+  font-size: 17px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.track {
+  grid-column: 1 / -1;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--control);
+  overflow: hidden;
+}
+.results {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.fill {
+  display: block;
+  height: 100%;
+  background: var(--text-3);
+}
+.leader .fill { background: var(--enamel); }
+.mine {
+  color: var(--enamel);
+  font-weight: 600;
+}
+
+/* Предложение в списке */
+.proposal {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 14px 16px;
+}
+.proposal + .proposal { border-top: 1px solid var(--separator, var(--control)); }
+.proposalText {
+  margin: 0;
+  font-size: 16px;
+  line-height: 1.4;
+  overflow-wrap: anywhere;
+}
+.status {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-2);
+}
+.statusNew { color: var(--enamel); }
+.answer {
+  margin: 0;
+  padding-left: 10px;
+  border-left: 3px solid var(--control);
+  font-size: 15px;
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+.actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}

@@ -20,6 +20,8 @@ tags:
   - name: issues
   - name: uk
   - name: district
+  - name: council
+    description: Совет дома — предложения председателю и опросы без юридической силы
 
 paths:
   /health:
@@ -74,7 +76,7 @@ paths:
               properties:
                 role:
                   type: string
-                  enum: [resident, resident_2, uk_operator, district]
+                  enum: [resident, resident_2, chairman, uk_operator, district]
                   description: resident и resident_2 — два соседа из одного дома, uk_operator — сотрудник УК
       responses:
         "200": { $ref: "#/components/responses/Session" }
@@ -655,6 +657,122 @@ paths:
         "401": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
 
+  /proposals:
+    post:
+      tags: [council]
+      summary: Предложение председателю совета своего дома
+      description: Только житель с домом и согласием. Председатель увидит текст без имени автора.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [text]
+              properties:
+                text: { type: string, minLength: 10, maxLength: 1000 }
+      responses:
+        "201": { description: Предложение, content: { application/json: { schema: { $ref: "#/components/schemas/Proposal" } } } }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "422": { $ref: "#/components/responses/Error" }
+
+  /me/proposals:
+    get:
+      tags: [council]
+      summary: Мои предложения с ответами председателя
+      responses:
+        "200": { description: Свежие первыми, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Proposal" } } } } }
+        "401": { $ref: "#/components/responses/Error" }
+
+  /council/proposals:
+    get:
+      tags: [council]
+      summary: Папка председателя
+      description: Предложения его дома без авторов, новые первыми. Остальным ролям 403.
+      responses:
+        "200": { description: Предложения, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Proposal" } } } } }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+
+  /council/proposals/{id}/reply:
+    post:
+      tags: [council]
+      summary: Ответ председателя на предложение
+      description: Один раз. Отклонить можно только с ответом. Чужое предложение даёт 404.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [status]
+              properties:
+                status: { type: string, enum: [accepted, declined] }
+                answer: { type: string, maxLength: 1000 }
+      responses:
+        "200": { description: Предложение с ответом, content: { application/json: { schema: { $ref: "#/components/schemas/Proposal" } } } }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+        "422": { $ref: "#/components/responses/Error" }
+
+  /council/polls:
+    post:
+      tags: [council]
+      summary: Опрос жителей дома без юридической силы
+      description: Только председатель. Из предложения своего дома или без него.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [question, options]
+              properties:
+                proposal_id: { type: string, format: uuid }
+                question: { type: string, minLength: 5, maxLength: 300 }
+                options: { type: array, minItems: 2, maxItems: 5, items: { type: string, maxLength: 100 } }
+                days: { type: integer, minimum: 1, maximum: 14, default: 7 }
+      responses:
+        "201": { description: Опрос, content: { application/json: { schema: { $ref: "#/components/schemas/Poll" } } } }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "422": { $ref: "#/components/responses/Error" }
+
+  /polls:
+    get:
+      tags: [council]
+      summary: Опросы моего дома с итогами
+      responses:
+        "200": { description: Свежие первыми, content: { application/json: { schema: { type: array, items: { $ref: "#/components/schemas/Poll" } } } } }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+
+  /polls/{id}/vote:
+    post:
+      tags: [council]
+      summary: Голос в опросе своего дома
+      description: Один голос на жителя, переголосовать нельзя.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [option]
+              properties:
+                option: { type: integer, minimum: 0, description: Номер варианта с нуля }
+      responses:
+        "200": { description: Опрос с итогами, content: { application/json: { schema: { $ref: "#/components/schemas/Poll" } } } }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+        "422": { $ref: "#/components/responses/Error" }
+
   /district/metrics:
     get:
       tags: [district]
@@ -800,9 +918,35 @@ components:
               type: string
               enum: [unauthorized, consent_required, forbidden, not_found, already_joined, issue_closed,
                      invalid_transition, not_overdue, too_many_photos, not_done, window_closed, already_answered,
+                     already_voted, poll_closed,
                      photo_too_large, unsupported_media, reason_required, comment_required, invalid_contact,
                      invalid_input, http_error, internal]
             message: { type: string, description: Текст для показа жителю }
+
+    Proposal:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        text: { type: string }
+        status: { type: string, enum: [new, accepted, declined] }
+        answer: { type: string }
+        created_at: { type: string, format: date-time }
+        answered_at: { type: string, format: date-time }
+
+    Poll:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        proposal_id: { type: string, format: uuid }
+        question: { type: string }
+        options:
+          type: array
+          items: { type: object, properties: { text: { type: string }, votes: { type: integer } } }
+        total: { type: integer }
+        my_vote: { type: [integer, "null"], description: Номер варианта жителя, null — не голосовал }
+        open: { type: boolean }
+        created_at: { type: string, format: date-time }
+        closes_at: { type: string, format: date-time }
 
     User:
       type: object
@@ -811,6 +955,7 @@ components:
         first_name: { type: string }
         role: { type: string, enum: [resident, uk_operator, district] }
         district: { type: string, description: Для роли district — какой район пользователь смотрит }
+        chairman: { type: boolean, description: Житель председатель совета своего дома; поле есть только со значением true }
         house_id: { type: string }
         organization_id: { type: string }
         has_consent: { type: boolean }

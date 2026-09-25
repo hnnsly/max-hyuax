@@ -39,6 +39,7 @@ curl -X POST https://<домен>/api/v1/auth/demo -H "Content-Type: application
 11. **Проверить ремонт:** участник выполненной заявки в течение 7 дней отправляет `POST /issues/{id}/confirm` («починили») или `POST /issues/{id}/reopen` с телом `{"comment":"На третьем этаже темно"}` («не починили»). В карточке заявки поля `confirmed_count`, `my_answer`, `answer_until` и `reopened_at`.
 12. **Телефон для мастера:** житель, вошедший через MAX, отправляет `POST /me/phone` с полями `phone`, `auth_date` и `hash` из `WebApp.requestContact()`. `DELETE /me/phone` убирает номер. Демо-пользователю `403`. Номер виден только сотруднику ответственной УК в поле `contacts` карточки `GET /issues/{id}`.
 13. **Кабинет района:** с токеном `district` `GET /district/metrics` сравнивает УК района (первый ответ, открыто, просрочено, закрыто в срок, проверка жителями), `GET /district/overdue` отдаёт просроченные заявки района с адресами. Другим ролям `403`.
+14. **Совет дома:** `POST /proposals`, `GET /me/proposals`, `GET /polls`, `POST /polls/{id}/vote`; председатель: `GET /council/proposals`, `POST /council/proposals/{id}/reply`, `POST /council/polls`. Коды `already_voted` и `poll_closed` приходят с 409.
 
 ## Ошибки
 
