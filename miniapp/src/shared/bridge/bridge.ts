@@ -100,6 +100,19 @@ export const bridge = {
   scan: async () => (await wa()!.openCodeReader!(false)).value,
 
   /**
+   * Открыть ссылку max.ru внутри MAX (dev-max/docs/webapps/bridge.md, openMaxLink): например, чат с ботом.
+   * В браузере — новая вкладка.
+   */
+  openMaxLink(url: string): void {
+    const w = wa();
+    if (w?.initData && w.openMaxLink) {
+      w.openMaxLink(url);
+      return;
+    }
+    window.open(url, '_blank', 'noopener');
+  },
+
+  /**
    * Поделиться в чат MAX. Внутри MAX — нативный выбор чата, в браузере — ссылка на шеринг MAX.
    * Вызывать только из обработчика нажатия.
    */

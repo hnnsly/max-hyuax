@@ -148,6 +148,8 @@ func (h *Handler) onMessage(ctx context.Context, m *maxapi.Message) error {
 			return h.councilMenu(ctx, to, m.Sender)
 		case "role":
 			return h.switchRole(ctx, to, m.Sender, arg)
+		case "start":
+			return h.greet(ctx, to, arg)
 		}
 		return h.greet(ctx, to, "")
 	}
@@ -436,7 +438,8 @@ func (h *Handler) callbackReply(ctx context.Context, cb *maxapi.Callback) (maxap
 			return maxapi.CallbackAnswer{}, err
 		}
 		m := maxapi.NewMessage{
-			Text:        fmt.Sprintf("Дом сохранён: %s.\nТеперь опишите проблему одним сообщением: что сломалось и где. Или выберите действие:", d.House.Address),
+			Text: fmt.Sprintf("Дом сохранён: %s.\nЕсли вы пришли из приложения, вернитесь в него: дом уже выбран.\n"+
+				"Здесь можно описать проблему одним сообщением или выбрать действие:", d.House.Address),
 			Attachments: []maxapi.Attachment{menuKeyboard(h.botName)},
 		}
 		return maxapi.CallbackAnswer{Message: &m}, nil
@@ -624,7 +627,14 @@ func (h *Handler) onRoleCallback(ctx context.Context, from maxapi.User, role str
 	return maxapi.CallbackAnswer{Notification: "Роль изменена"}, nil
 }
 
+// payloadGeo — диплинк ?start=geo из мини-приложения: в WebView MAX нет геолокации,
+// поэтому дом рядом выбирается кнопкой геопозиции в чате с ботом.
+const payloadGeo = "geo"
+
 func (h *Handler) greet(ctx context.Context, to maxapi.Target, startPayload string) error {
+	if startPayload == payloadGeo {
+		return h.askHouse(ctx, to)
+	}
 	_, err := h.max.Send(ctx, to, maxapi.NewMessage{
 		Text:        greetingText,
 		Attachments: []maxapi.Attachment{greetKeyboard(h.botName, startPayload)},

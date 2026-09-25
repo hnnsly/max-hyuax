@@ -27,6 +27,25 @@ export function HouseSearch() {
   const [place, setPlace] = useState<GeoPlace | null>(null);
   const [error, setError] = useState('');
   const [toast, showToast] = useToast();
+  const startHouse = useUser().house_id;
+
+  // Житель мог выбрать дом в чате с ботом (геопозицией): при возврате в приложение подхватываем его.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible') return;
+      api.me().then(
+        (u) => {
+          if (u.house_id && u.house_id !== startHouse) {
+            setUser(u);
+            reset({ name: 'home' });
+          }
+        },
+        () => {},
+      );
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [startHouse, setUser, reset]);
 
   useEffect(() => {
     const q = query.trim();
@@ -54,9 +73,17 @@ export function HouseSearch() {
     };
   }, [query]);
 
+  // В WebView MAX геолокации обычно нет, а в Bridge её нет совсем (dev-max/docs/webapps/bridge.md):
+  // тогда дома рядом выбираются кнопкой геопозиции в чате с ботом, дом подхватится при возврате.
+  const viaBot = () => {
+    bridge.openMaxLink(`https://max.ru/${BOT_NAME}?start=geo`);
+    showToast('Отправьте геопозицию в чате с ботом и выберите дом, затем вернитесь сюда');
+  };
+
   const nearby = () => {
     if (!('geolocation' in navigator)) {
-      showToast('Геопозиция не поддерживается вашим браузером. Введите адрес');
+      if (bridge.inMax()) viaBot();
+      else showToast('Геопозиция не поддерживается вашим браузером. Введите адрес');
       return;
     }
     navigator.geolocation.getCurrentPosition(
@@ -74,13 +101,18 @@ export function HouseSearch() {
         api.reverseGeocode(latitude, longitude).then(setPlace, () => setPlace(null));
       },
       (err) => {
+        if (bridge.inMax()) {
+          viaBot();
+          return;
+        }
         if (err.code === 1) {
           showToast('Доступ к геопозиции заблокирован. Разрешите его в настройках браузера или введите адрес');
         } else {
           showToast('Не удалось определить координаты. Введите адрес вручную');
         }
       },
-      { timeout: 15_000, enableHighAccuracy: true },
+      // В MAX долго не ждём: если геопозиции нет, сразу переходим в чат с ботом.
+      { timeout: bridge.inMax() ? 6_000 : 15_000, enableHighAccuracy: true },
     );
   };
 

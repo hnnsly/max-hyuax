@@ -220,7 +220,7 @@ func TestWithoutHouseBotAsksLocationThenBindsHouse(t *testing.T) {
 	if err != nil || u.HouseID != "h-1" {
 		t.Fatalf("user = %+v, err = %v", u, err)
 	}
-	if txt, _ := e.max.last("cb1"); !strings.Contains(txt, "опишите проблему") {
+	if txt, _ := e.max.last("cb1"); !strings.Contains(txt, "Дом сохранён") || !strings.Contains(txt, "описать проблему") {
 		t.Fatalf("after house = %q", txt)
 	}
 }
@@ -799,5 +799,18 @@ func TestRoleSwitchOnlyOnDemoStand(t *testing.T) {
 	}
 	if got, _ := e.store.Users().Get(t.Context(), u.ID); got.Role != user.RoleResident {
 		t.Fatalf("role changed outside demo: %+v", got)
+	}
+}
+
+// Диплинк ?start=geo из мини-приложения сразу просит геопозицию: в WebView MAX её нет.
+func TestStartGeoAsksLocation(t *testing.T) {
+	e := newEnv(t)
+	e.handle(t, maxapi.Update{Type: maxapi.UpdateBotStarted, ChatID: 7, User: maxapi.User{UserID: 9201}, Payload: "geo"})
+	if _, bs := e.max.last(""); findButton(t, bs, "Показать дома рядом").Type != "request_geo_location" {
+		t.Fatalf("start=geo buttons = %+v", bs)
+	}
+	e.handle(t, text(9201, "/start geo"))
+	if _, bs := e.max.last(""); findButton(t, bs, "Показать дома рядом").Type != "request_geo_location" {
+		t.Fatalf("/start geo buttons = %+v", bs)
 	}
 }
