@@ -10,6 +10,7 @@ import (
 	"dommax/internal/app"
 	"dommax/internal/app/apptest"
 	"dommax/internal/app/cards"
+	"dommax/internal/domain/council"
 	"dommax/internal/domain/house"
 	"dommax/internal/domain/issue"
 	"dommax/internal/domain/user"
@@ -76,6 +77,7 @@ type sent struct {
 }
 
 type fakeMessenger struct {
+	council []string // «вид:id предложения» отправленных сообщений совета
 	calls   []sent
 	editErr error
 }
@@ -89,6 +91,11 @@ func (f *fakeMessenger) UpsertCard(_ context.Context, maxUser int64, mid string,
 		return "mid-new", nil
 	}
 	return mid, nil
+}
+
+func (f *fakeMessenger) NotifyCouncil(_ context.Context, maxUser int64, kind app.NotificationKind, p council.Proposal) error {
+	f.council = append(f.council, string(kind)+":"+p.ID)
+	return nil
 }
 
 func (f *fakeMessenger) Notify(_ context.Context, maxUser int64, kind app.NotificationKind, c cards.Card) error {

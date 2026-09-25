@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"dommax/internal/app"
+	"dommax/internal/domain/council"
 	"dommax/internal/domain/issue"
 )
 
@@ -91,6 +92,8 @@ type Messenger interface {
 	UpsertCard(ctx context.Context, maxUserID int64, mid string, c Card) (string, error)
 	// Notify отправляет отдельное сообщение: итог по закрытой заявке или уведомление о просрочке.
 	Notify(ctx context.Context, maxUserID int64, kind app.NotificationKind, c Card) error
+	// NotifyCouncil — сообщение совета дома: председателю о предложении, автору об ответе.
+	NotifyCouncil(ctx context.Context, maxUserID int64, kind app.NotificationKind, p council.Proposal) error
 }
 
 type Service struct {
@@ -112,6 +115,13 @@ func (s *Service) Deliver(ctx context.Context, n app.Notification) error {
 	}
 	if u.MaxUserID == 0 || u.Deleted() {
 		return nil
+	}
+	if n.ProposalID != "" {
+		p, err := s.store.Council().GetProposal(ctx, n.ProposalID)
+		if err != nil {
+			return err
+		}
+		return s.msg.NotifyCouncil(ctx, u.MaxUserID, n.Kind, p)
 	}
 	c, err := s.card(ctx, n.IssueID)
 	if err != nil {

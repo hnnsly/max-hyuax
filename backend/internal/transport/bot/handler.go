@@ -15,6 +15,7 @@ import (
 	"dommax/internal/app"
 	"dommax/internal/app/auth"
 	"dommax/internal/app/cards"
+	appcouncil "dommax/internal/app/council"
 	"dommax/internal/app/hints"
 	"dommax/internal/app/houses"
 	"dommax/internal/app/issues"
@@ -53,7 +54,8 @@ type Services struct {
 	Houses         *houses.Service
 	Hints          *hints.Service
 	Photos         *photos.Service
-	Cards          *cards.Service     // карточка заявки для показа в чате
+	Cards          *cards.Service // карточка заявки для показа в чате
+	Council        *appcouncil.Service
 	Pending        app.BotPendingRepo // что бот ждёт от жителя следующим сообщением
 	ConsentVersion string
 	Now            func() time.Time
@@ -77,6 +79,7 @@ var Commands = []maxapi.Command{
 	{Name: "new", Description: "Сообщить о проблеме"},
 	{Name: "my", Description: "Мои заявки"},
 	{Name: "house", Description: "Мой дом и контакты УК"},
+	{Name: "polls", Description: "Совет дома и опросы"},
 	{Name: "help", Description: "Как это работает"},
 }
 
@@ -85,7 +88,7 @@ const greetingText = "Здравствуйте! Я помогаю соседям
 
 const helpText = "Напишите одним сообщением, что сломалось и где, например: «не горит свет на 5 этаже во втором подъезде». " +
 	"Я определю категорию, ответственного и срок и проверю, не сообщали ли уже соседи.\n\n" +
-	"Команды:\n/menu главное меню\n/new сообщить о проблеме\n/my мои заявки\n/house мой дом и контакты УК\n\n" +
+	"Команды:\n/menu главное меню\n/new сообщить о проблеме\n/my мои заявки\n/house мой дом и контакты УК\n/polls совет дома и опросы\n\n" +
 	"Соседи видят только число сообщивших. Имя получает только управляющая компания."
 
 func (h *Handler) Handle(ctx context.Context, u maxapi.Update) error {
@@ -138,6 +141,8 @@ func (h *Handler) onMessage(ctx context.Context, m *maxapi.Message) error {
 			return h.myHouse(ctx, to, m.Sender)
 		case "menu":
 			return h.menu(ctx, to)
+		case "polls":
+			return h.councilMenu(ctx, to, m.Sender)
 		}
 		return h.greet(ctx, to, "")
 	}
@@ -431,6 +436,15 @@ func (h *Handler) callbackReply(ctx context.Context, cb *maxapi.Callback) (maxap
 
 	case cbReopen:
 		return h.askReopenComment(ctx, u, maxapi.ToUser(cb.User.UserID), rest)
+
+	case cbVote:
+		return h.vote(ctx, u, cb.Payload, rest)
+	case cbCouncil:
+		return h.councilItem(ctx, cb, u, rest)
+	case cbAccept:
+		return h.acceptProposal(ctx, u, rest)
+	case cbDecline:
+		return h.askDeclineAnswer(ctx, u, rest)
 
 	case cbPick:
 		var rows [][]maxapi.Button

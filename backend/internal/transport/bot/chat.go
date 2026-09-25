@@ -40,7 +40,7 @@ func menuKeyboard(botName string) maxapi.Attachment {
 	return maxapi.Keyboard(
 		[]maxapi.Button{maxapi.CallbackButton("Сообщить о проблеме", PayloadReport)},
 		[]maxapi.Button{maxapi.CallbackButton("Мои заявки", pack(cbMenu, menuMine)), maxapi.CallbackButton("Сейчас в доме", pack(cbMenu, menuNow))},
-		[]maxapi.Button{maxapi.CallbackButton("Мой дом", pack(cbMenu, menuHouse))},
+		[]maxapi.Button{maxapi.CallbackButton("Совет дома", pack(cbMenu, menuCouncil)), maxapi.CallbackButton("Мой дом", pack(cbMenu, menuHouse))},
 		[]maxapi.Button{maxapi.OpenAppButton("Открыть приложение", botName, "")},
 	)
 }
@@ -71,6 +71,8 @@ func (h *Handler) menuItem(ctx context.Context, to maxapi.Target, from maxapi.Us
 		err = h.houseNow(ctx, to, from)
 	case menuHouse:
 		err = h.myHouse(ctx, to, from)
+	case menuCouncil:
+		err = h.councilMenu(ctx, to, from)
 	default:
 		return maxapi.CallbackAnswer{Notification: "Эта кнопка устарела. Откройте меню: /menu"}, nil
 	}
@@ -205,6 +207,8 @@ func (h *Handler) onPending(ctx context.Context, to maxapi.Target, u user.User, 
 		return false, err
 	}
 	switch p.Action {
+	case pendPropose, pendDecline:
+		return true, h.onCouncilPending(ctx, to, u, p, txt)
 	case pendReopen:
 		is, err := h.svc.Issues.Reopen(ctx, u, p.Ref, txt)
 		switch {

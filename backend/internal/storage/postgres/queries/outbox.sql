@@ -1,6 +1,6 @@
 -- name: EnqueueNotification :exec
-INSERT INTO outbox (kind, issue_id, user_id)
-VALUES (@kind, @issue_id, @user_id)
+INSERT INTO outbox (kind, issue_id, proposal_id, user_id)
+VALUES (@kind, sqlc.narg('issue_id'), sqlc.narg('proposal_id'), @user_id)
 ON CONFLICT (kind, issue_id, user_id) WHERE status = 'pending' DO NOTHING;
 
 -- name: ClaimNotifications :many
@@ -15,7 +15,7 @@ WHERE id IN (
     LIMIT @max_rows
     FOR UPDATE SKIP LOCKED
 )
-RETURNING id, kind, issue_id, user_id, attempts;
+RETURNING id, kind, issue_id, proposal_id, user_id, attempts;
 
 -- name: MarkNotificationDone :exec
 UPDATE outbox SET status = 'done', last_error = '' WHERE id = @id;

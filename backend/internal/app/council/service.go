@@ -60,7 +60,24 @@ func (s *Service) Propose(ctx context.Context, u user.User, text string) (counci
 	if err != nil {
 		return council.Proposal{}, err
 	}
-	return p, s.store.Council().AddProposal(ctx, p)
+	// Предложение и уведомление председателям сохраняются вместе: либо оба, либо ничего.
+	err = s.store.InTx(ctx, func(tx app.Store) error {
+		if err := tx.Council().AddProposal(ctx, p); err != nil {
+			return err
+		}
+		chairmen, err := tx.Users().Chairmen(ctx, p.HouseID)
+		if err != nil {
+			return err
+		}
+		var notes []app.Notification
+		for _, c := range chairmen {
+			if c.ID != u.ID { // председатель сам себе не пишет
+				notes = append(notes, app.Notification{Kind: app.NotifyProposal, ProposalID: p.ID, UserID: c.ID})
+			}
+		}
+		return tx.Outbox().Enqueue(ctx, notes)
+	})
+	return p, err
 }
 
 // MyProposals — предложения автора с ответами председателя.
@@ -92,12 +109,19 @@ func (s *Service) Reply(ctx context.Context, u user.User, id string, status coun
 	if err := p.Reply(status, answer, s.cfg.Now()); err != nil {
 		return council.Proposal{}, err
 	}
-	saved, err := s.store.Council().ReplyProposal(ctx, p)
+	err = s.store.InTx(ctx, func(tx app.Store) error {
+		saved, err := tx.Council().ReplyProposal(ctx, p)
+		if err != nil {
+			return err
+		}
+		if !saved {
+			return council.ErrAlreadyAnswered
+		}
+		// Автор узнаёт об ответе в чате с ботом.
+		return tx.Outbox().Enqueue(ctx, []app.Notification{{Kind: app.NotifyProposalAnswer, ProposalID: p.ID, UserID: p.AuthorID}})
+	})
 	if err != nil {
 		return council.Proposal{}, err
-	}
-	if !saved {
-		return council.Proposal{}, council.ErrAlreadyAnswered
 	}
 	return p, nil
 }

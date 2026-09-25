@@ -124,6 +124,46 @@ func (q *Queries) InsertUser(ctx context.Context, arg InsertUserParams) (User, e
 	return i, err
 }
 
+const listHouseChairmen = `-- name: ListHouseChairmen :many
+SELECT id, max_user_id, demo_key, first_name, phone, house_id, role, organization_id, consent_version, consent_at, deleted_at, created_at, district, chairman_house_id FROM users WHERE chairman_house_id = $1 AND deleted_at IS NULL ORDER BY id
+`
+
+// Председатели совета дома: им приходят предложения соседей.
+func (q *Queries) ListHouseChairmen(ctx context.Context, houseID pgtype.Text) ([]User, error) {
+	rows, err := q.db.Query(ctx, listHouseChairmen, houseID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []User
+	for rows.Next() {
+		var i User
+		if err := rows.Scan(
+			&i.ID,
+			&i.MaxUserID,
+			&i.DemoKey,
+			&i.FirstName,
+			&i.Phone,
+			&i.HouseID,
+			&i.Role,
+			&i.OrganizationID,
+			&i.ConsentVersion,
+			&i.ConsentAt,
+			&i.DeletedAt,
+			&i.CreatedAt,
+			&i.District,
+			&i.ChairmanHouseID,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const markUpdateProcessed = `-- name: MarkUpdateProcessed :execrows
 INSERT INTO processed_updates (key) VALUES ($1) ON CONFLICT DO NOTHING
 `

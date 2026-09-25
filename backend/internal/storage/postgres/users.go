@@ -81,3 +81,8 @@ func timeOrZero(t *time.Time) time.Time {
 	}
 	return *t
 }
+
+func (r userRepo) Chairmen(ctx context.Context, houseID string) ([]user.User, error) {
+	rows, err := r.q.ListHouseChairmen(ctx, pgtype.Text{String: houseID, Valid: true})
+	return mapSlice(rows, toUser), err
+}

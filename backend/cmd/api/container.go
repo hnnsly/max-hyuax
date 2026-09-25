@@ -54,6 +54,7 @@ type Container struct {
 	hints      func() *hints.Service
 	photos     func() *photos.Service
 	geocoder   func() app.Geocoder
+	council    func() *council.Service
 	maxClient  func() (*maxapi.Client, error)
 	botMe      func() (maxapi.User, error)
 	botHandler func() (*bot.Handler, error)
@@ -104,6 +105,11 @@ func Open(ctx context.Context, cfg config, log *slog.Logger) (*Container, error)
 		return n
 	})
 	c.houses = sync.OnceValue(func() *houses.Service { return houses.NewService(store, c.geocoder()) })
+	c.council = sync.OnceValue(func() *council.Service {
+		return council.NewService(store, council.Config{
+			Now: time.Now, NewID: func() string { return uuid.NewV7().String() }, ConsentVersion: cfg.ConsentVersion,
+		})
+	})
 	c.photos = sync.OnceValue(func() *photos.Service {
 		return photos.NewService(store, photoFiles, photos.Config{
 			Now: time.Now, NewID: func() string { return uuid.NewV7().String() }, ConsentVersion: cfg.ConsentVersion,
@@ -160,7 +166,7 @@ func Open(ctx context.Context, cfg config, log *slog.Logger) (*Container, error)
 		}
 		return bot.NewHandler(client, me.Username, bot.Services{
 			Auth: c.Auth(), Issues: c.Issues(), Houses: c.Houses(), Hints: c.Hints(), Photos: c.Photos(),
-			Cards: cardSvc, Pending: store.Pending(), ConsentVersion: cfg.ConsentVersion, Now: time.Now,
+			Cards: cardSvc, Council: c.council(), Pending: store.Pending(), ConsentVersion: cfg.ConsentVersion, Now: time.Now,
 		}, log), nil
 	})
 	c.webhook = sync.OnceValues(func() (*bot.Webhook, error) {
@@ -203,12 +209,10 @@ func Open(ctx context.Context, cfg config, log *slog.Logger) (*Container, error)
 	c.http = sync.OnceValues(func() (*fiber.App, error) {
 		deps := httpapi.Deps{
 			Auth: c.Auth(), Issues: c.Issues(), Houses: c.Houses(), Hints: c.Hints(),
-			Appeal: appeal.NewService(store, appeal.Config{Secret: []byte(cfg.SessionSecret), TTL: appealLinkTTL, Now: time.Now}),
-			Photos: c.Photos(),
-			Council: council.NewService(store, council.Config{
-				Now: time.Now, NewID: func() string { return uuid.NewV7().String() }, ConsentVersion: cfg.ConsentVersion,
-			}),
-			Ping: store.Ping, ConsentVersion: cfg.ConsentVersion, Now: time.Now, Log: log,
+			Appeal:  appeal.NewService(store, appeal.Config{Secret: []byte(cfg.SessionSecret), TTL: appealLinkTTL, Now: time.Now}),
+			Photos:  c.Photos(),
+			Council: c.council(),
+			Ping:    store.Ping, ConsentVersion: cfg.ConsentVersion, Now: time.Now, Log: log,
 		}
 		if cfg.BotMode == "webhook" {
 			wh, err := c.webhook()

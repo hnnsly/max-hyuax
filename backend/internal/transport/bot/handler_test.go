@@ -17,9 +17,11 @@ import (
 	"testing"
 	"time"
 
+	"dommax/internal/app"
 	"dommax/internal/app/apptest"
 	"dommax/internal/app/auth"
 	"dommax/internal/app/cards"
+	appcouncil "dommax/internal/app/council"
 	"dommax/internal/app/hints"
 	"dommax/internal/app/houses"
 	"dommax/internal/app/issues"
@@ -106,10 +108,11 @@ const (
 )
 
 type env struct {
-	store  *apptest.MemStore
-	max    *fakeMax
-	h      *bot.Handler
-	issues *issues.Service
+	store   *apptest.MemStore
+	max     *fakeMax
+	h       *bot.Handler
+	issues  *issues.Service
+	council *appcouncil.Service
 }
 
 func newEnv(t *testing.T) env { return newEnvWithLLM(t, nil) }
@@ -129,12 +132,13 @@ func newEnvWithLLM(t *testing.T, llm hints.LLM) env {
 		Hints:          hints.NewService(llm, time.Second, slog.New(slog.NewTextHandler(io.Discard, nil))),
 		Photos:         photos.NewService(s, &apptest.MemFiles{}, photos.Config{Now: now, NewID: func() string { n++; return fmt.Sprintf("p-%d", n) }, ConsentVersion: "v1"}),
 		Cards:          cards.NewService(s, nil, now),
+		Council:        appcouncil.NewService(s, appcouncil.Config{Now: now, NewID: func() string { n++; return fmt.Sprintf("c-%d", n) }, ConsentVersion: "v1"}),
 		Pending:        s.Pending(),
 		ConsentVersion: "v1",
 		Now:            now,
 	}
 	f := &fakeMax{}
-	return env{store: s, max: f, issues: svc.Issues, h: bot.NewHandler(f, botName, svc, slog.New(slog.NewTextHandler(io.Discard, nil)))}
+	return env{store: s, max: f, issues: svc.Issues, council: svc.Council, h: bot.NewHandler(f, botName, svc, slog.New(slog.NewTextHandler(io.Discard, nil)))}
 }
 
 func text(from int64, body string) maxapi.Update {
@@ -680,5 +684,58 @@ func TestContactSharesPhone(t *testing.T) {
 	}
 	if saved, _ := e.store.Users().Get(t.Context(), u.ID); saved.Phone != "+79990000123" {
 		t.Fatalf("phone = %q", saved.Phone)
+	}
+}
+
+// Совет дома в чате: житель пишет предложение, председатель получает его в очередь уведомлений
+// и берёт в работу, автор получает ответ; голос в опросе кнопкой сменяется итогами.
+func TestCouncilInChat(t *testing.T) {
+	e := newEnv(t)
+	anna := e.resident(9001, true)
+	nina := user.User{ID: 9002, MaxUserID: 9002, Role: user.RoleResident, HouseID: "h-1", ChairmanHouseID: "h-1", ConsentVersion: "v1"}
+	e.store.AddUser(nina)
+
+	e.handle(t, text(9001, "/polls"))
+	txt, bs := e.max.last("")
+	if !strings.Contains(txt, "Совет дома") || !strings.Contains(txt, "Открытых опросов сейчас нет") {
+		t.Fatalf("/polls = %q", txt)
+	}
+	e.handle(t, press(9001, "cb1", findButton(t, bs, "Предложить совету").Payload))
+	e.handle(t, text(9001, "Поставить лавочку у второго подъезда"))
+	if txt, _ := e.max.last(""); !strings.Contains(txt, "отправлено председателю") {
+		t.Fatalf("after proposal = %q", txt)
+	}
+	queued := e.store.Outbox().(*apptest.MemOutbox).Pending
+	if len(queued) != 1 || queued[0].Kind != app.NotifyProposal || queued[0].UserID != nina.ID {
+		t.Fatalf("queued = %+v", queued)
+	}
+
+	e.handle(t, text(9002, "/polls"))
+	_, bs = e.max.last("")
+	e.handle(t, press(9002, "cb2", findButton(t, bs, "Папка предложений").Payload))
+	prop, pbs := e.max.last("")
+	if !strings.Contains(prop, "лавочку") || strings.Contains(prop, "Анна") {
+		t.Fatalf("folder item = %q", prop)
+	}
+	e.handle(t, press(9002, "cb3", findButton(t, pbs, "Взять в работу").Payload))
+	if txt, _ := e.max.last("cb3"); !strings.Contains(txt, "взято в работу") {
+		t.Fatalf("accept = %q", txt)
+	}
+	queued = e.store.Outbox().(*apptest.MemOutbox).Pending
+	if last := queued[len(queued)-1]; last.Kind != app.NotifyProposalAnswer || last.UserID != anna.ID {
+		t.Fatalf("answer notification = %+v", last)
+	}
+
+	if _, err := e.council.CreatePoll(t.Context(), nina, appcouncil.PollInput{Question: "Ставим лавочку?", Options: []string{"За", "Против"}, Days: 7}); err != nil {
+		t.Fatal(err)
+	}
+	e.handle(t, text(9001, "/polls"))
+	poll := e.max.sent[len(e.max.sent)-2].msg
+	if !strings.Contains(poll.Text, "Ставим лавочку") {
+		t.Fatalf("poll message = %q", poll.Text)
+	}
+	e.handle(t, press(9001, "cb4", findButton(t, buttons(poll), "За").Payload))
+	if txt, _ := e.max.last("cb4"); !strings.Contains(txt, "За: 100%, ваш голос") || !strings.Contains(txt, "Всего 1 голос") {
+		t.Fatalf("results = %q", txt)
 	}
 }

@@ -121,13 +121,14 @@ type Organization struct {
 type Outbox struct {
 	ID            int64
 	Kind          string
-	IssueID       string
+	IssueID       *string
 	UserID        int64
 	Status        string
 	Attempts      int32
 	NextAttemptAt time.Time
 	LastError     string
 	CreatedAt     time.Time
+	ProposalID    *string
 }
 
 type Poll struct {

@@ -20,15 +20,16 @@ WHERE id IN (
     LIMIT $1
     FOR UPDATE SKIP LOCKED
 )
-RETURNING id, kind, issue_id, user_id, attempts
+RETURNING id, kind, issue_id, proposal_id, user_id, attempts
 `
 
 type ClaimNotificationsRow struct {
-	ID       int64
-	Kind     string
-	IssueID  string
-	UserID   int64
-	Attempts int32
+	ID         int64
+	Kind       string
+	IssueID    *string
+	ProposalID *string
+	UserID     int64
+	Attempts   int32
 }
 
 // Взятые строки переходят в sending и коммитятся сразу: новое изменение заявки
@@ -46,6 +47,7 @@ func (q *Queries) ClaimNotifications(ctx context.Context, maxRows int32) ([]Clai
 			&i.ID,
 			&i.Kind,
 			&i.IssueID,
+			&i.ProposalID,
 			&i.UserID,
 			&i.Attempts,
 		); err != nil {
@@ -60,19 +62,25 @@ func (q *Queries) ClaimNotifications(ctx context.Context, maxRows int32) ([]Clai
 }
 
 const enqueueNotification = `-- name: EnqueueNotification :exec
-INSERT INTO outbox (kind, issue_id, user_id)
-VALUES ($1, $2, $3)
+INSERT INTO outbox (kind, issue_id, proposal_id, user_id)
+VALUES ($1, $2, $3, $4)
 ON CONFLICT (kind, issue_id, user_id) WHERE status = 'pending' DO NOTHING
 `
 
 type EnqueueNotificationParams struct {
-	Kind    string
-	IssueID string
-	UserID  int64
+	Kind       string
+	IssueID    *string
+	ProposalID *string
+	UserID     int64
 }
 
 func (q *Queries) EnqueueNotification(ctx context.Context, arg EnqueueNotificationParams) error {
-	_, err := q.db.Exec(ctx, enqueueNotification, arg.Kind, arg.IssueID, arg.UserID)
+	_, err := q.db.Exec(ctx, enqueueNotification,
+		arg.Kind,
+		arg.IssueID,
+		arg.ProposalID,
+		arg.UserID,
+	)
 	return err
 }
 

@@ -26,3 +26,7 @@ WHERE id = @id;
 
 -- name: MarkUpdateProcessed :execrows
 INSERT INTO processed_updates (key) VALUES (@key) ON CONFLICT DO NOTHING;
+
+-- name: ListHouseChairmen :many
+-- Председатели совета дома: им приходят предложения соседей.
+SELECT * FROM users WHERE chairman_house_id = @house_id AND deleted_at IS NULL ORDER BY id;

@@ -14,7 +14,9 @@ func (s *Store) Outbox() app.OutboxRepo { return outboxRepo{s.q} }
 
 func (r outboxRepo) Enqueue(ctx context.Context, notes []app.Notification) error {
 	for _, n := range notes {
-		err := r.q.EnqueueNotification(ctx, sqlcdb.EnqueueNotificationParams{Kind: string(n.Kind), IssueID: n.IssueID, UserID: n.UserID})
+		err := r.q.EnqueueNotification(ctx, sqlcdb.EnqueueNotificationParams{
+			Kind: string(n.Kind), IssueID: nullString(n.IssueID), ProposalID: nullString(n.ProposalID), UserID: n.UserID,
+		})
 		if err != nil {
 			return err
 		}
@@ -26,9 +28,11 @@ func (r outboxRepo) Claim(ctx context.Context, n int) ([]app.OutboxItem, error) 
 	rows, err := r.q.ClaimNotifications(ctx, int32(n))
 	return mapSlice(rows, func(row sqlcdb.ClaimNotificationsRow) app.OutboxItem {
 		return app.OutboxItem{
-			ID:           row.ID,
-			Notification: app.Notification{Kind: app.NotificationKind(row.Kind), IssueID: row.IssueID, UserID: row.UserID},
-			Attempts:     int(row.Attempts),
+			ID: row.ID,
+			Notification: app.Notification{
+				Kind: app.NotificationKind(row.Kind), IssueID: deref(row.IssueID), ProposalID: deref(row.ProposalID), UserID: row.UserID,
+			},
+			Attempts: int(row.Attempts),
 		}
 	}), err
 }
@@ -50,4 +54,19 @@ func (r outboxRepo) CardMID(ctx context.Context, issueID string, userID int64) (
 
 func (r outboxRepo) SaveCardMID(ctx context.Context, issueID string, userID int64, mid string) error {
 	return r.q.SaveCardMID(ctx, sqlcdb.SaveCardMIDParams{IssueID: issueID, UserID: userID, Mid: mid})
+}
+
+// nullString и deref переводят пустую строку домена в NULL базы и обратно.
+func nullString(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return new(s)
+}
+
+func deref(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
 }

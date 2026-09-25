@@ -679,3 +679,16 @@ func (r pendingRepo) Take(_ context.Context, userID int64, now time.Time) (app.B
 	delete(r.s.pending, userID)
 	return p, ok && now.Before(p.ExpiresAt), nil
 }
+
+func (r userRepo) Chairmen(_ context.Context, houseID string) ([]user.User, error) {
+	r.s.mu.Lock()
+	defer r.s.mu.Unlock()
+	var out []user.User
+	for _, u := range r.s.UserMap {
+		if u.ChairmanHouseID == houseID && !u.Deleted() {
+			out = append(out, u)
+		}
+	}
+	slices.SortFunc(out, func(a, b user.User) int { return cmp.Compare(a.ID, b.ID) })
+	return out, nil
+}

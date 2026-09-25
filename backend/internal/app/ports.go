@@ -111,6 +111,8 @@ type UserRepo interface {
 	ByDemoKey(ctx context.Context, key string) (user.User, error)
 	Create(ctx context.Context, u user.User) (user.User, error)
 	Save(ctx context.Context, u user.User) error
+	// Chairmen — председатели совета дома, без удалённых аккаунтов.
+	Chairmen(ctx context.Context, houseID string) ([]user.User, error)
 }
 
 type NotificationKind string
@@ -127,14 +129,19 @@ const (
 	// NotifyStatus — отдельное сообщение участникам, когда УК приняла заявку или взяла её в работу:
 	// правка живой карточки телефон не подсвечивает, и житель не узнал бы о движении.
 	NotifyStatus NotificationKind = "status"
+	// NotifyProposal — председателю совета: соседи прислали предложение (ProposalID).
+	NotifyProposal NotificationKind = "proposal"
+	// NotifyProposalAnswer — автору предложения: председатель ответил.
+	NotifyProposalAnswer NotificationKind = "proposal_answer"
 )
 
 // Notification — намерение уведомить участника. Текст собирается при отправке
 // из актуального состояния заявки, поэтому в очереди хранится только адресат.
 type Notification struct {
-	Kind    NotificationKind
-	IssueID string
-	UserID  int64
+	Kind       NotificationKind
+	IssueID    string
+	ProposalID string // для уведомлений совета дома вместо IssueID
+	UserID     int64
 }
 
 type OutboxItem struct {
