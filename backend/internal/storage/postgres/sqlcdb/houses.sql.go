@@ -304,7 +304,11 @@ func (q *Queries) NearestHouses(ctx context.Context, arg NearestHousesParams) ([
 
 const searchHouses = `-- name: SearchHouses :many
 SELECT id, address, district, year_built, floors, entrances_count, organization_id, lat, lon, source FROM houses
-WHERE address ILIKE '%' || $1::text || '%'
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM unnest(string_to_array(trim(regexp_replace($1::text, '[,.\-]+', ' ', 'g')), ' ')) AS w
+    WHERE w <> '' AND address NOT ILIKE '%' || w || '%'
+)
 ORDER BY address
 LIMIT 20
 `

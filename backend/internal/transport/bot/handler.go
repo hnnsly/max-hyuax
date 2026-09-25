@@ -168,6 +168,17 @@ func (h *Handler) onProblemText(ctx context.Context, to maxapi.Target, from maxa
 		return err
 	}
 	if u.HouseID == "" {
+		if list, err := h.svc.Houses.Search(ctx, txt); err == nil && len(list) > 0 {
+			var rows [][]maxapi.Button
+			for _, hs := range list[:min(4, len(list))] {
+				rows = append(rows, []maxapi.Button{maxapi.CallbackButton(hs.Address, pack(cbHouse, hs.ID))})
+			}
+			_, err := h.max.Send(ctx, to, maxapi.NewMessage{
+				Text:        "По вашему адресу нашли в Москве:",
+				Attachments: []maxapi.Attachment{maxapi.Keyboard(rows...)},
+			})
+			return err
+		}
 		return h.askHouse(ctx, to)
 	}
 	// Подсказка: модель (если подключена) или ключевые слова; житель подтверждает кнопкой.

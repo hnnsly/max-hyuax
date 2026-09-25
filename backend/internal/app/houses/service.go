@@ -16,7 +16,7 @@ import (
 )
 
 // LocateTimeout — сколько ждать ответ геокодера: публичный геокодер бывает медленным, экран не должен висеть.
-const LocateTimeout = 3 * time.Second
+const LocateTimeout = 6 * time.Second
 
 // MaxNearRadiusMeters — радиус (300 м), в пределах которого дом из БД считается стоящим рядом с жителем.
 const MaxNearRadiusMeters = 300.0
@@ -48,9 +48,8 @@ func (s *Service) Search(ctx context.Context, query string) ([]house.House, erro
 	if err != nil {
 		return nil, err
 	}
-	// OpenStreetMap спрашиваем, только когда в запросе есть номер дома: иначе поиск по мере ввода
-	// («Твер», «Тверская») создавал бы в базе дома, которые житель и не собирался выбирать.
-	if len(list) < 3 && s.geo != nil && strings.ContainsAny(query, "0123456789") {
+	// OpenStreetMap спрашиваем, если в локальной базе мало результатов.
+	if len(list) < 5 && s.geo != nil && utf8.RuneCountInString(query) >= 3 {
 		gctx, cancel := context.WithTimeout(ctx, LocateTimeout)
 		osmHouses, gerr := s.geo.SearchHouses(gctx, query)
 		cancel()

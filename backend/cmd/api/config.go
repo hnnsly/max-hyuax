@@ -90,6 +90,11 @@ func loadConfig(getenv func(string) string) (config, error) {
 	useSSL := getenv("S3_USE_SSL") == "true" || getenv("MINIO_USE_SSL") == "true" || getenv("USE_SSL") == "true" ||
 		strings.HasPrefix(rawS3, "https://") || strings.HasSuffix(rawS3, ":443")
 
+	geoURL := cmp.Or(getenv("GEOCODER_URL"), "https://nominatim.openstreetmap.org")
+	if geoURL == "off" || geoURL == "none" {
+		geoURL = ""
+	}
+
 	c := config{
 		DatabaseURL:    buildDatabaseURL(getenv),
 		HTTPAddr:       cmp.Or(getenv("HTTP_ADDR"), ":8080"),
@@ -109,8 +114,8 @@ func loadConfig(getenv func(string) string) (config, error) {
 			UseSSL:    useSSL,
 		},
 		PhotosDir:   cmp.Or(getenv("PHOTOS_DIR"), "data/photos"),
-		GeocoderURL: getenv("GEOCODER_URL"),
-		GeocoderUA:  cmp.Or(getenv("GEOCODER_USER_AGENT"), "dom-max/1.0"),
+		GeocoderURL: geoURL,
+		GeocoderUA:  cmp.Or(getenv("GEOCODER_USER_AGENT"), "dom-max/1.0 (+https://max.ru/t105_hakaton_max_bot)"),
 		OllamaURL:   getenv("OLLAMA_URL"),
 		OllamaModel: cmp.Or(getenv("OLLAMA_MODEL"), "qwen3:4b"),
 	}

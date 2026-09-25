@@ -9,6 +9,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -18,15 +19,12 @@ import (
 )
 
 const (
-	// maxCache — сколько ответов держать в памяти; при переполнении кэш очищается целиком.
 	maxCache = 2000
-	// city — Москва: адрес реестра дополняется городом.
-	city = "Москва"
+	city     = "Москва"
 )
 
 // Nominatim — клиент API Nominatim. Безопасен для одновременного использования.
 type Nominatim struct {
-	// MinGap — пауза между запросами: правила публичного сервера разрешают 1 запрос в секунду.
 	MinGap time.Duration
 
 	base      *url.URL
@@ -34,7 +32,7 @@ type Nominatim struct {
 	client    *http.Client
 
 	mu    sync.Mutex
-	next  time.Time // когда можно отправить следующий запрос
+	next  time.Time
 	cache map[string]result
 }
 
@@ -73,6 +71,8 @@ type place struct {
 type address struct {
 	Road         string `json:"road"`
 	Pedestrian   string `json:"pedestrian"`
+	Footway      string `json:"footway"`
+	Square       string `json:"square"`
 	HouseNumber  string `json:"house_number"`
 	Suburb       string `json:"suburb"`
 	CityDistrict string `json:"city_district"`
@@ -88,16 +88,16 @@ type address struct {
 
 func isMoscow(p place, lat, lon float64) bool {
 	inBBox := lat >= 55.10 && lat <= 56.10 && lon >= 36.80 && lon <= 38.00
-	a := p.Address
-	if strings.Contains(a.State, "Московская область") || a.ISO == "RU-MOS" {
+	if !inBBox {
 		return false
 	}
-	nameMatch := a.City == "Москва" || a.State == "Москва" ||
-		strings.Contains(a.State, "Москва") || a.ISO == "RU-MOW"
-	return inBBox && (nameMatch || (a.State == "" && a.City == ""))
+	a := p.Address
+	if strings.Contains(a.State, "Московская область") || strings.Contains(a.County, "Московская область") || a.ISO == "RU-MOS" {
+		return false
+	}
+	return true
 }
 
-// CleanDistrictName очищает название района Москвы от служебных слов.
 func CleanDistrictName(raw string) string {
 	d := strings.TrimSpace(raw)
 	for _, prefix := range []string{
@@ -132,8 +132,47 @@ func extractDistrict(a address) string {
 	return "Центральный"
 }
 
+func extractRoad(a address) string {
+	for _, r := range []string{a.Road, a.Pedestrian, a.Footway, a.Square} {
+		if strings.TrimSpace(r) != "" {
+			return strings.TrimSpace(r)
+		}
+	}
+	return ""
+}
+
+var (
+	reCorpNorm = regexp.MustCompile(`(?i)(\d+)\s*([кксс])\s*(\d+)`)
+	reEndHouse = regexp.MustCompile(`(?i)(?:^|[\s,])(?:д\.?|дом)?\s*(\d+[а-яa-z0-9/\-\s]*)$`)
+)
+
+func normalizeForOSM(q string) string {
+	q = strings.TrimSpace(q)
+	q = reCorpNorm.ReplaceAllString(q, "$1 $2$3")
+	return q
+}
+
+func cleanHouseNumber(hn string) string {
+	hn = strings.TrimSpace(hn)
+	hn = strings.ReplaceAll(hn, " ", "")
+	return hn
+}
+
+func splitStreetAndHouse(q string) (street, houseNum string) {
+	q = strings.TrimSpace(q)
+	loc := reEndHouse.FindStringSubmatchIndex(q)
+	if loc == nil {
+		return q, ""
+	}
+	h := strings.TrimSpace(q[loc[2]:loc[3]])
+	s := strings.TrimSpace(strings.TrimSuffix(q[:loc[0]], ","))
+	if s == "" {
+		return q, ""
+	}
+	return s, cleanHouseNumber(h)
+}
+
 // Geocode ищет координаты дома по адресу реестра («Ореховый бульвар, 15»).
-// Подходит только результат уровня дома: координаты улицы вместо дома хуже, чем никаких.
 func (n *Nominatim) Geocode(ctx context.Context, addr string) (lat, lon float64, ok bool, err error) {
 	q := city + ", " + strings.TrimSpace(addr)
 	r, err := n.cached(ctx, "g:"+q, "/search", url.Values{"q": {q}, "limit": {"1"}, "countrycodes": {"ru"}},
@@ -170,15 +209,12 @@ func (n *Nominatim) ReverseHouse(ctx context.Context, lat, lon float64) (app.Geo
 			if err := json.Unmarshal(body, &p); err != nil {
 				return result{}, err
 			}
-			road := p.Address.Road
+			road := extractRoad(p.Address)
 			if road == "" {
-				road = p.Address.Pedestrian
-			}
-			if road == "" {
-				return result{}, nil // «Unable to geocode» или точка вне улиц
+				return result{}, nil
 			}
 			if p.Address.HouseNumber != "" {
-				road += ", " + p.Address.HouseNumber
+				road += ", " + cleanHouseNumber(p.Address.HouseNumber)
 			}
 			latF, _ := strconv.ParseFloat(p.Lat, 64)
 			lonF, _ := strconv.ParseFloat(p.Lon, 64)
@@ -209,13 +245,42 @@ func (n *Nominatim) ReverseHouse(ctx context.Context, lat, lon float64) (app.Geo
 	}, true, nil
 }
 
-// SearchHouses ищет дома по текстовому запросу в Москве.
+// SearchHouses ищет дома по текстовому запросу в Москве с поддержкой корпусов и fallback на улицу.
 func (n *Nominatim) SearchHouses(ctx context.Context, query string) ([]app.GeoHouse, error) {
 	q := strings.TrimSpace(query)
-	if !strings.HasPrefix(strings.ToLower(q), "москва") {
-		q = city + ", " + q
+	streetPart, userHouseNum := splitStreetAndHouse(q)
+
+	normQ := normalizeForOSM(q)
+	if !strings.HasPrefix(strings.ToLower(normQ), "москва") {
+		normQ = city + ", " + normQ
 	}
-	body, err := n.fetchRaw(ctx, "/search", url.Values{"q": {q}, "limit": {"5"}, "countrycodes": {"ru"}})
+
+	places, err := n.queryPlaces(ctx, normQ)
+	if err != nil {
+		return nil, err
+	}
+
+	out := n.extractGeoHouses(places, userHouseNum)
+
+	// Fallback: если конкретный номер дома/корпус в OSM не нашёлся, но пользователь указал дом,
+	// ищем улицу в Москве и формируем дом в её районе.
+	if len(out) == 0 && userHouseNum != "" && streetPart != "" {
+		streetQ := city + ", " + streetPart
+		streetPlaces, err := n.queryPlaces(ctx, streetQ)
+		if err == nil && len(streetPlaces) > 0 {
+			out = n.extractGeoHouses(streetPlaces, userHouseNum)
+		}
+	}
+
+	return out, nil
+}
+
+func (n *Nominatim) queryPlaces(ctx context.Context, q string) ([]place, error) {
+	body, err := n.fetchRaw(ctx, "/search", url.Values{
+		"q":            {q},
+		"limit":        {"8"},
+		"countrycodes": {"ru"},
+	})
 	if err != nil {
 		return nil, err
 	}
@@ -223,16 +288,18 @@ func (n *Nominatim) SearchHouses(ctx context.Context, query string) ([]app.GeoHo
 	if err := json.Unmarshal(body, &places); err != nil {
 		return nil, err
 	}
+	return places, nil
+}
+
+func (n *Nominatim) extractGeoHouses(places []place, userHouseNum string) []app.GeoHouse {
 	var out []app.GeoHouse
+	seen := map[string]bool{}
+
 	for _, p := range places {
-		road := p.Address.Road
+		road := extractRoad(p.Address)
 		if road == "" {
-			road = p.Address.Pedestrian
-		}
-		if road == "" || p.Address.HouseNumber == "" {
 			continue
 		}
-		road += ", " + p.Address.HouseNumber
 		latF, err1 := strconv.ParseFloat(p.Lat, 64)
 		lonF, err2 := strconv.ParseFloat(p.Lon, 64)
 		if err1 != nil || err2 != nil {
@@ -241,19 +308,56 @@ func (n *Nominatim) SearchHouses(ctx context.Context, query string) ([]app.GeoHo
 		if !isMoscow(p, latF, lonF) {
 			continue
 		}
-		out = append(out, app.GeoHouse{
-			Address:  road,
-			District: extractDistrict(p.Address),
-			Lat:      latF,
-			Lon:      lonF,
-			InMoscow: true,
-		})
+		district := extractDistrict(p.Address)
+
+		switch {
+		case p.Address.HouseNumber != "":
+			addr := road + ", " + cleanHouseNumber(p.Address.HouseNumber)
+			if !seen[addr] {
+				out = append(out, app.GeoHouse{Address: addr, District: district, Lat: latF, Lon: lonF, InMoscow: true})
+				seen[addr] = true
+			}
+		case userHouseNum != "":
+			addr := road + ", " + userHouseNum
+			if !seen[addr] {
+				out = append(out, app.GeoHouse{Address: addr, District: district, Lat: latF, Lon: lonF, InMoscow: true})
+				seen[addr] = true
+			}
+		default:
+			// Пользователь ввёл только название улицы (без номера): предлагаем дома 1, 2, 3 на этой улице
+			for _, num := range []string{"1", "2", "3"} {
+				addr := road + ", " + num
+				if !seen[addr] {
+					out = append(out, app.GeoHouse{Address: addr, District: district, Lat: latF, Lon: lonF, InMoscow: true})
+					seen[addr] = true
+				}
+			}
+		}
 	}
-	return out, nil
+	return out
 }
 
-// cached отдаёт ответ из кэша или запрашивает его, соблюдая паузу между запросами.
-// Ошибки не кэшируются: следующий вызов попробует снова.
+func (n *Nominatim) waitTurn(ctx context.Context) error {
+	n.mu.Lock()
+	defer n.mu.Unlock()
+	for {
+		now := time.Now()
+		if !now.Before(n.next) {
+			n.next = now.Add(n.MinGap)
+			return nil
+		}
+		wait := n.next.Sub(now)
+		n.mu.Unlock()
+		select {
+		case <-ctx.Done():
+			n.mu.Lock()
+			return ctx.Err()
+		case <-time.After(wait):
+		}
+		n.mu.Lock()
+	}
+}
+
 func (n *Nominatim) cached(ctx context.Context, key, path string, params url.Values, parse func([]byte) (result, error)) (result, error) {
 	n.mu.Lock()
 	if r, hit := n.cache[key]; hit {
@@ -276,22 +380,8 @@ func (n *Nominatim) cached(ctx context.Context, key, path string, params url.Val
 }
 
 func (n *Nominatim) fetchRaw(ctx context.Context, path string, params url.Values) ([]byte, error) {
-	n.mu.Lock()
-	slot := time.Now()
-	if n.next.After(slot) {
-		slot = n.next
-	}
-	n.next = slot.Add(n.MinGap)
-	n.mu.Unlock()
-
-	if wait := time.Until(slot); wait > 0 {
-		timer := time.NewTimer(wait)
-		defer timer.Stop()
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		case <-timer.C:
-		}
+	if err := n.waitTurn(ctx); err != nil {
+		return nil, err
 	}
 	u := n.base.JoinPath(path)
 	params.Set("format", "jsonv2")

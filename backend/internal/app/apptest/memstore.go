@@ -281,8 +281,18 @@ type houseRepo struct{ s *MemStore }
 
 func (r houseRepo) Search(_ context.Context, query string) ([]house.House, error) {
 	var out []house.House
+	replacer := strings.NewReplacer(",", " ", ".", " ")
+	words := strings.Fields(strings.ToLower(replacer.Replace(query)))
 	for _, h := range r.s.HouseMap {
-		if strings.Contains(strings.ToLower(h.Address), strings.ToLower(query)) {
+		addr := strings.ToLower(h.Address)
+		match := true
+		for _, w := range words {
+			if !strings.Contains(addr, w) {
+				match = false
+				break
+			}
+		}
+		if match {
 			out = append(out, h)
 		}
 	}

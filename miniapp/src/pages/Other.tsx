@@ -108,7 +108,12 @@ export function HouseSearch() {
           <p className={s.hint}>Адрес по карте: {place.attribution}</p>
         </div>
       )}
-      {found && found.length === 0 && <EmptyState title="Ничего не нашли" text="Проверьте адрес. Пока в сервисе дома одного района Москвы." />}
+      {found && found.length === 0 && (
+        <EmptyState
+          title="Ничего не нашли"
+          text="Укажите улицу и номер дома в Москве, например: Тверская 12 или Ореховый бульвар 17к2"
+        />
+      )}
       {found && found.length > 0 && (
         <CellList mode="island">
           {found.map((h) => (

@@ -1,6 +1,10 @@
 -- name: SearchHouses :many
 SELECT * FROM houses
-WHERE address ILIKE '%' || @query::text || '%'
+WHERE NOT EXISTS (
+    SELECT 1
+    FROM unnest(string_to_array(trim(regexp_replace(@query::text, '[,.\-]+', ' ', 'g')), ' ')) AS w
+    WHERE w <> '' AND address NOT ILIKE '%' || w || '%'
+)
 ORDER BY address
 LIMIT 20;
 

@@ -2,6 +2,7 @@ package geo_test
 
 import (
 	"context"
+	"net"
 	"net/http"
 	"net/http/httptest"
 	"sync/atomic"
@@ -15,7 +16,11 @@ import (
 func fakeNominatim(t *testing.T, handler http.HandlerFunc) (*httptest.Server, *atomic.Int32) {
 	t.Helper()
 	var calls atomic.Int32
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	l, err := net.Listen("tcp4", "127.0.0.1:0")
+	if err != nil {
+		t.Skip("tcp4 listen disabled in sandbox")
+	}
+	srv := httptest.NewUnstartedServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		calls.Add(1)
 		if r.Header.Get("User-Agent") != "dom-test/1.0" {
 			t.Errorf("User-Agent = %q", r.Header.Get("User-Agent"))
@@ -25,6 +30,8 @@ func fakeNominatim(t *testing.T, handler http.HandlerFunc) (*httptest.Server, *a
 		}
 		handler(w, r)
 	}))
+	srv.Listener = l
+	srv.Start()
 	t.Cleanup(srv.Close)
 	return srv, &calls
 }
