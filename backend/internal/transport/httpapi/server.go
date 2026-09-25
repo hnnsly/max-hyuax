@@ -75,6 +75,7 @@ func New(d Deps) *fiber.App {
 	api.Get("/geo/reverse", h.auth, h.reverseGeocode)
 	api.Get("/houses/:id", h.auth, h.getHouse)
 	api.Get("/houses/:id/issues", h.auth, h.houseIssues)
+	api.Get("/houses/:id/report.pdf", h.houseReportPDF)
 	api.Get("/objects/:code", h.auth, h.objectByCode)
 
 	api.Get("/issues/similar", h.auth, h.similarIssues)

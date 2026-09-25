@@ -6,6 +6,7 @@ import { useUser } from '../app/session';
 import { api, ApiError } from '../shared/api/client';
 import type { Poll, Proposal } from '../shared/api/types';
 import { useResource } from '../shared/api/useResource';
+import { bridge } from '../shared/bridge/bridge';
 import { canVote, DEFAULT_OPTIONS, pollQuestion, pollResults, proposalStatus } from '../shared/lib/council';
 import { dayMonth, plural } from '../shared/lib/format';
 import { EmptyState, ErrorState, Island, Loading, Screen, Section, useToast } from '../shared/ui/Layout';
@@ -293,6 +294,7 @@ type Reply = { proposal: Proposal; status: 'accepted' | 'declined' };
 
 /** Папка председателя: предложения соседей без имён, ответ и вынос на опрос. */
 export function CouncilFolder() {
+  const user = useUser();
   const { back } = useRouter();
   const res = useResource(async () => {
     const [proposals, polls] = await Promise.all([api.councilFolder(), api.polls()]);
@@ -302,10 +304,12 @@ export function CouncilFolder() {
   const [toast, showToast] = useToast();
   const [reply, setReply] = useState<Reply | null>(null);
   const [polling, setPolling] = useState<Proposal | null>(null);
+  const [creatingPoll, setCreatingPoll] = useState(false);
 
   const done = (msg: string) => {
     setReply(null);
     setPolling(null);
+    setCreatingPoll(false);
     res.reload();
     showToast(msg);
   };
@@ -313,6 +317,21 @@ export function CouncilFolder() {
   return (
     <Screen title="Папка предложений" onBack={back}>
       <p className={s.text}>Предложения соседей по дому. Имён авторов здесь нет: отвечайте по существу, ответ увидит автор.</p>
+      <Button variant="primary" size="medium" stretched onClick={() => setCreatingPoll(true)}>
+        Открыть новый опрос жителей
+      </Button>
+      {user.house_id && (
+        <Button
+          variant="secondary"
+          size="medium"
+          stretched
+          onClick={() => {
+            bridge.download(`/api/v1/houses/${encodeURIComponent(user.house_id!)}/report.pdf`, `house-${user.house_id}-report.pdf`).catch(() => showToast('Не удалось скачать отчёт'));
+          }}
+        >
+          Скачать сводный отчёт по дому (PDF)
+        </Button>
+      )}
       {res.loading && !res.data ? (
         <Loading />
       ) : res.error || !res.data ? (
@@ -359,15 +378,24 @@ export function CouncilFolder() {
           done(reply.status === 'declined' ? 'Предложение отклонено, автор увидит ответ' : 'Предложение в работе, автор увидит ответ');
         }}
       />
-      {polling && <PollSheet proposal={polling} onClose={() => setPolling(null)} onDone={() => done('Опрос открыт для жителей дома на 7 дней')} />}
+      {(polling || creatingPoll) && (
+        <PollSheet
+          proposal={polling ?? undefined}
+          onClose={() => {
+            setPolling(null);
+            setCreatingPoll(false);
+          }}
+          onDone={() => done('Опрос открыт для жителей дома на 7 дней')}
+        />
+      )}
       {toast}
     </Screen>
   );
 }
 
-/** Опрос из предложения: вопрос и варианты можно поправить, опрос идёт неделю. */
-function PollSheet({ proposal, onClose, onDone }: { proposal: Proposal; onClose: () => void; onDone: () => void }) {
-  const [question, setQuestion] = useState(() => pollQuestion(proposal.text));
+/** Опрос из предложения или новый опрос: вопрос и варианты можно поправить, опрос идёт неделю. */
+function PollSheet({ proposal, onClose, onDone }: { proposal?: Proposal; onClose: () => void; onDone: () => void }) {
+  const [question, setQuestion] = useState(() => (proposal ? pollQuestion(proposal.text) : ''));
   const [options, setOptions] = useState(DEFAULT_OPTIONS);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
@@ -382,7 +410,7 @@ function PollSheet({ proposal, onClose, onDone }: { proposal: Proposal; onClose:
     setBusy(true);
     setError('');
     try {
-      await api.createPoll({ proposal_id: proposal.id, question: question.trim(), options: filled });
+      await api.createPoll({ proposal_id: proposal?.id, question: question.trim(), options: filled });
       onDone();
     } catch (err) {
       setError(errText(err, 'Не получилось открыть опрос'));

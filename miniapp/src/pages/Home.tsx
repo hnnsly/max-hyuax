@@ -110,6 +110,13 @@ export function Home() {
 
       <CellList mode="island">
         <CellSimple title="Мои заявки" showChevron after={mine.length > 0 && <Counter value={mine.length} rounded />} onClick={() => push({ name: 'mine' })} />
+        <CellSimple
+          title="Отчёт по дому (PDF)"
+          showChevron
+          onClick={() => {
+            bridge.download(`/api/v1/houses/${encodeURIComponent(house.id)}/report.pdf`, `house-${house.id}-report.pdf`).catch(() => showToast('Не удалось скачать отчёт'));
+          }}
+        />
         <CellSimple title="Другой дом" showChevron onClick={() => push({ name: 'houseSearch' })} />
       </CellList>
       <button type="button" className={s.dangerLink} onClick={() => setDeleting(true)}>

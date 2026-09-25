@@ -485,6 +485,67 @@ func (h *handlers) appealPDF(c fiber.Ctx) error {
 	return c.Send(out)
 }
 
+// houseReportPDF отдаёт сводный PDF-отчёт о состоянии общего имущества и реестре заявок дома.
+func (h *handlers) houseReportPDF(c fiber.Ctx) error {
+	houseID := c.Params("id")
+	d, err := h.Houses.Get(c.Context(), houseID)
+	if err != nil {
+		return err
+	}
+	issuesList, err := h.Issues.ListByHouse(c.Context(), houseID)
+	if err != nil {
+		return err
+	}
+
+	now := h.Now()
+	doc := pdf.HouseReportDocument{
+		Address:      d.House.Address,
+		District:     d.House.District,
+		Organization: d.Organization.Name,
+		Dispatcher:   d.Organization.PhoneDispatcher,
+		GeneratedAt:  now,
+		TotalIssues:  len(issuesList),
+		Issues:       make([]pdf.HouseReportIssue, 0, len(issuesList)),
+	}
+
+	for _, is := range issuesList {
+		if !is.Status().Closed() {
+			doc.OpenIssues++
+		}
+		if is.Status() == issue.StatusDone {
+			doc.DoneIssues++
+		}
+		if is.IsOverdue(now) || !is.OverdueAt().IsZero() {
+			doc.OverdueIssues++
+		}
+		doc.TotalReporters += is.ParticipantCount()
+
+		catTitle := is.Category()
+		if r, err := rules.Lookup(is.Category()); err == nil {
+			catTitle = r.Title
+		}
+		doc.Issues = append(doc.Issues, pdf.HouseReportIssue{
+			Number:       is.Number(),
+			Title:        is.Title(),
+			Category:     catTitle,
+			Status:       is.Status(),
+			CreatedAt:    is.CreatedAt(),
+			Deadline:     is.Deadline(),
+			Participants: is.ParticipantCount(),
+			Comment:      is.StatusComment(),
+		})
+	}
+
+	out, err := pdf.HouseReport(doc)
+	if err != nil {
+		return err
+	}
+	c.Set(fiber.HeaderContentType, "application/pdf")
+	c.Set(fiber.HeaderContentDisposition, fmt.Sprintf(`attachment; filename="house-%s-report.pdf"`, houseID))
+	c.Set(fiber.HeaderCacheControl, "no-store")
+	return c.Send(out)
+}
+
 // maxPhotosPerUpload — сколько фото принимается за один запрос.
 const maxPhotosPerUpload = 3
 
