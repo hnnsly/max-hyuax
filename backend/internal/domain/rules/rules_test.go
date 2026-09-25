@@ -29,6 +29,16 @@ func TestAddBusinessDaysFromSaturdayStartsMonday(t *testing.T) {
 	}
 }
 
+func TestAddBusinessDaysSkipsPublicHolidays(t *testing.T) {
+	// 31 декабря + 1 рабочий день пропускает все каникулы 1-8 января и выпадает на 9 января (пятницу)
+	from := time.Date(2025, 12, 31, 15, 0, 0, 0, msk)
+	got := rules.AddBusinessDays(from, 1)
+	want := time.Date(2026, 1, 9, 23, 59, 59, 0, msk)
+	if !got.Equal(want) {
+		t.Fatalf("new year holidays: got %v, want %v", got, want)
+	}
+}
+
 func TestLookupKnownCategory(t *testing.T) {
 	r, err := rules.Lookup("lift")
 	if err != nil {

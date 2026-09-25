@@ -21,6 +21,12 @@ interface WebApp {
   openCodeReader?(fileSelect?: boolean): Promise<{ value: string }>;
   downloadFile?(url: string, fileName: string): Promise<{ status: 'downloading' | 'cancelled' }>;
   requestContact?(): Promise<{ phone: string; authDate: string | number; hash: string }>;
+  enableClosingConfirmation?(): void;
+  disableClosingConfirmation?(): void;
+  DeviceStorage?: {
+    setItem?(key: string, value: string): unknown;
+    removeItem?(key: string): unknown;
+  };
   HapticFeedback?: { notificationOccurred(type: 'success' | 'error' | 'warning'): unknown };
 }
 
@@ -128,5 +134,60 @@ export const bridge = {
   /** Тактильный отклик есть только на телефонах; в остальных местах молча пропускаем. */
   hapticSuccess() {
     if (mobile()) wa()?.HapticFeedback?.notificationOccurred('success');
+  },
+
+  /** Защита от случайного закрытия формы свайпом вниз в MAX (FR-ISSUE-05). */
+  closingConfirmation: {
+    enable(): void {
+      if (inMax()) wa()?.enableClosingConfirmation?.();
+    },
+    disable(): void {
+      if (inMax()) wa()?.disableClosingConfirmation?.();
+    },
+  },
+
+  /** Черновик новой заявки по дому: localStorage + дублирование в DeviceStorage MAX. */
+  draft: {
+    load(houseId: string): { category: string; objectId: string; text: string } | null {
+      if (!houseId) return null;
+      try {
+        const raw = localStorage.getItem(`dommax.draft.${houseId}`);
+        if (!raw) return null;
+        const parsed = JSON.parse(raw) as { category?: string; objectId?: string; text?: string };
+        return {
+          category: typeof parsed.category === 'string' ? parsed.category : '',
+          objectId: typeof parsed.objectId === 'string' ? parsed.objectId : '',
+          text: typeof parsed.text === 'string' ? parsed.text : '',
+        };
+      } catch {
+        return null;
+      }
+    },
+    save(houseId: string, d: { category: string; objectId: string; text: string }): void {
+      if (!houseId) return;
+      const key = `dommax.draft.${houseId}`;
+      try {
+        if (!d.category && !d.objectId && !d.text.trim()) {
+          localStorage.removeItem(key);
+          if (inMax()) wa()?.DeviceStorage?.removeItem?.(key);
+          return;
+        }
+        const raw = JSON.stringify(d);
+        localStorage.setItem(key, raw);
+        if (inMax()) wa()?.DeviceStorage?.setItem?.(key, raw);
+      } catch {
+        /* хранилище недоступно */
+      }
+    },
+    clear(houseId: string): void {
+      if (!houseId) return;
+      const key = `dommax.draft.${houseId}`;
+      try {
+        localStorage.removeItem(key);
+        if (inMax()) wa()?.DeviceStorage?.removeItem?.(key);
+      } catch {
+        /* хранилище недоступно */
+      }
+    },
   },
 };

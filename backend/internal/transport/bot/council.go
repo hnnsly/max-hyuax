@@ -27,9 +27,11 @@ const (
 	councilPropose = "propose"
 	councilMine    = "mine"
 	councilFolder  = "folder"
+	councilNewPoll = "new_poll"
 
 	pendPropose = "propose"
 	pendDecline = "decline" // Ref — id предложения
+	pendNewPoll = "new_poll"
 
 	// pollsInChat — сколько открытых опросов присылать сразу, остальные в приложении.
 	pollsInChat = 3
@@ -72,7 +74,10 @@ func (h *Handler) councilMenu(ctx context.Context, to maxapi.Target, from maxapi
 		{maxapi.CallbackButton("Мои предложения", pack(cbCouncil, councilMine))},
 	}
 	if u.IsChairmanOf(u.HouseID) {
-		rows = append(rows, []maxapi.Button{maxapi.CallbackButton("Папка предложений", pack(cbCouncil, councilFolder))})
+		rows = append(rows, []maxapi.Button{
+			maxapi.CallbackButton("Папка предложений", pack(cbCouncil, councilFolder)),
+			maxapi.CallbackButton("Создать опрос", pack(cbCouncil, councilNewPoll)),
+		})
 	}
 	_, err = h.max.Send(ctx, to, maxapi.NewMessage{Text: text, Attachments: []maxapi.Attachment{maxapi.Keyboard(rows...)}})
 	return err
@@ -240,6 +245,16 @@ func (h *Handler) councilItem(ctx context.Context, cb *maxapi.Callback, u user.U
 			return maxapi.CallbackAnswer{Notification: "Новых предложений нет"}, nil
 		}
 		return maxapi.CallbackAnswer{Notification: "Новые предложения ниже"}, nil
+
+	case councilNewPoll:
+		if !u.IsChairmanOf(u.HouseID) {
+			return maxapi.CallbackAnswer{Notification: "Создавать опросы может только председатель совета."}, nil
+		}
+		if err := h.svc.Pending.Set(ctx, u.ID, app.BotPending{Action: pendNewPoll, ExpiresAt: h.svc.Now().Add(pendingTTL)}); err != nil {
+			return maxapi.CallbackAnswer{}, err
+		}
+		err := h.send(ctx, to, "Напишите вопрос опроса для жителей одним сообщением (например: «Установить шлагбаум на въезде во двор?»).\n\nОпрос откроется на 7 дней с вариантами «За», «Против», «Воздержался».")
+		return maxapi.CallbackAnswer{Notification: "Жду вопрос опроса"}, err
 	}
 	return maxapi.CallbackAnswer{Notification: "Эта кнопка устарела."}, nil
 }
@@ -306,6 +321,21 @@ func (h *Handler) onCouncilPending(ctx context.Context, to maxapi.Target, u user
 			return h.send(ctx, to, a.Notification)
 		}
 		return h.send(ctx, to, "Предложение отклонено, автор увидит ваш ответ.")
+	case pendNewPoll:
+		v, err := h.svc.Council.CreatePoll(ctx, u, appcouncil.PollInput{
+			Question: txt,
+			Options:  []string{"За", "Против", "Воздержался"},
+			Days:     7,
+		})
+		if errors.Is(err, council.ErrInvalid) {
+			_ = h.svc.Pending.Set(ctx, u.ID, app.BotPending{Action: pendNewPoll, ExpiresAt: h.svc.Now().Add(pendingTTL)})
+			return h.send(ctx, to, "Вопрос должен содержать от 5 до 300 символов. Напишите его ещё раз.")
+		}
+		if err != nil {
+			return err
+		}
+		_, err = h.max.Send(ctx, to, pollMessage(v))
+		return err
 	}
 	return nil
 }

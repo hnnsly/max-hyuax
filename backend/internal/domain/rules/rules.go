@@ -87,13 +87,33 @@ func Classify(text string) (Rule, bool) {
 	return best, bestScore > 0
 }
 
-// AddBusinessDays отсчитывает n рабочих дней (пн–пт) после from и возвращает конец
-// этого дня в часовом поясе from. Праздники пока не учитываются.
+// isPublicHoliday сообщает, является ли день государственным нерабочим праздничным днём в РФ (ТК РФ ст. 112).
+func isPublicHoliday(t time.Time) bool {
+	month, day := t.Month(), t.Day()
+	switch month {
+	case time.January:
+		return day >= 1 && day <= 8 // Новогодние каникулы и Рождество
+	case time.February:
+		return day == 23 // День защитника Отечества
+	case time.March:
+		return day == 8 // Международный женский день
+	case time.May:
+		return day == 1 || day == 9 // Праздник Весны и Труда, День Победы
+	case time.June:
+		return day == 12 // День России
+	case time.November:
+		return day == 4 // День народного единства
+	}
+	return false
+}
+
+// AddBusinessDays отсчитывает n рабочих дней (исключая выходные дни и праздники по ТК РФ ст. 112)
+// после from и возвращает конец этого дня в часовом поясе from.
 func AddBusinessDays(from time.Time, n int) time.Time {
 	d := time.Date(from.Year(), from.Month(), from.Day(), 23, 59, 59, 0, from.Location())
 	for added := 0; added < n; {
 		d = d.AddDate(0, 0, 1)
-		if wd := d.Weekday(); wd != time.Saturday && wd != time.Sunday {
+		if wd := d.Weekday(); wd != time.Saturday && wd != time.Sunday && !isPublicHoliday(d) {
 			added++
 		}
 	}

@@ -124,7 +124,12 @@ tasks:
     cmds:
       - go tool sqlc generate
 
-  # --- Мини-приложение ---
+  # --- Сдача проекта ---
+
+  export:
+    desc: Экспорт чистого репозитория для жюри (без hack-docs/ и ИИ-меток, по ADR-007)
+    cmds:
+      - bash scripts/export-submission.sh {{.CLI_ARGS}}
 
   miniapp:install:
     desc: Установить зависимости мини-приложения (по package-lock)

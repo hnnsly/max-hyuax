@@ -6,6 +6,7 @@ import { useSession, useUser } from '../app/session';
 import { api, ApiError } from '../shared/api/client';
 import type { AssetObject, Category, CategoryHint, HouseDetails, Issue } from '../shared/api/types';
 import { useResource } from '../shared/api/useResource';
+import { bridge } from '../shared/bridge/bridge';
 import { capitalize, dayMonth, plural, time } from '../shared/lib/format';
 import { hintOffer, worthHint } from '../shared/lib/model';
 import { EmptyState, ErrorState, Island, Loading, Screen, useToast } from '../shared/ui/Layout';
@@ -88,15 +89,29 @@ function ReportFlow({ ctx, initialCategory }: { ctx: Context; initialCategory?: 
   const { setUser } = useSession();
   const { back, reset } = useRouter();
   const [toast, showToast] = useToast();
+  const savedDraft = !ctx.fixedObject ? bridge.draft.load(ctx.house.id) : null;
   const [step, setStep] = useState<Step>('describe');
-  const [category, setCategory] = useState(initialCategory ?? '');
-  const [objectId, setObjectId] = useState(ctx.fixedObject?.id ?? '');
-  const [text, setText] = useState('');
+  const [category, setCategory] = useState(initialCategory || savedDraft?.category || '');
+  const [objectId, setObjectId] = useState(ctx.fixedObject?.id || savedDraft?.objectId || '');
+  const [text, setText] = useState(savedDraft?.text ?? '');
   const [similar, setSimilar] = useState<Issue[]>([]);
   const [agree, setAgree] = useState(user.has_consent);
   const [busy, setBusy] = useState(false);
   const [hint, setHint] = useState<CategoryHint | null>(null);
   const [photos, setPhotos] = useState<File[]>([]);
+
+  // Сохранение черновика и защита от случайного закрытия формы в MAX (FR-ISSUE-05).
+  useEffect(() => {
+    if (!ctx.fixedObject) {
+      bridge.draft.save(ctx.house.id, { category, objectId, text });
+    }
+    if (text.trim().length > 0 || photos.length > 0) {
+      bridge.closingConfirmation.enable();
+    } else {
+      bridge.closingConfirmation.disable();
+    }
+    return () => bridge.closingConfirmation.disable();
+  }, [ctx.fixedObject, ctx.house.id, category, objectId, text, photos.length]);
 
   // Подсказка категории по тексту: спрашиваем после паузы в наборе; по QR категория уже известна.
   useEffect(() => {
@@ -123,7 +138,11 @@ function ReportFlow({ ctx, initialCategory }: { ctx: Context; initialCategory?: 
   const object = house.objects.find((o) => o.id === objectId);
   const where = [house.address, object?.label].filter(Boolean).join(', ');
 
-  const toHome = (issueId: string, flash: string) => reset({ name: 'home' }, { name: 'issue', id: issueId, flash });
+  const toHome = (issueId: string, flash: string) => {
+    bridge.draft.clear(house.id);
+    bridge.closingConfirmation.disable();
+    reset({ name: 'home' }, { name: 'issue', id: issueId, flash });
+  };
 
   const check = async () => {
     setBusy(true);
