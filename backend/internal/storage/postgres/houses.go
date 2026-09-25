@@ -96,3 +96,18 @@ func mapSlice[S, D any](in []S, f func(S) D) []D {
 	}
 	return out
 }
+
+// Upsert вызывается внутри транзакции импорта: дом, подъезды и объекты сохраняются вместе.
+func (r houseRepo) Upsert(ctx context.Context, h house.House) (bool, error) {
+	created, err := r.q.UpsertHouse(ctx, sqlcdb.UpsertHouseParams{
+		ID: h.ID, Address: h.Address, District: h.District, YearBuilt: int32(h.YearBuilt), Floors: int32(h.Floors),
+		EntrancesCount: int32(h.EntrancesCount), OrganizationID: h.OrganizationID, Lat: h.Lat, Lon: h.Lon, Source: h.Source,
+	})
+	if err != nil {
+		return false, err
+	}
+	if err := r.q.EnsureEntrances(ctx, sqlcdb.EnsureEntrancesParams{HouseID: h.ID, EntrancesCount: int32(h.EntrancesCount)}); err != nil {
+		return false, err
+	}
+	return created, r.q.EnsureHouseObjects(ctx, h.ID)
+}

@@ -48,6 +48,12 @@ export interface Organization {
   schedule?: string;
 }
 
+/** Адрес точки по данным OpenStreetMap; без адреса геокодер выключен или ничего не нашёл. */
+export interface GeoPlace {
+  address?: string;
+  attribution?: string;
+}
+
 export interface House {
   id: string;
   address: string;

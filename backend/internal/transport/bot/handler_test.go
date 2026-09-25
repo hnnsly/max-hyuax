@@ -116,7 +116,7 @@ func newEnvWithLLM(t *testing.T, llm hints.LLM) env {
 	svc := bot.Services{
 		Auth:           auth.NewService(s, auth.Config{Now: now}),
 		Issues:         issues.NewService(s, issues.Config{Now: now, NewID: func() string { n++; return fmt.Sprintf("i-%d", n) }, ConsentVersion: "v1"}),
-		Houses:         houses.NewService(s),
+		Houses:         houses.NewService(s, nil),
 		Hints:          hints.NewService(llm, time.Second, slog.New(slog.NewTextHandler(io.Discard, nil))),
 		Photos:         photos.NewService(s, &apptest.MemFiles{}, photos.Config{Now: now, NewID: func() string { n++; return fmt.Sprintf("p-%d", n) }, ConsentVersion: "v1"}),
 		ConsentVersion: "v1",

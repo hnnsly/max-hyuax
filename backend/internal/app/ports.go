@@ -76,6 +76,17 @@ type HouseRepo interface {
 	ByOrganization(ctx context.Context, orgID string) ([]house.House, error)
 	// OrganizationsInDistrict — организации, у которых есть дома в районе, по названию.
 	OrganizationsInDistrict(ctx context.Context, district string) ([]house.Organization, error)
+	// Upsert создаёт или обновляет дом по id и добавляет недостающие подъезды и объекты с QR-кодами
+	// (лифт и свет в подъезде, кровля, мусоропровод). created — дома раньше не было.
+	Upsert(ctx context.Context, h house.House) (created bool, err error)
+}
+
+// Geocoder — геокодер на открытых данных (ADR-016). Не нашёл — ok = false без ошибки.
+type Geocoder interface {
+	// Geocode — координаты дома по адресу реестра («Ореховый бульвар, 15»).
+	Geocode(ctx context.Context, address string) (lat, lon float64, ok bool, err error)
+	// Reverse — короткий адрес точки: «улица, дом».
+	Reverse(ctx context.Context, lat, lon float64) (address string, ok bool, err error)
 }
 
 type UserRepo interface {

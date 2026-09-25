@@ -9,6 +9,44 @@ import (
 	"context"
 )
 
+const ensureEntrances = `-- name: EnsureEntrances :exec
+INSERT INTO entrances (id, house_id, number)
+SELECT $1::text || '-e' || n, $1::text, n
+FROM generate_series(1, $2::int) AS n
+ON CONFLICT (id) DO NOTHING
+`
+
+type EnsureEntrancesParams struct {
+	HouseID        string
+	EntrancesCount int32
+}
+
+// Подъезды 1..N; лишние старые не удаляются: на них могут ссылаться заявки.
+func (q *Queries) EnsureEntrances(ctx context.Context, arg EnsureEntrancesParams) error {
+	_, err := q.db.Exec(ctx, ensureEntrances, arg.HouseID, arg.EntrancesCount)
+	return err
+}
+
+const ensureHouseObjects = `-- name: EnsureHouseObjects :exec
+INSERT INTO asset_objects (id, house_id, entrance_id, category, label, qr_code)
+SELECT e.id || '-lift', e.house_id, e.id, 'lift', 'подъезд ' || e.number || ', пассажирский лифт', e.id || '-lift'
+FROM entrances e WHERE e.house_id = $1
+UNION ALL
+SELECT e.id || '-light', e.house_id, e.id, 'lighting', 'подъезд ' || e.number || ', лестничная клетка', e.id || '-light'
+FROM entrances e WHERE e.house_id = $1
+UNION ALL
+SELECT $1::text || '-roof', $1::text, NULL, 'leak', 'кровля', $1::text || '-roof'
+UNION ALL
+SELECT $1::text || '-trash', $1::text, NULL, 'garbage', 'мусоропровод', $1::text || '-trash'
+ON CONFLICT (id) DO NOTHING
+`
+
+// Те же объекты и коды, что в модельных данных (миграция 00002): лифт и свет в подъезде, кровля, мусоропровод.
+func (q *Queries) EnsureHouseObjects(ctx context.Context, houseID string) error {
+	_, err := q.db.Exec(ctx, ensureHouseObjects, houseID)
+	return err
+}
+
 const getHouse = `-- name: GetHouse :one
 SELECT id, address, district, year_built, floors, entrances_count, organization_id, lat, lon, source FROM houses WHERE id = $1
 `
@@ -220,6 +258,7 @@ func (q *Queries) ListOrganizationHouses(ctx context.Context, organizationID str
 
 const nearestHouses = `-- name: NearestHouses :many
 SELECT id, address, district, year_built, floors, entrances_count, organization_id, lat, lon, source FROM houses
+WHERE NOT (lat = 0 AND lon = 0)
 ORDER BY (lat - $1::float8) ^ 2 + ((lon - $2::float8) * cos(radians($1::float8))) ^ 2
 LIMIT $3
 `
@@ -231,6 +270,7 @@ type NearestHousesParams struct {
 }
 
 // Плоская аппроксимация расстояния: для радиуса в пару километров точности хватает.
+// Дома без координат (импорт, где геокодер не нашёл адрес) в выдачу не попадают.
 func (q *Queries) NearestHouses(ctx context.Context, arg NearestHousesParams) ([]House, error) {
 	rows, err := q.db.Query(ctx, nearestHouses, arg.Lat, arg.Lon, arg.MaxRows)
 	if err != nil {
@@ -298,4 +338,46 @@ func (q *Queries) SearchHouses(ctx context.Context, query string) ([]House, erro
 		return nil, err
 	}
 	return items, nil
+}
+
+const upsertHouse = `-- name: UpsertHouse :one
+INSERT INTO houses (id, address, district, year_built, floors, entrances_count, organization_id, lat, lon, source)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+ON CONFLICT (id) DO UPDATE SET
+    address = EXCLUDED.address, district = EXCLUDED.district, year_built = EXCLUDED.year_built,
+    floors = EXCLUDED.floors, entrances_count = EXCLUDED.entrances_count,
+    organization_id = EXCLUDED.organization_id, lat = EXCLUDED.lat, lon = EXCLUDED.lon, source = EXCLUDED.source
+RETURNING (xmax = 0)::bool AS created
+`
+
+type UpsertHouseParams struct {
+	ID             string
+	Address        string
+	District       string
+	YearBuilt      int32
+	Floors         int32
+	EntrancesCount int32
+	OrganizationID string
+	Lat            float64
+	Lon            float64
+	Source         string
+}
+
+// Импорт реестра: дом обновляется по id. xmax = 0 только у только что вставленной строки.
+func (q *Queries) UpsertHouse(ctx context.Context, arg UpsertHouseParams) (bool, error) {
+	row := q.db.QueryRow(ctx, upsertHouse,
+		arg.ID,
+		arg.Address,
+		arg.District,
+		arg.YearBuilt,
+		arg.Floors,
+		arg.EntrancesCount,
+		arg.OrganizationID,
+		arg.Lat,
+		arg.Lon,
+		arg.Source,
+	)
+	var created bool
+	err := row.Scan(&created)
+	return created, err
 }

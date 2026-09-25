@@ -159,6 +159,35 @@ func (h *handlers) nearestHouses(c fiber.Ctx) error {
 	return c.JSON(mapSlice(list, toHouseDTO))
 }
 
+// osmAttribution — подпись, которую требует лицензия ODbL рядом с найденным адресом (ADR-016).
+const osmAttribution = "© участники OpenStreetMap"
+
+type geoDTO struct {
+	Address     string `json:"address,omitempty"`
+	Attribution string `json:"attribution,omitempty"`
+}
+
+// reverseGeocode — адрес точки для «Найти дома рядом». Сбой геокодера не ошибка для жителя:
+// ответ без адреса, экран покажет только дома.
+func (h *handlers) reverseGeocode(c fiber.Ctx) error {
+	lat, errLat := strconv.ParseFloat(c.Query("lat"), 64)
+	lon, errLon := strconv.ParseFloat(c.Query("lon"), 64)
+	if errLat != nil || errLon != nil {
+		return app.ErrInvalidInput
+	}
+	addr, err := h.Houses.Locate(c.Context(), lat, lon)
+	if errors.Is(err, app.ErrInvalidInput) {
+		return err
+	}
+	if err != nil {
+		h.Log.WarnContext(c.Context(), "reverse geocoding failed", "err", err)
+	}
+	if addr == "" {
+		return c.JSON(geoDTO{})
+	}
+	return c.JSON(geoDTO{Address: addr, Attribution: osmAttribution})
+}
+
 func (h *handlers) getHouse(c fiber.Ctx) error {
 	d, err := h.Houses.Get(c.Context(), c.Params("id"))
 	if err != nil {

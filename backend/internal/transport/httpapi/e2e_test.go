@@ -85,7 +85,7 @@ func TestMain(m *testing.M) {
 				BotToken: botToken, SessionSecret: "s", SessionTTL: time.Hour, DemoEnabled: demo, ConsentVersion: "v1", Now: time.Now,
 			}),
 			Issues:         issues.NewService(store, issues.Config{Now: time.Now, NewID: func() string { return uuid.NewV7().String() }, ConsentVersion: "v1"}),
-			Houses:         houses.NewService(store),
+			Houses:         houses.NewService(store, nil),
 			Hints:          hints.NewService(nil, time.Second, log),
 			Appeal:         appeal.NewService(store, appeal.Config{Secret: []byte("s"), TTL: 10 * time.Minute, Now: time.Now}),
 			Photos:         photos.NewService(store, &apptest.MemFiles{}, photos.Config{Now: time.Now, NewID: func() string { return uuid.NewV7().String() }, ConsentVersion: "v1"}),

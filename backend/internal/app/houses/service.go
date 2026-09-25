@@ -1,10 +1,11 @@
-// Пакет houses — чтение справочника домов: поиск, ближайшие, карточка дома, вход по QR.
+// Пакет houses — справочник домов: поиск, ближайшие, карточка дома, вход по QR, импорт реестра.
 package houses
 
 import (
 	"context"
 	"fmt"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"dommax/internal/app"
@@ -12,9 +13,15 @@ import (
 	"dommax/internal/domain/user"
 )
 
-type Service struct{ store app.Store }
+// LocateTimeout — сколько ждать обратный адрес: публичный геокодер бывает медленным, экран не должен висеть.
+const LocateTimeout = 3 * time.Second
 
-func NewService(store app.Store) *Service { return &Service{store: store} }
+type Service struct {
+	store app.Store
+	geo   app.Geocoder // nil — геокодер выключен
+}
+
+func NewService(store app.Store, geo app.Geocoder) *Service { return &Service{store: store, geo: geo} }
 
 // Details — дом со всем, что нужно экрану заявки: УК, подъезды, объекты с QR.
 type Details struct {
@@ -33,10 +40,35 @@ func (s *Service) Search(ctx context.Context, query string) ([]house.House, erro
 }
 
 func (s *Service) Nearest(ctx context.Context, lat, lon float64) ([]house.House, error) {
-	if lat < -90 || lat > 90 || lon < -180 || lon > 180 {
-		return nil, fmt.Errorf("%w: coordinates out of range", app.ErrInvalidInput)
+	if err := checkCoords(lat, lon); err != nil {
+		return nil, err
 	}
 	return s.store.Houses().Nearest(ctx, lat, lon, 5)
+}
+
+// Locate — адрес, где стоит житель, для «Найти дома рядом» (ADR-016).
+// Пустая строка без ошибки — геокодер выключен или адрес не найден.
+func (s *Service) Locate(ctx context.Context, lat, lon float64) (string, error) {
+	if err := checkCoords(lat, lon); err != nil {
+		return "", err
+	}
+	if s.geo == nil {
+		return "", nil
+	}
+	ctx, cancel := context.WithTimeout(ctx, LocateTimeout)
+	defer cancel()
+	addr, ok, err := s.geo.Reverse(ctx, lat, lon)
+	if err != nil || !ok {
+		return "", err
+	}
+	return addr, nil
+}
+
+func checkCoords(lat, lon float64) error {
+	if lat < -90 || lat > 90 || lon < -180 || lon > 180 {
+		return fmt.Errorf("%w: coordinates out of range", app.ErrInvalidInput)
+	}
+	return nil
 }
 
 func (s *Service) Get(ctx context.Context, id string) (Details, error) {

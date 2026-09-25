@@ -35,6 +35,19 @@ docker compose -f deploy/compose.yaml --env-file deploy/.env.example down
 
 Логи сервиса: `docker compose -f deploy/compose.yaml --env-file deploy/.env.example logs -f api`.
 
+### Импорт домов из CSV
+
+Реестр домов загружается командой внутри контейнера `api`, файл передаётся через stdin:
+
+```bash
+docker compose -f deploy/compose.yaml --env-file deploy/.env.example exec -T api api import-houses - < deploy/seed/houses-sample.csv
+```
+
+- В ответ печатается отчёт: сколько домов создано и обновлено, у скольких координаты найдены геокодером, ошибки с номерами строк.
+- Пример `deploy/seed/houses-sample.csv`: девять модельных домов района Зябликово и одна строка с несуществующей УК, чтобы было видно отчёт об ошибке.
+- Формат колонок описан в [architecture.md](architecture.md#реестр-домов-и-геокодер). Локально без Docker: `task import:houses -- deploy/seed/houses-sample.csv`.
+- Геокодер задаётся `GEOCODER_URL` и `GEOCODER_USER_AGENT`. По умолчанию это публичный Nominatim: для сотен домов подходит, для реестра города нужен свой сервер.
+
 ### Подсказка категории через модель (необязательно)
 
 Без модели подсказка работает на ключевых словах. Чтобы включить self-hosted модель, раскомментируйте в env-файле две строки и запустите ту же команду `up -d --build`:

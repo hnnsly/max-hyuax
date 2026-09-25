@@ -124,6 +124,9 @@ func TestErrorResponses(t *testing.T) {
 		{"search query too short", api, "GET", "/api/v1/houses?query=1", anna, "", 422, "invalid_input"},
 		{"coordinates out of range", api, "GET", "/api/v1/houses/nearest?lat=200&lon=37", anna, "", 422, "invalid_input"},
 		{"coordinates not numbers", api, "GET", "/api/v1/houses/nearest?lat=abc&lon=37", anna, "", 422, "invalid_input"},
+		{"reverse geocoding out of range", api, "GET", "/api/v1/geo/reverse?lat=55&lon=-200", anna, "", 422, "invalid_input"},
+		{"reverse geocoding without lon", api, "GET", "/api/v1/geo/reverse?lat=55", anna, "", 422, "invalid_input"},
+		{"reverse geocoding without token", api, "GET", "/api/v1/geo/reverse?lat=55&lon=37", "", "", 401, "unauthorized"},
 		{"empty consent version", api, "POST", "/api/v1/me/consent", anna, `{"version":""}`, 422, "invalid_input"},
 		// Id в адресе не uuid: такой записи нет, это 404, а не сбой сервера.
 		{"issue id not a uuid", api, "GET", "/api/v1/issues/abc", anna, "", 404, "not_found"},
@@ -207,5 +210,13 @@ func TestWebhookIgnoresRedelivery(t *testing.T) {
 	time.Sleep(100 * time.Millisecond)
 	if got := count() - before; got != 1 {
 		t.Fatalf("handled %d times, want exactly once", got)
+	}
+}
+
+// Без GEOCODER_URL обратный адрес не ищется: 200 без адреса и без подписи OSM.
+func TestReverseGeocodeDisabled(t *testing.T) {
+	r := expect(t, call(t, "GET", "/api/v1/geo/reverse?lat=55.6124&lon=37.7462", login(t, "resident"), nil), 200, "reverse")
+	if len(r.body) != 0 {
+		t.Fatalf("body = %v, want empty object", r.body)
 	}
 }

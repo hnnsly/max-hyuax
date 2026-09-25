@@ -250,6 +250,30 @@ paths:
                 items: { $ref: "#/components/schemas/House" }
         "422": { $ref: "#/components/responses/Error" }
 
+  /geo/reverse:
+    get:
+      tags: [houses]
+      summary: Адрес точки по данным OpenStreetMap
+      description: |
+        Подсказка к «Найти дома рядом». Геокодер совместим с Nominatim (GEOCODER_URL).
+        Если геокодер выключен, не нашёл адрес или не ответил за 3 с, ответ 200 без полей.
+        Рядом с адресом нужно показывать attribution: этого требует лицензия ODbL.
+      parameters:
+        - { name: lat, in: query, required: true, schema: { type: number }, example: 55.6128 }
+        - { name: lon, in: query, required: true, schema: { type: number }, example: 37.7199 }
+      responses:
+        "200":
+          description: Адрес или пустой объект
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  address: { type: string, example: "Ореховый бульвар, 15" }
+                  attribution: { type: string, example: "© участники OpenStreetMap" }
+        "401": { $ref: "#/components/responses/Error" }
+        "422": { $ref: "#/components/responses/Error" }
+
   /houses/{id}:
     get:
       tags: [houses]

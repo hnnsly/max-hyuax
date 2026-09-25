@@ -3,6 +3,7 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -24,6 +25,15 @@ func run(log *slog.Logger) error {
 	}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	// Без аргументов — сервис; import-houses — разовая загрузка реестра домов (ADR-016).
+	if args := os.Args[1:]; len(args) > 0 {
+		if len(args) != 2 || args[0] != "import-houses" {
+			return errors.New("usage: api [import-houses <file.csv|->]")
+		}
+		// Отчёт идёт в stdout, служебные логи — в stderr, чтобы не смешивались.
+		return importHouses(ctx, cfg, slog.New(slog.NewJSONHandler(os.Stderr, nil)), args[1], os.Stdout)
+	}
 
 	c, err := Open(ctx, cfg, log)
 	if err != nil {

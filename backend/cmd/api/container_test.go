@@ -291,3 +291,39 @@ func TestOpenFilesPicksStorage(t *testing.T) {
 	}
 	_ = s3.Close()
 }
+
+// import-houses целиком: файл реестра → дома с объектами в базе, отчёт с ошибками строк;
+// повторный запуск того же файла обновляет дома, а не создаёт дубли.
+func TestImportHousesCommand(t *testing.T) {
+	cfg := testConfig(t)
+	path := t.TempDir() + "/houses.csv"
+	csv := "id,address,district,org_id,year,floors,entrances,lat,lon,source\n" +
+		"h-imp-1,\"Тестовая улица, 1\",Зябликово,org-orekh,1985,9,2,55.61,37.74,model\n" +
+		",\"Тестовая улица, 2\",Зябликово,org-orekh,1986,12,1,,,model\n" +
+		"h-imp-3,\"Тестовая улица, 3\",Зябликово,org-missing,1986,12,1,,,model\n"
+	if err := os.WriteFile(path, []byte(csv), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var out strings.Builder
+	if err := importHouses(t.Context(), cfg, quietLog(), path, &out); err != nil {
+		t.Fatalf("import: %v", err)
+	}
+	if !strings.Contains(out.String(), "создано 2, обновлено 0") || !strings.Contains(out.String(), "строка 4") {
+		t.Fatalf("report = %s", out.String())
+	}
+	out.Reset()
+	if err := importHouses(t.Context(), cfg, quietLog(), path, &out); err != nil || !strings.Contains(out.String(), "создано 0, обновлено 2") {
+		t.Fatalf("second import = %s, err = %v", out.String(), err)
+	}
+	c, err := Open(t.Context(), cfg, quietLog())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer c.Close()
+	if obj, _, err := c.Houses().ByQRCode(t.Context(), "h-imp-1-e2-light"); err != nil || obj.HouseID != "h-imp-1" {
+		t.Fatalf("imported object = %+v, err = %v", obj, err)
+	}
+	if err := importHouses(t.Context(), cfg, quietLog(), path+".missing", &out); err == nil {
+		t.Fatal("import of missing file succeeded")
+	}
+}

@@ -28,6 +28,8 @@ type config struct {
 
 	S3          files.S3Config // фото в S3 (MinIO в Docker); без Endpoint — на диске в PhotosDir
 	PhotosDir   string         // запасное хранилище фото для локального запуска
+	GeocoderURL string         // API, совместимое с Nominatim (ADR-016); пусто — геокодер выключен
+	GeocoderUA  string         // User-Agent с названием и контактом: требование правил Nominatim
 	OllamaURL   string         // пусто — LLM не подключена, подсказка по ключевым словам
 	OllamaModel string
 }
@@ -57,6 +59,8 @@ func loadConfig(getenv func(string) string) (config, error) {
 			Bucket:    cmp.Or(getenv("S3_BUCKET"), "photos"),
 		},
 		PhotosDir:   cmp.Or(getenv("PHOTOS_DIR"), "data/photos"),
+		GeocoderURL: getenv("GEOCODER_URL"),
+		GeocoderUA:  cmp.Or(getenv("GEOCODER_USER_AGENT"), "dom-max/1.0"),
 		OllamaURL:   getenv("OLLAMA_URL"),
 		OllamaModel: cmp.Or(getenv("OLLAMA_MODEL"), "qwen3:4b"),
 	}

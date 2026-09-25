@@ -112,6 +112,12 @@ tasks:
     cmds:
       - go run ./cmd/api
 
+  import:houses:
+    desc: Импорт реестра домов из CSV в локальную базу (task import:houses -- deploy/seed/houses-sample.csv)
+    dir: backend
+    cmds:
+      - go run ./cmd/api import-houses "{{.USER_WORKING_DIR}}/{{.CLI_ARGS}}"
+
   sqlc:
     desc: Сгенерировать код запросов sqlc
     dir: backend

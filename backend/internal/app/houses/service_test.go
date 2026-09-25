@@ -1,6 +1,7 @@
 package houses_test
 
 import (
+	"context"
 	"errors"
 	"testing"
 
@@ -17,7 +18,7 @@ func setup() (*apptest.MemStore, *houses.Service) {
 	s.HouseMap["h-1"] = house.House{ID: "h-1", Address: "Ореховый бульвар, 17к2", OrganizationID: "org-1"}
 	s.HouseMap["h-orphan"] = house.House{ID: "h-orphan", Address: "Без УК", OrganizationID: "org-missing"}
 	s.Objects = []house.AssetObject{{ID: "o-1", HouseID: "h-1", Category: "lift", QRCode: "h-1-lift"}}
-	return s, houses.NewService(s)
+	return s, houses.NewService(s, nil)
 }
 
 func TestNearestValidatesCoordinates(t *testing.T) {
@@ -61,7 +62,7 @@ func TestByQRCode(t *testing.T) {
 func TestSearchValidatesQuery(t *testing.T) {
 	s := apptest.New()
 	s.HouseMap["h-1"] = house.House{ID: "h-1", Address: "Ореховый бульвар, 17к2"}
-	svc := houses.NewService(s)
+	svc := houses.NewService(s, nil)
 
 	// Строка в cp1251 вместо UTF-8: так отправляет запрос консоль Windows со старой кодовой страницей.
 	for _, q := range []string{"", "1", "17\xea2"} {
@@ -88,4 +89,38 @@ func TestOperatorHousesAreOwnOnly(t *testing.T) {
 			t.Errorf("ForOperator(%+v) err = %v, want forbidden", u, err)
 		}
 	}
+}
+
+// Locate: адрес точки для «Найти дома рядом»; без геокодера и при «не нашёл» пустая строка.
+func TestLocate(t *testing.T) {
+	s, svc := setup()
+	if addr, err := svc.Locate(t.Context(), 55.6, 37.7); addr != "" || err != nil {
+		t.Fatalf("without geocoder = %q, %v", addr, err)
+	}
+	geo := &reverseGeo{addr: "Ореховый бульвар, 15"}
+	svc = houses.NewService(s, geo)
+	if addr, err := svc.Locate(t.Context(), 55.6, 37.7); addr != "Ореховый бульвар, 15" || err != nil {
+		t.Fatalf("Locate = %q, %v", addr, err)
+	}
+	if _, err := svc.Locate(t.Context(), 91, 0); !errors.Is(err, app.ErrInvalidInput) {
+		t.Fatalf("bad coords err = %v", err)
+	}
+	geo.addr = ""
+	if addr, err := svc.Locate(t.Context(), 55.6, 37.7); addr != "" || err != nil {
+		t.Fatalf("not found = %q, %v", addr, err)
+	}
+	geo.err = errors.New("geocoder down")
+	if _, err := svc.Locate(t.Context(), 55.6, 37.7); err == nil {
+		t.Fatal("geocoder error swallowed by service")
+	}
+}
+
+type reverseGeo struct {
+	fakeGeo
+	addr string
+	err  error
+}
+
+func (g *reverseGeo) Reverse(context.Context, float64, float64) (string, bool, error) {
+	return g.addr, g.addr != "", g.err
 }

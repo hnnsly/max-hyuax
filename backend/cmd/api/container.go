@@ -20,6 +20,7 @@ import (
 	"dommax/internal/app/issues"
 	"dommax/internal/app/photos"
 	"dommax/internal/storage/files"
+	"dommax/internal/storage/geo"
 	"dommax/internal/storage/llm"
 	"dommax/internal/storage/maxapi"
 	"dommax/internal/storage/postgres"
@@ -51,6 +52,7 @@ type Container struct {
 	houses     func() *houses.Service
 	hints      func() *hints.Service
 	photos     func() *photos.Service
+	geocoder   func() app.Geocoder
 	maxClient  func() (*maxapi.Client, error)
 	botMe      func() (maxapi.User, error)
 	botHandler func() (*bot.Handler, error)
@@ -88,7 +90,19 @@ func Open(ctx context.Context, cfg config, log *slog.Logger) (*Container, error)
 			Now: time.Now, NewID: func() string { return uuid.NewV7().String() }, ConsentVersion: cfg.ConsentVersion,
 		})
 	})
-	c.houses = sync.OnceValue(func() *houses.Service { return houses.NewService(store) })
+	c.geocoder = sync.OnceValue(func() app.Geocoder {
+		// Без GEOCODER_URL импорт и «Найти дома рядом» работают без геокодера.
+		if cfg.GeocoderURL == "" {
+			return nil
+		}
+		n, err := geo.NewNominatim(cfg.GeocoderURL, cfg.GeocoderUA)
+		if err != nil {
+			log.Warn("geocoder disabled", "err", err)
+			return nil
+		}
+		return n
+	})
+	c.houses = sync.OnceValue(func() *houses.Service { return houses.NewService(store, c.geocoder()) })
 	c.photos = sync.OnceValue(func() *photos.Service {
 		return photos.NewService(store, photoFiles, photos.Config{
 			Now: time.Now, NewID: func() string { return uuid.NewV7().String() }, ConsentVersion: cfg.ConsentVersion,
@@ -226,6 +240,9 @@ func (c *Container) Issues() *issues.Service { return c.issues() }
 func (c *Container) Houses() *houses.Service { return c.houses() }
 func (c *Container) Hints() *hints.Service   { return c.hints() }
 func (c *Container) Photos() *photos.Service { return c.photos() }
+
+// Importer — импорт реестра домов (команда import-houses).
+func (c *Container) Importer() *houses.Importer { return houses.NewImporter(c.store, c.geocoder()) }
 
 func (c *Container) MaxClient() (*maxapi.Client, error)        { return c.maxClient() }
 func (c *Container) BotIdentity() (maxapi.User, error)         { return c.botMe() }

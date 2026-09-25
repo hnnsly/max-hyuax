@@ -292,6 +292,13 @@ func (r houseRepo) Nearest(ctx context.Context, _, _ float64, limit int) ([]hous
 	return all[:min(len(all), limit)], nil
 }
 
+// Upsert в памяти хранит только сам дом: подъезды и объекты проверяет тест на Postgres.
+func (r houseRepo) Upsert(_ context.Context, h house.House) (bool, error) {
+	_, existed := r.s.HouseMap[h.ID]
+	r.s.HouseMap[h.ID] = h
+	return !existed, nil
+}
+
 func (r houseRepo) Get(_ context.Context, id string) (house.House, error) {
 	h, ok := r.s.HouseMap[id]
 	if !ok {

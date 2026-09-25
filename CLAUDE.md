@@ -82,7 +82,7 @@ backend/                Go 1.27.1 · Fiber v3 · pgx + sqlc · PostgreSQL · goo
   internal/app/         сценарии + порты (интерфейсы); зависит только от domain
   internal/app/apptest/ хранилище в памяти для юнит-тестов сценариев
   internal/transport/   входящие: httpapi (Fiber), bot (события MAX, webhook, polling), jobs (outbox, просрочки), pdf (обращение в ГЖИ)
-  internal/storage/     исходящие: postgres (репозитории, migrations, queries → sqlcdb), maxapi (клиент Bot API), llm (Ollama), files (фото в MinIO по S3, диск запасной)
+  internal/storage/     исходящие: postgres (репозитории, migrations, queries → sqlcdb), maxapi (клиент Bot API), llm (Ollama), files (фото в MinIO по S3, диск запасной), geo (геокодер Nominatim)
 miniapp/                Vite · React 19 · TypeScript (strict) · @maxhub/max-ui · MAX Bridge · Vitest
   src/app (сессия, стек экранов), src/pages, src/shared/{api,bridge,lib,ui,theme}
 deploy/                 compose.yaml, Caddyfile, seed/
@@ -113,6 +113,7 @@ docs/                   документация продукта (ведётс�
 - `task run` — api на `:8080`, миграции при старте; бот по `BOT_MODE` из `.env` (локально `off`);
 - `task test:live` — проверка на живом MAX Bot API; `task test:llm` — подсказка категории на настоящем Ollama (нужны `OLLAMA_URL` и скачанная модель);
 - локально одной командой, как у жюри: `docker compose -f deploy/compose.yaml --env-file deploy/.env.example up -d --build` (ADR-013);
+- `task import:houses -- deploy/seed/houses-sample.csv` — импорт реестра домов из CSV в локальную базу (геокодер из `GEOCODER_URL`);
 - `task sqlc` — перегенерировать код запросов после правки `queries/*.sql` или миграций;
 - `task up` / `task down` / `task logs -- api` — весь стек в compose;
 - `task miniapp:install` — зависимости мини-приложения (`npm ci`);
@@ -157,7 +158,7 @@ docs/                   документация продукта (ведётс�
 - `hack-docs/HANDOFF.md` — текущее состояние работы и следующий шаг
 - `hack-docs/INDEX.md` — вход в базу знаний
 - `hack-docs/SRS.md` + `hack-docs/requirements/` — требования (user-stories, ux-flows, nfr, data-model)
-- `hack-docs/adr/` — решения 001–015, 017 и 018 (016 зарезервирован под геокодер)
+- `hack-docs/adr/` — решения 001–018
 - `hack-docs/design/canvas-v2/project/` — утверждённый дизайн v2 (эталон экранов), `hack-docs/design/DESIGN-SYSTEM.md`
 - `hack-docs/GEN_V2_PLAN.md` — действующий план на 24–30.09 (части 0–7, линия отсечения); `hack-docs/GENERAL_PLAN.md` (v1) и `hack-docs/ROADMAP.md` — исходный план и вехи M0–M5
 - `hack-docs/research/max-platform-capabilities.md` — справка по Bot API, Bridge, MAX UI

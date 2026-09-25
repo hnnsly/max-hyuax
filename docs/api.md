@@ -21,7 +21,7 @@ curl -X POST https://<домен>/api/v1/auth/demo -H "Content-Type: application
 
 ## Основной сценарий
 
-1. **Найти дом:** `GET /houses?query=17к2` или `GET /houses/nearest?lat=55.6124&lon=37.7462`.
+1. **Найти дом:** `GET /houses?query=17к2` или `GET /houses/nearest?lat=55.6124&lon=37.7462`. Подсказка «где я»: `GET /geo/reverse?lat=55.6128&lon=37.7199` вернёт `{"address": "Ореховый бульвар, 15", "attribution": "© участники OpenStreetMap"}` или пустой объект, если геокодер выключен или адрес не найден.
 2. **Или открыть объект по QR:** `GET /objects/h-17k2-e2-lift`.
 3. **Проверить дубли:** `GET /issues/similar?house_id=h-17k2&category=lift&object_id=h-17k2-e2-lift`.
 4. **Сообщить о проблеме:** `POST /issues` с телом `{"house_id":"h-17k2","object_id":"h-17k2-e2-lift","description":"Кабина не приходит"}`. Категория, заголовок, ответственный и срок заполнятся сами.

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from '../app/router';
 import { demoRoles, useSession, useUser, type DemoRole } from '../app/session';
 import { api, ApiError } from '../shared/api/client';
-import type { House } from '../shared/api/types';
+import type { GeoPlace, House } from '../shared/api/types';
 import { isClosed } from '../shared/api/types';
 import { useResource } from '../shared/api/useResource';
 import { bridge, BOT_NAME } from '../shared/bridge/bridge';
@@ -23,6 +23,7 @@ export function HouseSearch() {
   const { reset, back, canGoBack } = useRouter();
   const [query, setQuery] = useState('');
   const [found, setFound] = useState<House[] | null>(null);
+  const [place, setPlace] = useState<GeoPlace | null>(null);
   const [error, setError] = useState('');
   const [toast, showToast] = useToast();
 
@@ -58,7 +59,11 @@ export function HouseSearch() {
       return;
     }
     navigator.geolocation.getCurrentPosition(
-      (pos) => api.nearestHouses(pos.coords.latitude, pos.coords.longitude).then(setFound, () => showToast('Не удалось найти дома рядом')),
+      ({ coords: { latitude, longitude } }) => {
+        api.nearestHouses(latitude, longitude).then(setFound, () => showToast('Не удалось найти дома рядом'));
+        // Адрес по карте только подсказывает, какой дом выбрать: без него список домов работает.
+        api.reverseGeocode(latitude, longitude).then(setPlace, () => setPlace(null));
+      },
       () => showToast('Нет доступа к геопозиции. Найдите дом по адресу'),
       { timeout: 10_000 },
     );
@@ -83,7 +88,10 @@ export function HouseSearch() {
         placeholder="Улица и номер дома"
         aria-label="Адрес"
         value={query}
-        onChange={(e) => setQuery(e.target.value)}
+        onChange={(e) => {
+          setQuery(e.target.value);
+          setPlace(null); // адрес по карте относится к поиску рядом, не к поиску по тексту
+        }}
         iconBefore={<MagnifyingGlass size={20} />}
         withClearButton
         autoFocus
@@ -93,6 +101,13 @@ export function HouseSearch() {
         Найти дома рядом со мной
       </Button>
       {error && <p className={s.hint} role="alert">{error}</p>}
+      {place?.address && (
+        <div role="status">
+          <p className={s.text}>Вы сейчас здесь: {place.address}</p>
+          {/* Подпись требует лицензия данных OpenStreetMap (ODbL). */}
+          <p className={s.hint}>Адрес по карте: {place.attribution}</p>
+        </div>
+      )}
       {found && found.length === 0 && <EmptyState title="Ничего не нашли" text="Проверьте адрес. Пока в сервисе дома одного района Москвы." />}
       {found && found.length > 0 && (
         <CellList mode="island">
