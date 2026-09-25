@@ -84,11 +84,6 @@ export function Home() {
       <HousePlate address={house.address} />
       {facts.length > 0 && <Facts items={facts} />}
       {house.source === 'model' && <DemoMark />}
-      {osm && (
-        <p className={s.hint}>
-          Дом добавлен по данным OpenStreetMap (© участники OpenStreetMap). Управляющая организация определена по району и может отличаться.
-        </p>
-      )}
 
       <Island>
         <div className={s.org}>

@@ -25,13 +25,16 @@ export function HouseCouncil({ onToast }: { onToast: (msg: string) => void }) {
   const [proposing, setProposing] = useState(false);
   const chairman = Boolean(user.chairman);
   const res = useResource(async () => {
+    if (user.role !== 'resident') return { polls: [], mine: [], folder: [] };
     const [polls, mine, folder] = await Promise.all([
       api.polls(),
       api.myProposals(),
       chairman ? api.councilFolder() : Promise.resolve<Proposal[]>([]),
     ]);
     return { polls, mine, folder };
-  }, [chairman]);
+  }, [chairman, user.role]);
+
+  if (user.role !== 'resident') return null;
 
   const proposed = () => {
     setProposing(false);
@@ -47,9 +50,20 @@ export function HouseCouncil({ onToast }: { onToast: (msg: string) => void }) {
     const fresh = folder.filter((p) => p.status === 'new').length;
     body = (
       <>
-        {polls.map((p) => (
-          <PollCard key={p.id} poll={p} onVoted={res.reload} onToast={onToast} />
-        ))}
+        {polls.length > 0 ? (
+          polls.map((p) => (
+            <PollCard key={p.id} poll={p} onVoted={res.reload} onToast={onToast} />
+          ))
+        ) : (
+          <Island>
+            <div className={c.poll}>
+              <h3 className={c.question}>Опросы жителей</h3>
+              <p className={c.meta}>
+                В доме пока нет активных опросов. Когда председатель совета откроет опрос по обращениям жителей, он появится здесь.
+              </p>
+            </div>
+          </Island>
+        )}
         <Island>
           <div className={s.block}>
             <p className={s.text}>Есть идея для дома? Напишите председателю совета. Он увидит текст без вашего имени.</p>
