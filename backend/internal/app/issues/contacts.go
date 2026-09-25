@@ -30,6 +30,10 @@ func (s *Service) Contacts(ctx context.Context, viewer user.User, is *issue.Issu
 		if u.Deleted() || !u.PhoneShared() {
 			continue
 		}
+		// Роль, взятая через /role на демо-стенде, видит только синтетических демо-жителей.
+		if viewer.RoleSwitched && !u.Demo {
+			continue
+		}
 		out = append(out, Contact{FirstName: u.FirstName, Phone: u.Phone})
 	}
 	return out, nil

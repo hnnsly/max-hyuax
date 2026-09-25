@@ -24,9 +24,14 @@ type User struct {
 	District       string // для района: какой район он смотрит
 	// ChairmanHouseID — дом, где житель председатель совета: получает предложения соседей и проводит опросы.
 	ChairmanHouseID string
-	ConsentVersion  string
-	ConsentAt       time.Time
-	DeletedAt       time.Time
+	// Demo — демо-пользователь из миграций (вход ?demo=): его данные синтетические.
+	Demo bool
+	// RoleSwitched — роль взята через /role на демо-стенде. Такой пользователь управляет заявками,
+	// но не видит имён и телефонов настоящих жителей.
+	RoleSwitched   bool
+	ConsentVersion string
+	ConsentAt      time.Time
+	DeletedAt      time.Time
 }
 
 // CanManageIssues сообщает, может ли пользователь менять статусы заявок организации orgID.

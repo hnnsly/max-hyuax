@@ -13,7 +13,7 @@ import (
 )
 
 const getUser = `-- name: GetUser :one
-SELECT id, max_user_id, demo_key, first_name, phone, house_id, role, organization_id, consent_version, consent_at, deleted_at, created_at, district, chairman_house_id FROM users WHERE id = $1
+SELECT id, max_user_id, demo_key, first_name, phone, house_id, role, organization_id, consent_version, consent_at, deleted_at, created_at, district, chairman_house_id, role_switched FROM users WHERE id = $1
 `
 
 func (q *Queries) GetUser(ctx context.Context, id int64) (User, error) {
@@ -34,12 +34,13 @@ func (q *Queries) GetUser(ctx context.Context, id int64) (User, error) {
 		&i.CreatedAt,
 		&i.District,
 		&i.ChairmanHouseID,
+		&i.RoleSwitched,
 	)
 	return i, err
 }
 
 const getUserByDemoKey = `-- name: GetUserByDemoKey :one
-SELECT id, max_user_id, demo_key, first_name, phone, house_id, role, organization_id, consent_version, consent_at, deleted_at, created_at, district, chairman_house_id FROM users WHERE demo_key = $1
+SELECT id, max_user_id, demo_key, first_name, phone, house_id, role, organization_id, consent_version, consent_at, deleted_at, created_at, district, chairman_house_id, role_switched FROM users WHERE demo_key = $1
 `
 
 func (q *Queries) GetUserByDemoKey(ctx context.Context, demoKey pgtype.Text) (User, error) {
@@ -60,12 +61,13 @@ func (q *Queries) GetUserByDemoKey(ctx context.Context, demoKey pgtype.Text) (Us
 		&i.CreatedAt,
 		&i.District,
 		&i.ChairmanHouseID,
+		&i.RoleSwitched,
 	)
 	return i, err
 }
 
 const getUserByMaxID = `-- name: GetUserByMaxID :one
-SELECT id, max_user_id, demo_key, first_name, phone, house_id, role, organization_id, consent_version, consent_at, deleted_at, created_at, district, chairman_house_id FROM users WHERE max_user_id = $1
+SELECT id, max_user_id, demo_key, first_name, phone, house_id, role, organization_id, consent_version, consent_at, deleted_at, created_at, district, chairman_house_id, role_switched FROM users WHERE max_user_id = $1
 `
 
 func (q *Queries) GetUserByMaxID(ctx context.Context, maxUserID pgtype.Int8) (User, error) {
@@ -86,6 +88,7 @@ func (q *Queries) GetUserByMaxID(ctx context.Context, maxUserID pgtype.Int8) (Us
 		&i.CreatedAt,
 		&i.District,
 		&i.ChairmanHouseID,
+		&i.RoleSwitched,
 	)
 	return i, err
 }
@@ -93,7 +96,7 @@ func (q *Queries) GetUserByMaxID(ctx context.Context, maxUserID pgtype.Int8) (Us
 const insertUser = `-- name: InsertUser :one
 INSERT INTO users (max_user_id, first_name, role)
 VALUES ($1, $2, $3)
-RETURNING id, max_user_id, demo_key, first_name, phone, house_id, role, organization_id, consent_version, consent_at, deleted_at, created_at, district, chairman_house_id
+RETURNING id, max_user_id, demo_key, first_name, phone, house_id, role, organization_id, consent_version, consent_at, deleted_at, created_at, district, chairman_house_id, role_switched
 `
 
 type InsertUserParams struct {
@@ -120,12 +123,13 @@ func (q *Queries) InsertUser(ctx context.Context, arg InsertUserParams) (User, e
 		&i.CreatedAt,
 		&i.District,
 		&i.ChairmanHouseID,
+		&i.RoleSwitched,
 	)
 	return i, err
 }
 
 const listHouseChairmen = `-- name: ListHouseChairmen :many
-SELECT id, max_user_id, demo_key, first_name, phone, house_id, role, organization_id, consent_version, consent_at, deleted_at, created_at, district, chairman_house_id FROM users WHERE chairman_house_id = $1 AND deleted_at IS NULL ORDER BY id
+SELECT id, max_user_id, demo_key, first_name, phone, house_id, role, organization_id, consent_version, consent_at, deleted_at, created_at, district, chairman_house_id, role_switched FROM users WHERE chairman_house_id = $1 AND deleted_at IS NULL ORDER BY id
 `
 
 // Председатели совета дома: им приходят предложения соседей.
@@ -153,6 +157,7 @@ func (q *Queries) ListHouseChairmen(ctx context.Context, houseID pgtype.Text) ([
 			&i.CreatedAt,
 			&i.District,
 			&i.ChairmanHouseID,
+			&i.RoleSwitched,
 		); err != nil {
 			return nil, err
 		}
@@ -186,10 +191,11 @@ SET max_user_id       = $1,
     organization_id   = NULLIF($6::text, ''),
     district          = $7,
     chairman_house_id = NULLIF($8::text, ''),
-    consent_version   = $9,
-    consent_at        = $10,
-    deleted_at        = $11
-WHERE id = $12
+    role_switched     = $9,
+    consent_version   = $10,
+    consent_at        = $11,
+    deleted_at        = $12
+WHERE id = $13
 `
 
 type UpdateUserParams struct {
@@ -201,6 +207,7 @@ type UpdateUserParams struct {
 	OrganizationID  string
 	District        string
 	ChairmanHouseID string
+	RoleSwitched    bool
 	ConsentVersion  string
 	ConsentAt       *time.Time
 	DeletedAt       *time.Time
@@ -217,6 +224,7 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) error {
 		arg.OrganizationID,
 		arg.District,
 		arg.ChairmanHouseID,
+		arg.RoleSwitched,
 		arg.ConsentVersion,
 		arg.ConsentAt,
 		arg.DeletedAt,

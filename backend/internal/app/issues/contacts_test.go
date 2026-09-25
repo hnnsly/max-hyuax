@@ -54,3 +54,23 @@ func TestContactsOnlyForResponsibleUK(t *testing.T) {
 		}
 	}
 }
+
+// Сотрудник УК, взявший роль через /role на демо-стенде, видит только синтетических демо-жителей.
+func TestContactsHiddenFromSwitchedRole(t *testing.T) {
+	f := setup(t)
+	is := report(t, f, f.anna)
+	anna := f.anna
+	anna.SharePhone("+79991234567")
+	f.store.AddUser(anna)
+
+	switched := f.oper
+	switched.RoleSwitched = true
+	if got, _ := f.svc.Contacts(t.Context(), switched, is); len(got) != 0 {
+		t.Fatalf("switched role sees a real resident: %+v", got)
+	}
+	anna.Demo = true
+	f.store.AddUser(anna)
+	if got, _ := f.svc.Contacts(t.Context(), switched, is); len(got) != 1 {
+		t.Fatalf("switched role must see the demo resident, got %+v", got)
+	}
+}

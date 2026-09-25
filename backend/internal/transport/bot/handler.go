@@ -58,6 +58,7 @@ type Services struct {
 	Cards          *cards.Service // карточка заявки для показа в чате
 	Council        *appcouncil.Service
 	Pending        app.BotPendingRepo // что бот ждёт от жителя следующим сообщением
+	DemoRoles      bool               // /role доступна: демо-стенд (DEMO_AUTH_ENABLED)
 	ConsentVersion string
 	Now            func() time.Time
 }
@@ -561,12 +562,15 @@ func (h *Handler) switchRole(ctx context.Context, to maxapi.Target, from maxapi.
 		return err
 	}
 	arg = strings.ToLower(strings.TrimSpace(arg))
+	if !h.svc.DemoRoles {
+		return h.send(ctx, to, "Смена роли работает только на демо-стенде для проверки. Ваша роль: житель.")
+	}
 	switch arg {
 	case "chairman", "председатель":
 		if u.HouseID == "" {
 			return h.send(ctx, to, "Сначала выберите свой дом в /menu или отправьте геопозицию, чтобы стать председателем своего дома.")
 		}
-		if _, err := h.svc.Auth.SetRole(ctx, u, user.RoleResident, "", u.HouseID); err != nil {
+		if _, err := h.svc.Auth.SwitchRole(ctx, u, "chairman"); err != nil {
 			return err
 		}
 		return h.send(ctx, to, "Вам назначена роль: Председатель совета дома.\n\nТеперь в меню /polls вам доступна «Папка предложений», а при поступлении идей от соседей бот будет присылать их вам с кнопками ответа.")

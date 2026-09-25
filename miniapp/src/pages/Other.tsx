@@ -136,6 +136,8 @@ export function HouseSearch() {
           ))}
         </CellList>
       )}
+      {/* Поиск дополняется домами из OpenStreetMap: подпись требует лицензия ODbL (ADR-016). */}
+      <p className={s.hint}>Адреса: © участники OpenStreetMap</p>
       {toast}
     </Screen>
   );

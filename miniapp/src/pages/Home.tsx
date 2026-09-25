@@ -125,6 +125,8 @@ export function Home() {
         Удалить аккаунт
       </button>
       <DeleteAccountSheet open={deleting} onClose={() => setDeleting(false)} />
+      {/* Адреса домов частично из OpenStreetMap: лицензия ODbL требует подписи (ADR-016). */}
+      <p className={s.hint}>Адреса: © участники OpenStreetMap</p>
       {toast}
     </Screen>
   );

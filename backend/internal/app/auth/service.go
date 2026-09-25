@@ -175,20 +175,15 @@ func (s *Service) DeleteAccount(ctx context.Context, u user.User) error {
 	return s.store.Users().Save(ctx, u)
 }
 
-// SetRole переключает роль пользователя для тестирования и администрирования.
-func (s *Service) SetRole(ctx context.Context, u user.User, role user.Role, orgID, chairmanHouseID string) (user.User, error) {
-	u.Role = role
-	u.OrganizationID = orgID
-	u.ChairmanHouseID = chairmanHouseID
-	if role != user.RoleDistrict {
-		u.District = ""
-	}
-	return u, s.store.Users().Save(ctx, u)
-}
-
 // SwitchRole переключает роль текущего пользователя по имени роли (resident, chairman, uk_operator, district),
-// автоматически подставляя дом, УК или район его выбранного дома.
+// автоматически подставляя дом, УК или район его выбранного дома. Нужна комиссии, чтобы проверить все роли
+// из MAX, поэтому работает только на демо-стенде (DEMO_AUTH_ENABLED). Взятая так роль помечается
+// RoleSwitched: имена и телефоны настоящих жителей ей не отдаются (issues.Contacts).
 func (s *Service) SwitchRole(ctx context.Context, u user.User, target string) (user.User, error) {
+	if !s.cfg.DemoEnabled {
+		return u, fmt.Errorf("%w: role switch works only on the demo stand", app.ErrForbidden)
+	}
+	u.RoleSwitched = true
 	switch target {
 	case "chairman", "председатель":
 		if u.HouseID == "" {
@@ -224,6 +219,7 @@ func (s *Service) SwitchRole(ctx context.Context, u user.User, target string) (u
 		if u.HouseID == "" {
 			u.HouseID = "h-17k2"
 		}
+		u.RoleSwitched = false // обычный житель ничего лишнего не видит
 		u.Role = user.RoleResident
 		u.OrganizationID = ""
 		u.District = ""

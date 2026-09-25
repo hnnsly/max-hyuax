@@ -126,7 +126,7 @@ func newEnvWithLLM(t *testing.T, llm hints.LLM) env {
 	now := func() time.Time { return time.Date(2026, 9, 24, 10, 0, 0, 0, time.UTC) }
 	n := 0
 	svc := bot.Services{
-		Auth:           auth.NewService(s, auth.Config{Now: now, BotToken: testBotToken}),
+		Auth:           auth.NewService(s, auth.Config{Now: now, BotToken: testBotToken, DemoEnabled: true}),
 		Issues:         issues.NewService(s, issues.Config{Now: now, NewID: func() string { n++; return fmt.Sprintf("i-%d", n) }, ConsentVersion: "v1"}),
 		Houses:         houses.NewService(s, nil),
 		Hints:          hints.NewService(llm, time.Second, slog.New(slog.NewTextHandler(io.Discard, nil))),
@@ -134,6 +134,7 @@ func newEnvWithLLM(t *testing.T, llm hints.LLM) env {
 		Cards:          cards.NewService(s, nil, now),
 		Council:        appcouncil.NewService(s, appcouncil.Config{Now: now, NewID: func() string { n++; return fmt.Sprintf("c-%d", n) }, ConsentVersion: "v1"}),
 		Pending:        s.Pending(),
+		DemoRoles:      true,
 		ConsentVersion: "v1",
 		Now:            now,
 	}
@@ -784,5 +785,19 @@ func TestRoleSwitch(t *testing.T) {
 	u, _ = e.store.Users().ByMaxID(t.Context(), 9901)
 	if u.Role != user.RoleResident || u.ChairmanHouseID != "" {
 		t.Fatalf("role = %q, chairman = %q", u.Role, u.ChairmanHouseID)
+	}
+}
+
+// Вне демо-стенда /role ничего не меняет: иначе житель стал бы «сотрудником УК» с доступом к данным соседей.
+func TestRoleSwitchOnlyOnDemoStand(t *testing.T) {
+	e := newEnv(t)
+	u := e.resident(9101, true)
+	e.h = bot.NewHandler(e.max, botName, bot.Services{Auth: auth.NewService(e.store, auth.Config{Now: time.Now}), DemoRoles: false}, slog.New(slog.NewTextHandler(io.Discard, nil)))
+	e.handle(t, text(9101, "/role uk"))
+	if txt, _ := e.max.last(""); !strings.Contains(txt, "только на демо-стенде") {
+		t.Fatalf("/role outside demo = %q", txt)
+	}
+	if got, _ := e.store.Users().Get(t.Context(), u.ID); got.Role != user.RoleResident {
+		t.Fatalf("role changed outside demo: %+v", got)
 	}
 }

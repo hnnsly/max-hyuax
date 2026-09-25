@@ -179,4 +179,5 @@ type User struct {
 	CreatedAt       time.Time
 	District        string
 	ChairmanHouseID pgtype.Text
+	RoleSwitched    bool
 }

@@ -22,6 +22,7 @@ SET max_user_id       = @max_user_id,
     organization_id   = NULLIF(@organization_id::text, ''),
     district          = @district,
     chairman_house_id = NULLIF(@chairman_house_id::text, ''),
+    role_switched     = @role_switched,
     consent_version   = @consent_version,
     consent_at        = @consent_at,
     deleted_at        = @deleted_at

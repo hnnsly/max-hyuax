@@ -166,7 +166,8 @@ func Open(ctx context.Context, cfg config, log *slog.Logger) (*Container, error)
 		}
 		return bot.NewHandler(client, me.Username, bot.Services{
 			Auth: c.Auth(), Issues: c.Issues(), Houses: c.Houses(), Hints: c.Hints(), Photos: c.Photos(),
-			Cards: cardSvc, Council: c.council(), Pending: store.Pending(), ConsentVersion: cfg.ConsentVersion, Now: time.Now,
+			Cards: cardSvc, Council: c.council(), Pending: store.Pending(), DemoRoles: cfg.DemoAuth,
+			ConsentVersion: cfg.ConsentVersion, Now: time.Now,
 		}, log), nil
 	})
 	c.webhook = sync.OnceValues(func() (*bot.Webhook, error) {
