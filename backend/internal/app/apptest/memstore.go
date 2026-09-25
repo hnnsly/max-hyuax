@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"dommax/internal/app"
+	"dommax/internal/domain/council"
 	"dommax/internal/domain/house"
 	"dommax/internal/domain/issue"
 	"dommax/internal/domain/user"
@@ -29,6 +30,7 @@ type MemStore struct {
 	nextNum  int64
 	nextUID  int64
 	outbox   MemOutbox
+	council  memCouncil
 }
 
 // MemOutbox — очередь уведомлений в памяти: Pending виден тестам напрямую.
@@ -517,4 +519,130 @@ func (f *MemFiles) Get(_ context.Context, key string) ([]byte, error) {
 		return nil, app.ErrNotFound
 	}
 	return d, nil
+}
+
+// memCouncil — предложения, опросы и голоса в памяти.
+type memCouncil struct {
+	proposals []council.Proposal
+	polls     []council.Poll
+	votes     map[[2]string]int // {poll id, user id} → вариант
+}
+
+func (s *MemStore) Council() app.CouncilRepo { return councilRepo{s} }
+
+type councilRepo struct{ s *MemStore }
+
+func (r councilRepo) AddProposal(_ context.Context, p council.Proposal) error {
+	r.s.mu.Lock()
+	defer r.s.mu.Unlock()
+	r.s.council.proposals = append(r.s.council.proposals, p)
+	return nil
+}
+
+func (r councilRepo) GetProposal(_ context.Context, id string) (council.Proposal, error) {
+	r.s.mu.Lock()
+	defer r.s.mu.Unlock()
+	for _, p := range r.s.council.proposals {
+		if p.ID == id {
+			return p, nil
+		}
+	}
+	return council.Proposal{}, app.ErrNotFound
+}
+
+func (r councilRepo) ReplyProposal(_ context.Context, p council.Proposal) (bool, error) {
+	r.s.mu.Lock()
+	defer r.s.mu.Unlock()
+	for i, old := range r.s.council.proposals {
+		if old.ID == p.ID && old.Status == council.StatusNew {
+			r.s.council.proposals[i] = p
+			return true, nil
+		}
+	}
+	return false, nil
+}
+
+func (r councilRepo) HouseProposals(_ context.Context, houseID string, limit int) ([]council.Proposal, error) {
+	return r.proposals(func(p council.Proposal) bool { return p.HouseID == houseID }, limit), nil
+}
+
+func (r councilRepo) AuthorProposals(_ context.Context, authorID int64, limit int) ([]council.Proposal, error) {
+	return r.proposals(func(p council.Proposal) bool { return p.AuthorID == authorID }, limit), nil
+}
+
+// proposals — как в Postgres: новые первыми, дальше свежие.
+func (r councilRepo) proposals(keep func(council.Proposal) bool, limit int) []council.Proposal {
+	r.s.mu.Lock()
+	defer r.s.mu.Unlock()
+	var out []council.Proposal
+	for _, p := range r.s.council.proposals {
+		if keep(p) {
+			out = append(out, p)
+		}
+	}
+	slices.SortFunc(out, func(a, b council.Proposal) int {
+		return cmp.Or(cmpBool(b.Status == council.StatusNew, a.Status == council.StatusNew), b.CreatedAt.Compare(a.CreatedAt))
+	})
+	return out[:min(len(out), limit)]
+}
+
+func (r councilRepo) AddPoll(_ context.Context, p council.Poll) error {
+	r.s.mu.Lock()
+	defer r.s.mu.Unlock()
+	r.s.council.polls = append(r.s.council.polls, p)
+	return nil
+}
+
+func (r councilRepo) GetPoll(_ context.Context, id string) (council.Poll, error) {
+	r.s.mu.Lock()
+	defer r.s.mu.Unlock()
+	for _, p := range r.s.council.polls {
+		if p.ID == id {
+			return p, nil
+		}
+	}
+	return council.Poll{}, app.ErrNotFound
+}
+
+func (r councilRepo) HousePolls(_ context.Context, houseID string, limit int) ([]council.Poll, error) {
+	r.s.mu.Lock()
+	defer r.s.mu.Unlock()
+	var out []council.Poll
+	for _, p := range r.s.council.polls {
+		if p.HouseID == houseID {
+			out = append(out, p)
+		}
+	}
+	slices.SortFunc(out, func(a, b council.Poll) int { return b.CreatedAt.Compare(a.CreatedAt) })
+	return out[:min(len(out), limit)], nil
+}
+
+func (r councilRepo) Vote(_ context.Context, pollID string, userID int64, option int) (bool, error) {
+	r.s.mu.Lock()
+	defer r.s.mu.Unlock()
+	if r.s.council.votes == nil {
+		r.s.council.votes = map[[2]string]int{}
+	}
+	key := [2]string{pollID, strconv.FormatInt(userID, 10)}
+	if _, voted := r.s.council.votes[key]; voted {
+		return false, nil
+	}
+	r.s.council.votes[key] = option
+	return true, nil
+}
+
+func (r councilRepo) Tally(_ context.Context, p council.Poll, userID int64) (app.Tally, error) {
+	r.s.mu.Lock()
+	defer r.s.mu.Unlock()
+	t := app.Tally{Votes: make([]int, len(p.Options)), Mine: -1}
+	for key, option := range r.s.council.votes {
+		if key[0] != p.ID {
+			continue
+		}
+		t.Votes[option]++
+		if key[1] == strconv.FormatInt(userID, 10) {
+			t.Mine = option
+		}
+	}
+	return t, nil
 }

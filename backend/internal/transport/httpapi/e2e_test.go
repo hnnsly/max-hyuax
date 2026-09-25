@@ -32,6 +32,7 @@ import (
 	"dommax/internal/app/appeal"
 	"dommax/internal/app/apptest"
 	"dommax/internal/app/auth"
+	"dommax/internal/app/council"
 	"dommax/internal/app/hints"
 	"dommax/internal/app/houses"
 	"dommax/internal/app/issues"
@@ -89,6 +90,7 @@ func TestMain(m *testing.M) {
 			Hints:          hints.NewService(nil, time.Second, log),
 			Appeal:         appeal.NewService(store, appeal.Config{Secret: []byte("s"), TTL: 10 * time.Minute, Now: time.Now}),
 			Photos:         photos.NewService(store, &apptest.MemFiles{}, photos.Config{Now: time.Now, NewID: func() string { return uuid.NewV7().String() }, ConsentVersion: "v1"}),
+			Council:        council.NewService(store, council.Config{Now: time.Now, NewID: func() string { return uuid.NewV7().String() }, ConsentVersion: "v1"}),
 			Webhook:        bot.NewWebhook("hook-secret", webhooks, store, log),
 			Ping:           store.Ping,
 			ConsentVersion: "v1",

@@ -7,6 +7,7 @@ import (
 	"errors"
 	"time"
 
+	"dommax/internal/domain/council"
 	"dommax/internal/domain/house"
 	"dommax/internal/domain/issue"
 	"dommax/internal/domain/user"
@@ -170,6 +171,29 @@ type FileStore interface {
 	Delete(ctx context.Context, key string) error
 }
 
+// Tally — итоги опроса: голоса по вариантам и вариант пользователя (-1 — не голосовал).
+type Tally struct {
+	Votes []int
+	Mine  int
+}
+
+// CouncilRepo — предложения председателю совета и опросы дома (ADR-017).
+type CouncilRepo interface {
+	AddProposal(ctx context.Context, p council.Proposal) error
+	GetProposal(ctx context.Context, id string) (council.Proposal, error)
+	// ReplyProposal сохраняет ответ председателя; false — на предложение уже ответили.
+	ReplyProposal(ctx context.Context, p council.Proposal) (bool, error)
+	// HouseProposals — папка председателя: новые первыми.
+	HouseProposals(ctx context.Context, houseID string, limit int) ([]council.Proposal, error)
+	AuthorProposals(ctx context.Context, authorID int64, limit int) ([]council.Proposal, error)
+	AddPoll(ctx context.Context, p council.Poll) error
+	GetPoll(ctx context.Context, id string) (council.Poll, error)
+	HousePolls(ctx context.Context, houseID string, limit int) ([]council.Poll, error)
+	// Vote сохраняет голос; false — пользователь уже голосовал.
+	Vote(ctx context.Context, pollID string, userID int64, option int) (bool, error)
+	Tally(ctx context.Context, p council.Poll, userID int64) (Tally, error)
+}
+
 // Store — доступ к репозиториям; InTx выполняет fn в одной транзакции.
 type Store interface {
 	Issues() IssueRepo
@@ -177,5 +201,6 @@ type Store interface {
 	Users() UserRepo
 	Outbox() OutboxRepo
 	Photos() PhotoRepo
+	Council() CouncilRepo
 	InTx(ctx context.Context, fn func(tx Store) error) error
 }

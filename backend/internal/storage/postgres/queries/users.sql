@@ -18,6 +18,7 @@ SET max_user_id     = @max_user_id,
     first_name      = @first_name,
     phone           = @phone,
     house_id        = NULLIF(@house_id::text, ''),
+    chairman_house_id = NULLIF(@chairman_house_id::text, ''),
     consent_version = @consent_version,
     consent_at      = @consent_at,
     deleted_at      = @deleted_at

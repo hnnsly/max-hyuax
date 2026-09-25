@@ -38,11 +38,12 @@ type Session struct {
 // demoKeys — демо-роли для проверяющих; пользователи создаются миграцией с демо-данными.
 // Имя, дом и синтетический телефон нужны, чтобы вернуть демо-пользователя, если проверяющий
 // удалил аккаунт.
-var demoKeys = map[string]struct{ key, name, houseID, phone string }{
-	"resident":    {"resident_demo_1", "Анна", "h-17k2", "+79990000001"},
-	"resident_2":  {"resident_demo_2", "Сергей", "h-17k2", ""},
-	"uk_operator": {"uk_operator_demo", "Оператор УК", "", ""},
-	"district":    {"district_demo", "Управа района Зябликово", "", ""},
+var demoKeys = map[string]struct{ key, name, houseID, phone, chairmanOf string }{
+	"resident":    {"resident_demo_1", "Анна", "h-17k2", "+79990000001", ""},
+	"resident_2":  {"resident_demo_2", "Сергей", "h-17k2", "", ""},
+	"chairman":    {"chairman_demo", "Нина", "h-17k2", "", "h-17k2"},
+	"uk_operator": {"uk_operator_demo", "Оператор УК", "", "", ""},
+	"district":    {"district_demo", "Управа района Зябликово", "", "", ""},
 }
 
 // LoginMax проверяет initData и выдаёт сессию; новый пользователь MAX становится жителем.
@@ -88,7 +89,7 @@ func (s *Service) LoginDemo(ctx context.Context, role string) (Session, error) {
 	changed := false
 	if u.Deleted() {
 		// Проверяющий удалил демо-аккаунт: возвращаем его в исходное состояние из демо-данных.
-		u.DeletedAt, u.FirstName, u.HouseID = time.Time{}, demo.name, demo.houseID
+		u.DeletedAt, u.FirstName, u.HouseID, u.ChairmanHouseID = time.Time{}, demo.name, demo.houseID, demo.chairmanOf
 		u.AcceptConsent(s.cfg.ConsentVersion, s.cfg.Now())
 		changed = true
 	}

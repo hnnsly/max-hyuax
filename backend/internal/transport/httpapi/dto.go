@@ -23,13 +23,15 @@ type userDTO struct {
 	ConsentVersion string `json:"consent_version"` // версия, на которую нужно согласие сейчас
 	// PhoneShared — житель оставил телефон для мастера; сам номер в ответах о себе не отдаётся.
 	PhoneShared bool `json:"phone_shared"`
+	// Chairman — житель председатель совета своего дома: у него есть папка предложений.
+	Chairman bool `json:"chairman,omitzero"`
 }
 
 func toUserDTO(u user.User, consentVersion string) userDTO {
 	return userDTO{
 		ID: u.ID, FirstName: u.FirstName, Role: string(u.Role), HouseID: u.HouseID,
 		OrganizationID: u.OrganizationID, District: u.District, HasConsent: u.HasConsent(consentVersion), ConsentVersion: consentVersion,
-		PhoneShared: u.PhoneShared(),
+		PhoneShared: u.PhoneShared(), Chairman: u.IsChairmanOf(u.HouseID),
 	}
 }
 

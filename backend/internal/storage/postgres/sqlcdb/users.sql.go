@@ -13,7 +13,7 @@ import (
 )
 
 const getUser = `-- name: GetUser :one
-SELECT id, max_user_id, demo_key, first_name, phone, house_id, role, organization_id, consent_version, consent_at, deleted_at, created_at, district FROM users WHERE id = $1
+SELECT id, max_user_id, demo_key, first_name, phone, house_id, role, organization_id, consent_version, consent_at, deleted_at, created_at, district, chairman_house_id FROM users WHERE id = $1
 `
 
 func (q *Queries) GetUser(ctx context.Context, id int64) (User, error) {
@@ -33,12 +33,13 @@ func (q *Queries) GetUser(ctx context.Context, id int64) (User, error) {
 		&i.DeletedAt,
 		&i.CreatedAt,
 		&i.District,
+		&i.ChairmanHouseID,
 	)
 	return i, err
 }
 
 const getUserByDemoKey = `-- name: GetUserByDemoKey :one
-SELECT id, max_user_id, demo_key, first_name, phone, house_id, role, organization_id, consent_version, consent_at, deleted_at, created_at, district FROM users WHERE demo_key = $1
+SELECT id, max_user_id, demo_key, first_name, phone, house_id, role, organization_id, consent_version, consent_at, deleted_at, created_at, district, chairman_house_id FROM users WHERE demo_key = $1
 `
 
 func (q *Queries) GetUserByDemoKey(ctx context.Context, demoKey pgtype.Text) (User, error) {
@@ -58,12 +59,13 @@ func (q *Queries) GetUserByDemoKey(ctx context.Context, demoKey pgtype.Text) (Us
 		&i.DeletedAt,
 		&i.CreatedAt,
 		&i.District,
+		&i.ChairmanHouseID,
 	)
 	return i, err
 }
 
 const getUserByMaxID = `-- name: GetUserByMaxID :one
-SELECT id, max_user_id, demo_key, first_name, phone, house_id, role, organization_id, consent_version, consent_at, deleted_at, created_at, district FROM users WHERE max_user_id = $1
+SELECT id, max_user_id, demo_key, first_name, phone, house_id, role, organization_id, consent_version, consent_at, deleted_at, created_at, district, chairman_house_id FROM users WHERE max_user_id = $1
 `
 
 func (q *Queries) GetUserByMaxID(ctx context.Context, maxUserID pgtype.Int8) (User, error) {
@@ -83,6 +85,7 @@ func (q *Queries) GetUserByMaxID(ctx context.Context, maxUserID pgtype.Int8) (Us
 		&i.DeletedAt,
 		&i.CreatedAt,
 		&i.District,
+		&i.ChairmanHouseID,
 	)
 	return i, err
 }
@@ -90,7 +93,7 @@ func (q *Queries) GetUserByMaxID(ctx context.Context, maxUserID pgtype.Int8) (Us
 const insertUser = `-- name: InsertUser :one
 INSERT INTO users (max_user_id, first_name, role)
 VALUES ($1, $2, $3)
-RETURNING id, max_user_id, demo_key, first_name, phone, house_id, role, organization_id, consent_version, consent_at, deleted_at, created_at, district
+RETURNING id, max_user_id, demo_key, first_name, phone, house_id, role, organization_id, consent_version, consent_at, deleted_at, created_at, district, chairman_house_id
 `
 
 type InsertUserParams struct {
@@ -116,6 +119,7 @@ func (q *Queries) InsertUser(ctx context.Context, arg InsertUserParams) (User, e
 		&i.DeletedAt,
 		&i.CreatedAt,
 		&i.District,
+		&i.ChairmanHouseID,
 	)
 	return i, err
 }
@@ -138,21 +142,23 @@ SET max_user_id     = $1,
     first_name      = $2,
     phone           = $3,
     house_id        = NULLIF($4::text, ''),
-    consent_version = $5,
-    consent_at      = $6,
-    deleted_at      = $7
-WHERE id = $8
+    chairman_house_id = NULLIF($5::text, ''),
+    consent_version = $6,
+    consent_at      = $7,
+    deleted_at      = $8
+WHERE id = $9
 `
 
 type UpdateUserParams struct {
-	MaxUserID      pgtype.Int8
-	FirstName      string
-	Phone          string
-	HouseID        string
-	ConsentVersion string
-	ConsentAt      *time.Time
-	DeletedAt      *time.Time
-	ID             int64
+	MaxUserID       pgtype.Int8
+	FirstName       string
+	Phone           string
+	HouseID         string
+	ChairmanHouseID string
+	ConsentVersion  string
+	ConsentAt       *time.Time
+	DeletedAt       *time.Time
+	ID              int64
 }
 
 func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) error {
@@ -161,6 +167,7 @@ func (q *Queries) UpdateUser(ctx context.Context, arg UpdateUserParams) error {
 		arg.FirstName,
 		arg.Phone,
 		arg.HouseID,
+		arg.ChairmanHouseID,
 		arg.ConsentVersion,
 		arg.ConsentAt,
 		arg.DeletedAt,

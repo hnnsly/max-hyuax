@@ -38,30 +38,32 @@ func (r userRepo) Create(ctx context.Context, u user.User) (user.User, error) {
 
 func (r userRepo) Save(ctx context.Context, u user.User) error {
 	return r.q.UpdateUser(ctx, sqlcdb.UpdateUserParams{
-		ID:             u.ID,
-		MaxUserID:      pgtype.Int8{Int64: u.MaxUserID, Valid: u.MaxUserID != 0},
-		FirstName:      u.FirstName,
-		Phone:          u.Phone,
-		HouseID:        u.HouseID,
-		ConsentVersion: u.ConsentVersion,
-		ConsentAt:      timePtr(u.ConsentAt),
-		DeletedAt:      timePtr(u.DeletedAt),
+		ID:              u.ID,
+		MaxUserID:       pgtype.Int8{Int64: u.MaxUserID, Valid: u.MaxUserID != 0},
+		FirstName:       u.FirstName,
+		Phone:           u.Phone,
+		HouseID:         u.HouseID,
+		ChairmanHouseID: u.ChairmanHouseID,
+		ConsentVersion:  u.ConsentVersion,
+		ConsentAt:       timePtr(u.ConsentAt),
+		DeletedAt:       timePtr(u.DeletedAt),
 	})
 }
 
 func toUser(r sqlcdb.User) user.User {
 	return user.User{
-		ID:             r.ID,
-		MaxUserID:      r.MaxUserID.Int64,
-		FirstName:      r.FirstName,
-		Phone:          r.Phone,
-		HouseID:        r.HouseID.String,
-		Role:           user.Role(r.Role),
-		OrganizationID: r.OrganizationID.String,
-		District:       r.District,
-		ConsentVersion: r.ConsentVersion,
-		ConsentAt:      timeOrZero(r.ConsentAt),
-		DeletedAt:      timeOrZero(r.DeletedAt),
+		ID:              r.ID,
+		MaxUserID:       r.MaxUserID.Int64,
+		FirstName:       r.FirstName,
+		Phone:           r.Phone,
+		HouseID:         r.HouseID.String,
+		Role:            user.Role(r.Role),
+		OrganizationID:  r.OrganizationID.String,
+		District:        r.District,
+		ChairmanHouseID: r.ChairmanHouseID.String,
+		ConsentVersion:  r.ConsentVersion,
+		ConsentAt:       timeOrZero(r.ConsentAt),
+		DeletedAt:       timeOrZero(r.DeletedAt),
 	}
 }
 

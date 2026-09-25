@@ -122,23 +122,52 @@ type Outbox struct {
 	CreatedAt     time.Time
 }
 
+type Poll struct {
+	ID         string
+	HouseID    string
+	ProposalID *string
+	Question   string
+	Options    []string
+	CreatedAt  time.Time
+	ClosesAt   time.Time
+}
+
+type PollVote struct {
+	PollID  string
+	UserID  int64
+	Option  int32
+	VotedAt time.Time
+}
+
 type ProcessedUpdate struct {
 	Key        string
 	ReceivedAt time.Time
 }
 
+type Proposal struct {
+	ID         string
+	HouseID    string
+	AuthorID   int64
+	Text       string
+	Status     string
+	Answer     string
+	CreatedAt  time.Time
+	AnsweredAt *time.Time
+}
+
 type User struct {
-	ID             int64
-	MaxUserID      pgtype.Int8
-	DemoKey        pgtype.Text
-	FirstName      string
-	Phone          string
-	HouseID        pgtype.Text
-	Role           string
-	OrganizationID pgtype.Text
-	ConsentVersion string
-	ConsentAt      *time.Time
-	DeletedAt      *time.Time
-	CreatedAt      time.Time
-	District       string
+	ID              int64
+	MaxUserID       pgtype.Int8
+	DemoKey         pgtype.Text
+	FirstName       string
+	Phone           string
+	HouseID         pgtype.Text
+	Role            string
+	OrganizationID  pgtype.Text
+	ConsentVersion  string
+	ConsentAt       *time.Time
+	DeletedAt       *time.Time
+	CreatedAt       time.Time
+	District        string
+	ChairmanHouseID pgtype.Text
 }

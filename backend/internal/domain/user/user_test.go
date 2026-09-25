@@ -83,3 +83,19 @@ func TestDeleteAnonymizesPersonalData(t *testing.T) {
 		t.Fatalf("deleted user keeps personal data: %+v", u)
 	}
 }
+
+// Председатель — житель со своим домом; удаление аккаунта снимает и эту роль.
+func TestChairman(t *testing.T) {
+	u := user.User{Role: user.RoleResident, HouseID: "h-1", ChairmanHouseID: "h-1"}
+	if !u.IsChairmanOf("h-1") || u.IsChairmanOf("h-2") || u.IsChairmanOf("") {
+		t.Fatalf("IsChairmanOf wrong for %+v", u)
+	}
+	op := user.User{Role: user.RoleOperator, ChairmanHouseID: "h-1"}
+	if op.IsChairmanOf("h-1") {
+		t.Fatal("operator counted as chairman")
+	}
+	u.Delete(time.Now())
+	if u.ChairmanHouseID != "" || u.IsChairmanOf("h-1") {
+		t.Fatalf("deleted user is still chairman: %+v", u)
+	}
+}

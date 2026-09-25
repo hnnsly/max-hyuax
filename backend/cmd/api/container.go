@@ -15,6 +15,7 @@ import (
 	"dommax/internal/app/appeal"
 	"dommax/internal/app/auth"
 	"dommax/internal/app/cards"
+	"dommax/internal/app/council"
 	"dommax/internal/app/hints"
 	"dommax/internal/app/houses"
 	"dommax/internal/app/issues"
@@ -190,7 +191,10 @@ func Open(ctx context.Context, cfg config, log *slog.Logger) (*Container, error)
 			Auth: c.Auth(), Issues: c.Issues(), Houses: c.Houses(), Hints: c.Hints(),
 			Appeal: appeal.NewService(store, appeal.Config{Secret: []byte(cfg.SessionSecret), TTL: appealLinkTTL, Now: time.Now}),
 			Photos: c.Photos(),
-			Ping:   store.Ping, ConsentVersion: cfg.ConsentVersion, Now: time.Now, Log: log,
+			Council: council.NewService(store, council.Config{
+				Now: time.Now, NewID: func() string { return uuid.NewV7().String() }, ConsentVersion: cfg.ConsentVersion,
+			}),
+			Ping: store.Ping, ConsentVersion: cfg.ConsentVersion, Now: time.Now, Log: log,
 		}
 		if cfg.BotMode == "webhook" {
 			wh, err := c.webhook()

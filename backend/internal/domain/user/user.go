@@ -22,9 +22,11 @@ type User struct {
 	Role           Role
 	OrganizationID string // для оператора: УК, чьи заявки он ведёт
 	District       string // для района: какой район он смотрит
-	ConsentVersion string
-	ConsentAt      time.Time
-	DeletedAt      time.Time
+	// ChairmanHouseID — дом, где житель председатель совета: получает предложения соседей и проводит опросы.
+	ChairmanHouseID string
+	ConsentVersion  string
+	ConsentAt       time.Time
+	DeletedAt       time.Time
 }
 
 // CanManageIssues сообщает, может ли пользователь менять статусы заявок организации orgID.
@@ -35,6 +37,11 @@ func (u User) CanManageIssues(orgID string) bool {
 // CanTakePart — сообщать о проблемах, присоединяться к заявкам и проверять ремонт может только
 // житель. Сотрудник УК не подтверждает свои ремонты, район только смотрит.
 func (u User) CanTakePart() bool { return u.Role == RoleResident }
+
+// IsChairmanOf — житель председатель совета дома houseID (ADR-017). Председатель остаётся жителем.
+func (u User) IsChairmanOf(houseID string) bool {
+	return u.Role == RoleResident && houseID != "" && u.ChairmanHouseID == houseID
+}
 
 // CanViewDistrict — пользователь района видит сравнение УК и просроченные заявки своего района.
 func (u User) CanViewDistrict() bool {
@@ -54,7 +61,7 @@ func (u *User) AcceptConsent(docVersion string, at time.Time) {
 // Связь с MAX и адрес тоже стираются: если человек вернётся, у него будет новый аккаунт
 // без старых заявок.
 func (u *User) Delete(at time.Time) {
-	u.FirstName, u.Phone, u.HouseID = "", "", ""
+	u.FirstName, u.Phone, u.HouseID, u.ChairmanHouseID = "", "", "", ""
 	u.MaxUserID = 0
 	u.ConsentVersion, u.ConsentAt = "", time.Time{}
 	u.DeletedAt = at

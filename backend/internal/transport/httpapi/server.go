@@ -16,6 +16,7 @@ import (
 	"dommax/internal/app"
 	"dommax/internal/app/appeal"
 	"dommax/internal/app/auth"
+	"dommax/internal/app/council"
 	"dommax/internal/app/hints"
 	"dommax/internal/app/houses"
 	"dommax/internal/app/issues"
@@ -32,6 +33,7 @@ type Deps struct {
 	Hints          *hints.Service
 	Appeal         *appeal.Service
 	Photos         *photos.Service
+	Council        *council.Service
 	Webhook        *bot.Webhook // nil — webhook выключен (BOT_MODE не webhook)
 	Ping           func(context.Context) error
 	ConsentVersion string
@@ -95,6 +97,15 @@ func New(d Deps) *fiber.App {
 	api.Get("/uk/metrics", h.auth, h.ukMetrics)
 	api.Get("/uk/houses", h.auth, h.ukHouses)
 
+	// Совет дома (ADR-017): предложения председателю и опросы без юридической силы.
+	api.Post("/proposals", h.auth, h.propose)
+	api.Get("/me/proposals", h.auth, h.myProposals)
+	api.Get("/council/proposals", h.auth, h.councilFolder)
+	api.Post("/council/proposals/:id/reply", h.auth, h.replyProposal)
+	api.Post("/council/polls", h.auth, h.createPoll)
+	api.Get("/polls", h.auth, h.housePolls)
+	api.Post("/polls/:id/vote", h.auth, h.vote)
+
 	api.Get("/district/metrics", h.auth, h.districtMetrics)
 	api.Get("/district/overdue", h.auth, h.districtOverdue)
 
@@ -135,6 +146,9 @@ func (h *handlers) onError(c fiber.Ctx, err error) error {
 }
 
 func classify(err error) (int, string, string) {
+	if status, code, msg, ok := classifyCouncil(err); ok {
+		return status, code, msg
+	}
 	switch {
 	case errors.Is(err, app.ErrUnauthorized):
 		return fiber.StatusUnauthorized, "unauthorized", "Нужно войти заново"
