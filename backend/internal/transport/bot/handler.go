@@ -13,6 +13,7 @@ import (
 	"unicode/utf8"
 
 	"dommax/internal/app"
+	"dommax/internal/app/appeal"
 	"dommax/internal/app/auth"
 	"dommax/internal/app/cards"
 	appcouncil "dommax/internal/app/council"
@@ -29,15 +30,18 @@ import (
 // Payload callback-кнопок. Состояние диалога живёт в самих кнопках, поэтому бот
 // не хранит черновики и переживает перезапуск.
 const (
-	PayloadReport = "report"
-	cbHouse       = "h"    // h:<house_id> — выбрать дом
-	cbNew         = "n"    // n:<category>:<text> — создать заявку
-	cbPick        = "k"    // k:<text> — выбрать категорию
-	cbJoin        = "j"    // j:<issue_id> — «это и у меня»
-	cbConsent     = "c"    // c:<payload> — согласие, затем исходное действие
-	cbConfirm     = "f"    // f:<issue_id> — «починили» в сообщении о выполнении
-	cbRole        = "role" // role:<chairman|uk|resident> — сменить тестовую роль
-	maxTextRunes  = 300    // длиннее — удобнее оформить в форме мини-приложения
+	PayloadReport    = "report"
+	cbHouse          = "h"    // h:<house_id> — выбрать дом
+	cbNew            = "n"    // n:<category>:<text> — создать заявку
+	cbPick           = "k"    // k:<text> — выбрать категорию
+	cbJoin           = "j"    // j:<issue_id> — «это и у меня»
+	cbConsent        = "c"    // c:<payload> — согласие, затем исходное действие
+	cbConfirm        = "f"    // f:<issue_id> — «починили» в сообщении о выполнении
+	cbHidePhone      = "hp"   // hp:[issue_id] — скрыть телефон от УК
+	cbSignAppeal     = "sa"   // sa:<issue_id> — подписать обращение в ГЖИ
+	cbWithdrawAppeal = "wa"   // wa:<issue_id> — отозвать подпись под обращением
+	cbRole           = "role" // role:<chairman|uk|resident> — сменить тестовую роль
+	maxTextRunes     = 300    // длиннее — удобнее оформить в форме мини-приложения
 )
 
 // Messenger — часть Bot API, которая нужна обработчику.
@@ -57,6 +61,7 @@ type Services struct {
 	Photos         *photos.Service
 	Cards          *cards.Service // карточка заявки для показа в чате
 	Council        *appcouncil.Service
+	Appeal         *appeal.Service    // коллективные обращения в ГЖИ (ADR-023)
 	Pending        app.BotPendingRepo // что бот ждёт от жителя следующим сообщением
 	RoleSwitch     bool               // /role и «Роль для проверки» в меню (ROLE_SWITCH_ENABLED)
 	ConsentVersion string
@@ -77,6 +82,7 @@ func NewHandler(m Messenger, botName string, svc Services, log *slog.Logger) *Ha
 
 // Команды для меню бота (PATCH /me/commands).
 var Commands = []maxapi.Command{
+	{Name: "start", Description: "Главное меню / перезапуск"},
 	{Name: "menu", Description: "Главное меню"},
 	{Name: "new", Description: "Сообщить о проблеме"},
 	{Name: "my", Description: "Мои заявки"},
@@ -212,9 +218,13 @@ func (h *Handler) onProblemText(ctx context.Context, to maxapi.Target, from maxa
 	if u.HouseID == "" {
 		if list, err := h.svc.Houses.Search(ctx, txt); err == nil && len(list) > 0 {
 			var rows [][]maxapi.Button
-			for _, hs := range list[:min(4, len(list))] {
+			for _, hs := range list[:min(3, len(list))] {
 				rows = append(rows, []maxapi.Button{maxapi.CallbackButton(hs.Address, pack(cbHouse, hs.ID))})
 			}
+			rows = append(rows, []maxapi.Button{
+				maxapi.OpenAppButton("В приложении", h.botName, ""),
+				maxapi.CallbackButton("Другой адрес", win(scrHome)),
+			})
 			_, err := h.max.Send(ctx, to, maxapi.NewMessage{
 				Text:        "По вашему адресу нашли в Москве:",
 				Attachments: []maxapi.Attachment{maxapi.Keyboard(rows...)},
@@ -459,6 +469,35 @@ func (h *Handler) callbackReply(ctx context.Context, cb *maxapi.Callback) (maxap
 		return h.askDeclineAnswer(ctx, u, rest)
 	case cbRole:
 		return h.onRoleCallback(ctx, u, rest)
+
+	case cbHidePhone:
+		u, err := h.svc.Auth.HidePhone(ctx, u)
+		if err != nil {
+			return maxapi.CallbackAnswer{}, err
+		}
+		if rest != "" {
+			return h.openScreen(ctx, u, scrIssue+":"+rest+":"+scrMine)
+		}
+		return h.openScreen(ctx, u, scrHouse)
+
+	case cbSignAppeal:
+		if !u.HasConsent(h.svc.ConsentVersion) {
+			return consentAnswer("Чтобы подписать коллективное обращение, нужно согласие на обработку персональных данных.", cb.Payload), nil
+		}
+		if h.svc.Appeal != nil {
+			if _, err := h.svc.Appeal.Sign(ctx, u, rest, "", ""); err != nil {
+				return maxapi.CallbackAnswer{Notification: "Не удалось подписать обращение."}, nil
+			}
+		}
+		return h.openScreen(ctx, u, scrIssue+":"+rest+":"+scrMine)
+
+	case cbWithdrawAppeal:
+		if h.svc.Appeal != nil {
+			if _, err := h.svc.Appeal.Withdraw(ctx, u, rest); err != nil {
+				return maxapi.CallbackAnswer{Notification: "Не удалось отозвать подпись."}, nil
+			}
+		}
+		return h.openScreen(ctx, u, scrIssue+":"+rest+":"+scrMine)
 
 	case cbPick:
 		var rows [][]maxapi.Button

@@ -55,6 +55,7 @@ type Container struct {
 	photos     func() *photos.Service
 	geocoder   func() app.Geocoder
 	council    func() *council.Service
+	appeal     func() *appeal.Service
 	maxClient  func() (*maxapi.Client, error)
 	botMe      func() (maxapi.User, error)
 	botHandler func() (*bot.Handler, error)
@@ -108,6 +109,11 @@ func Open(ctx context.Context, cfg config, log *slog.Logger) (*Container, error)
 	c.council = sync.OnceValue(func() *council.Service {
 		return council.NewService(store, council.Config{
 			Now: time.Now, NewID: func() string { return uuid.NewV7().String() }, ConsentVersion: cfg.ConsentVersion,
+		})
+	})
+	c.appeal = sync.OnceValue(func() *appeal.Service {
+		return appeal.NewService(store, appeal.Config{
+			Secret: []byte(cfg.SessionSecret), TTL: appealLinkTTL, ConsentVersion: cfg.ConsentVersion, Now: time.Now,
 		})
 	})
 	c.photos = sync.OnceValue(func() *photos.Service {
@@ -166,7 +172,7 @@ func Open(ctx context.Context, cfg config, log *slog.Logger) (*Container, error)
 		}
 		return bot.NewHandler(client, me.Username, bot.Services{
 			Auth: c.Auth(), Issues: c.Issues(), Houses: c.Houses(), Hints: c.Hints(), Photos: c.Photos(),
-			Cards: cardSvc, Council: c.council(), Pending: store.Pending(), RoleSwitch: cfg.RoleSwitch,
+			Cards: cardSvc, Council: c.council(), Appeal: c.Appeal(), Pending: store.Pending(), RoleSwitch: cfg.RoleSwitch,
 			ConsentVersion: cfg.ConsentVersion, Now: time.Now,
 		}, log), nil
 	})
@@ -210,7 +216,7 @@ func Open(ctx context.Context, cfg config, log *slog.Logger) (*Container, error)
 	c.http = sync.OnceValues(func() (*fiber.App, error) {
 		deps := httpapi.Deps{
 			Auth: c.Auth(), Issues: c.Issues(), Houses: c.Houses(), Hints: c.Hints(),
-			Appeal:  appeal.NewService(store, appeal.Config{Secret: []byte(cfg.SessionSecret), TTL: appealLinkTTL, ConsentVersion: cfg.ConsentVersion, Now: time.Now}),
+			Appeal:  c.Appeal(),
 			Photos:  c.Photos(),
 			Council: c.council(),
 			Ping:    store.Ping, ConsentVersion: cfg.ConsentVersion, Now: time.Now, Log: log,
@@ -267,6 +273,8 @@ func (c *Container) Photos() *photos.Service { return c.photos() }
 // Importer — импорт реестра домов (команда import-houses).
 func (c *Container) Importer() *houses.Importer { return houses.NewImporter(c.store, c.geocoder()) }
 
+func (c *Container) Council() *council.Service                 { return c.council() }
+func (c *Container) Appeal() *appeal.Service                   { return c.appeal() }
 func (c *Container) MaxClient() (*maxapi.Client, error)        { return c.maxClient() }
 func (c *Container) BotIdentity() (maxapi.User, error)         { return c.botMe() }
 func (c *Container) BotHandler() (*bot.Handler, error)         { return c.botHandler() }

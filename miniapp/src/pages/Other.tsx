@@ -127,11 +127,16 @@ export function HouseSearch() {
     }
   };
 
+  const isChanging = Boolean(startHouse);
   return (
-    <Screen title="Мой дом" onBack={canGoBack ? back : undefined}>
+    <Screen title={isChanging ? 'Сменить дом' : 'Мой дом'} onBack={canGoBack ? back : undefined}>
       <div className={s.intro}>
-        <h2 className={s.introTitle}>Где вы живёте?</h2>
-        <p className={s.text}>Найдите свой дом, чтобы видеть его проблемы и сообщать о новых.</p>
+        <h2 className={s.introTitle}>{isChanging ? 'Сменить дом' : 'Где вы живёте?'}</h2>
+        <p className={s.text}>
+          {isChanging
+            ? 'Укажите новый адрес дома в Москве или выберите на карте.'
+            : 'Найдите свой дом, чтобы видеть его проблемы и сообщать о новых.'}
+        </p>
       </div>
       <Input
         placeholder="Улица и номер дома"

@@ -133,6 +133,12 @@ function ReportFlow({ ctx, initialCategory }: { ctx: Context; initialCategory?: 
   const offer = hintOffer(hint, category);
 
   const { house } = ctx;
+  const hasElevator =
+    !house.floors ||
+    house.floors > 5 ||
+    house.objects.some((o) => o.category === 'lift') ||
+    Boolean(ctx.fixedObject && ctx.fixedObject.category === 'lift');
+  const availableTiles = tiles.filter((t) => t.code !== 'lift' || hasElevator);
   const rule = ctx.categories.find((c) => c.code === category);
   const objects = house.objects.filter((o) => o.category === category);
   const object = house.objects.find((o) => o.id === objectId);
@@ -324,7 +330,7 @@ function ReportFlow({ ctx, initialCategory }: { ctx: Context; initialCategory?: 
         <p className={s.sub}>{capitalize(where)}</p>
       </div>
       <div className={s.tiles} role="group" aria-label="Категория">
-        {tiles.map(({ code, label, icon: Icon }) => (
+        {availableTiles.map(({ code, label, icon: Icon }) => (
           <button
             key={code}
             type="button"

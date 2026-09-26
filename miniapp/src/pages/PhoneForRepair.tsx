@@ -23,7 +23,10 @@ export function PhoneForRepair({ onToast }: { onToast: (msg: string) => void }) 
     setBusy(true);
     try {
       const contact = await bridge.requestContact();
-      if (!contact) return; // житель отказался в окне MAX: это его выбор, не ошибка
+      if (!contact) {
+        onToast('Вы не поделились номером телефона. Вы сможете оставить его в любой момент');
+        return;
+      }
       setUser(await api.sharePhone(contact));
       bridge.hapticSuccess();
       onToast('Телефон сохранён. Его увидит только УК по вашим открытым заявкам.');

@@ -18,6 +18,7 @@ import (
 	"time"
 
 	"dommax/internal/app"
+	"dommax/internal/app/appeal"
 	"dommax/internal/app/apptest"
 	"dommax/internal/app/auth"
 	"dommax/internal/app/cards"
@@ -133,6 +134,7 @@ func newEnvWithLLM(t *testing.T, llm hints.LLM) env {
 		Photos:         photos.NewService(s, &apptest.MemFiles{}, photos.Config{Now: now, NewID: func() string { n++; return fmt.Sprintf("p-%d", n) }, ConsentVersion: "v1"}),
 		Cards:          cards.NewService(s, nil, now),
 		Council:        appcouncil.NewService(s, appcouncil.Config{Now: now, NewID: func() string { n++; return fmt.Sprintf("c-%d", n) }, ConsentVersion: "v1"}),
+		Appeal:         appeal.NewService(s, appeal.Config{Secret: []byte("s"), TTL: time.Hour, ConsentVersion: "v1", Now: now}),
 		Pending:        s.Pending(),
 		RoleSwitch:     true,
 		ConsentVersion: "v1",
@@ -598,7 +600,7 @@ func TestMyCommandOpensIssueCardInChat(t *testing.T) {
 	if !strings.Contains(card, "Заявка № 101") || !strings.Contains(card, "Хронология") || !strings.Contains(card, "заявка подана") {
 		t.Fatalf("card = %q", card)
 	}
-	findButton(t, cbs, "Открыть в приложении")
+	findButton(t, cbs, "Открыть заявку")
 	// «Назад» возвращает к списку, откуда открыли карточку.
 	e.handle(t, press(8401, "cb3", findButton(t, cbs, "Назад").Payload))
 	if txt, _ := e.max.last("cb3"); !strings.Contains(txt, "Ваши заявки") {
@@ -1033,5 +1035,44 @@ func TestStartGeoAsksLocation(t *testing.T) {
 	e.handle(t, text(9201, "/start geo"))
 	if _, bs := e.max.last(""); findButton(t, bs, "Показать дома рядом").Type != "request_geo_location" {
 		t.Fatalf("/start geo buttons = %+v", bs)
+	}
+}
+
+// Подписание и отзыв коллективного обращения в ГЖИ через карточку заявки в боте (ADR-023).
+func TestAppealSignAndWithdrawInBot(t *testing.T) {
+	e := newEnv(t)
+	e.resident(9701, true)
+	e.handle(t, text(9701, "Не горит свет на лестнице"))
+	_, bs := e.max.last("")
+	e.handle(t, press(9701, "cb1", findButton(t, bs, "Отправить").Payload))
+
+	// Искусственно ставим просрочку заявке
+	is, _ := e.issues.Get(t.Context(), "i-1")
+	_ = is.MarkOverdue(time.Date(2026, 9, 30, 0, 0, 0, 0, time.UTC))
+	_ = e.store.Issues().Save(t.Context(), is)
+
+	// Открываем заявку в боте
+	e.handle(t, text(9701, "/my"))
+	_, mbs := e.max.last("")
+	e.handle(t, press(9701, "cb2", mbs[0].Payload))
+	_, cbs := e.max.last("cb2")
+	signBtn := findButton(t, cbs, "Подписать обращение в ГЖИ (0)")
+	if signBtn.Payload == "" {
+		t.Fatal("no sign appeal button on overdue issue")
+	}
+
+	// Подписываем обращение
+	e.handle(t, press(9701, "cb3", signBtn.Payload))
+	_, cbs2 := e.max.last("cb3")
+	withdrawBtn := findButton(t, cbs2, "Отозвать подпись ГЖИ (1)")
+	if withdrawBtn.Payload == "" {
+		t.Fatal("no withdraw appeal button after signing")
+	}
+
+	// Отзываем подпись
+	e.handle(t, press(9701, "cb4", withdrawBtn.Payload))
+	_, cbs3 := e.max.last("cb4")
+	if b := findButton(t, cbs3, "Подписать обращение в ГЖИ (0)"); b.Payload == "" {
+		t.Fatal("sign button not returned after withdrawal")
 	}
 }

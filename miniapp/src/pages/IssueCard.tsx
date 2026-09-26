@@ -1,10 +1,10 @@
-import { Button } from '@maxhub/max-ui';
-import { CheckCircle, FilePdf, ShareNetwork } from '@phosphor-icons/react';
-import { useEffect, useState } from 'react';
+import { Button, Input } from '@maxhub/max-ui';
+import { CheckCircle, FilePdf, PenNib, ShareNetwork } from '@phosphor-icons/react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from '../app/router';
 import { useUser } from '../app/session';
 import { api, ApiError } from '../shared/api/client';
-import { isClosed, type AppealLink, type Issue, type Status } from '../shared/api/types';
+import { isClosed, type AppealLink, type AppealSummary, type Issue, type Status } from '../shared/api/types';
 import { useResource } from '../shared/api/useResource';
 import { appLink, bridge } from '../shared/bridge/bridge';
 import { calendarDaysBetween, capitalize, dayMonth, dotDateTime, plural } from '../shared/lib/format';
@@ -27,9 +27,15 @@ export function IssueCard({ id, flash }: { id: string; flash?: string }) {
   const [landed, setLanded] = useState(false);
   const [appealBusy, setAppealBusy] = useState(false);
   const [appealLink, setAppealLink] = useState<(AppealLink & { until: number }) | null>(null);
+  const [signOpen, setSignOpen] = useState(false);
+  const [signBusy, setSignBusy] = useState(false);
   const res = useResource(async () => {
-    const [issue, events] = await Promise.all([api.issue(id), api.timeline(id)]);
-    return { issue, events };
+    const [issue, events, appealSummary] = await Promise.all([
+      api.issue(id),
+      api.timeline(id),
+      api.appealSignatures(id).catch(() => null),
+    ]);
+    return { issue, events, appealSummary };
   }, [id]);
 
   // Сообщение с предыдущего экрана (заявка отправлена, присоединились).
@@ -113,6 +119,19 @@ export function IssueCard({ id, flash }: { id: string; flash?: string }) {
       showToast(err instanceof ApiError ? err.message : 'Не получилось подготовить обращение');
     } finally {
       setAppealBusy(false);
+    }
+  };
+
+  const withdrawSignature = async () => {
+    setSignBusy(true);
+    try {
+      await api.withdrawAppeal(issue.id);
+      showToast('Подпись под обращением отозвана');
+      res.reload();
+    } catch (err) {
+      showToast(err instanceof ApiError ? err.message : 'Не удалось отозвать подпись');
+    } finally {
+      setSignBusy(false);
     }
   };
 
@@ -221,11 +240,34 @@ export function IssueCard({ id, flash }: { id: string; flash?: string }) {
         <Island>
           <div className={s.escalate}>
             <h3 className={s.escalateTitle}>УК не уложилась в срок</h3>
-            <p className={s.text}>Если ответа не будет, соседи могут обратиться в Мосжилинспекцию. Даты, комментарии УК и число сообщивших уже собраны в заявке.</p>
+            <p className={s.text}>
+              Срок ответа истёк. Жители могут направить коллективное обращение в Мосжилинспекцию. Даты, комментарии УК и хронология уже собраны.
+            </p>
+            {res.data.appealSummary && res.data.appealSummary.count > 0 && (
+              <p className={s.hint} style={{ margin: '4px 0 8px' }}>
+                Обращение поддержали {res.data.appealSummary.count} {plural(res.data.appealSummary.count, 'житель', 'жителя', 'жителей')} дома
+              </p>
+            )}
             {issue.joined && !closed && (
-              <Button variant="secondary" size="medium" stretched iconBefore={<FilePdf size={18} />} loading={appealBusy} onClick={appeal}>
-                {appealReady ? 'Скачать PDF' : 'Подготовить обращение'}
-              </Button>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 4 }}>
+                {res.data.appealSummary?.mine ? (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                    <div className={s.joinedNote}>
+                      <CheckCircle size={18} weight="fill" aria-hidden="true" /> Вы подписали обращение {res.data.appealSummary.named ? 'с указанием данных' : ''}
+                    </div>
+                    <Button variant="ghost" size="small" stretched loading={signBusy} onClick={withdrawSignature}>
+                      Отозвать подпись
+                    </Button>
+                  </div>
+                ) : (
+                  <Button variant="primary" size="medium" stretched iconBefore={<PenNib size={18} />} onClick={() => setSignOpen(true)}>
+                    Подписать обращение в ГЖИ
+                  </Button>
+                )}
+                <Button variant="secondary" size="medium" stretched iconBefore={<FilePdf size={18} />} loading={appealBusy} onClick={appeal}>
+                  {appealReady ? 'Скачать PDF обращения' : 'Подготовить обращение (PDF)'}
+                </Button>
+              </div>
             )}
           </div>
         </Island>
@@ -281,6 +323,16 @@ export function IssueCard({ id, flash }: { id: string; flash?: string }) {
         </Island>
       )}
       {canManage && <StatusSheet open={sheet} issue={issue} onClose={() => setSheet(false)} onSaved={saved} />}
+      <SignAppealSheet
+        open={signOpen}
+        issueId={issue.id}
+        onClose={() => setSignOpen(false)}
+        onSigned={() => {
+          setSignOpen(false);
+          showToast('Вы подписали коллективное обращение в ГЖИ');
+          res.reload();
+        }}
+      />
       {toast}
     </Screen>
   );
@@ -361,6 +413,91 @@ function StatusSheet({ open, issue, onClose, onSaved }: { open: boolean; issue: 
           Сохранить статус
         </Button>
       </div>
+    </Sheet>
+  );
+}
+
+/** Шторка подписания коллективного обращения в ГЖИ (ADR-023). */
+function SignAppealSheet({
+  open,
+  issueId,
+  onClose,
+  onSigned,
+}: {
+  open: boolean;
+  issueId: string;
+  onClose: () => void;
+  onSigned: () => void;
+}) {
+  const [fullName, setFullName] = useState('');
+  const [apartment, setApartment] = useState('');
+  const [agree, setAgree] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!agree) {
+      setError('Нужно подтвердить согласие на включение данных в обращение');
+      return;
+    }
+    setBusy(true);
+    setError('');
+    try {
+      await api.signAppeal(issueId, {
+        full_name: fullName.trim() || undefined,
+        apartment: apartment.trim() || undefined,
+      });
+      onSigned();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Не удалось подписать обращение');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Sheet open={open} title="Поддержать обращение" onClose={onClose} locked={busy}>
+      <form className={s.sheetBody} onSubmit={submit}>
+        <p className={s.text}>
+          Коллективное обращение в Мосжилинспекцию о нарушении управляющей компанией нормативных сроков ремонта.
+        </p>
+        <label className={s.blockTitle} htmlFor="sign-fullname">
+          Фамилия, имя и отчество (по желанию)
+        </label>
+        <Input
+          id="sign-fullname"
+          placeholder="Иванов Иван Иванович"
+          value={fullName}
+          maxLength={100}
+          onChange={(e) => setFullName(e.target.value)}
+        />
+        <label className={s.blockTitle} htmlFor="sign-apartment">
+          Номер квартиры (по желанию)
+        </label>
+        <Input
+          id="sign-apartment"
+          placeholder="42"
+          value={apartment}
+          maxLength={10}
+          onChange={(e) => setApartment(e.target.value)}
+        />
+        <p className={s.hint}>
+          ФИО и квартира необязательны: с ними вы будете включены в таблицу заявителей в PDF. Если оставить поля пустыми, ваш голос учтётся в общем числе поддержавших соседей.
+        </p>
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 'var(--fs-secondary)', margin: '4px 0 12px', cursor: 'pointer' }}>
+          <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
+          <span>Подтверждаю согласие на передачу данных в обращение</span>
+        </label>
+        {error && (
+          <p className={s.hint} role="alert">
+            {error}
+          </p>
+        )}
+        <Button type="submit" variant="primary" size="large" stretched loading={busy} disabled={!agree}>
+          Подписать обращение
+        </Button>
+      </form>
     </Sheet>
   );
 }

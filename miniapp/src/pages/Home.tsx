@@ -91,7 +91,11 @@ export function Home() {
         <div className={s.org}>
           <div style={{ minWidth: 0 }}>
             <div className={s.orgName}>{org.name}</div>
-            {schedule && <div className={s.orgNote}>{schedule}</div>}
+            <div className={s.orgNote}>
+              {dispatcher?.includes('539-53-53')
+                ? 'Единый диспетчерский центр Москвы (ЕДЦ)'
+                : (schedule || 'Диспетчерская служба')}
+            </div>
           </div>
           {dispatcher && (
             <a className={s.callButton} href={`tel:${dispatcher.replace(/[^+\d]/g, '')}`} aria-label="Позвонить в диспетчерскую">
@@ -116,7 +120,10 @@ export function Home() {
           title="Отчёт по дому (PDF)"
           showChevron
           onClick={() => {
-            bridge.download(`/api/v1/houses/${encodeURIComponent(house.id)}/report.pdf`, `house-${house.id}-report.pdf`).catch(() => showToast('Не удалось скачать отчёт'));
+            bridge.download(`/api/v1/houses/${encodeURIComponent(house.id)}/report.pdf`, `house-${house.id}-report.pdf`).catch(() => {
+              const url = `${window.location.origin}/api/v1/houses/${encodeURIComponent(house.id)}/report.pdf`;
+              bridge.share(`Сводный отчёт по дому ${house.address}`, url).catch(() => showToast('Не удалось скачать отчёт'));
+            });
           }}
         />
         <CellSimple title="Рейтинг УК района" showChevron onClick={() => push({ name: 'rating' })} />

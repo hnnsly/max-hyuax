@@ -93,19 +93,24 @@ function FilePreview({ file, n, onRemove }: { file: File; n: number; onRemove: (
 export function PhotoSlots({ files, onChange, onError }: { files: File[]; onChange: (files: File[]) => void; onError: (msg: string) => void }) {
   const max = 3;
   return (
-    <div className={s.photoRow}>
-      {files.map((f, i) => (
-        <FilePreview key={`${f.name}-${f.size}-${i}`} file={f} n={i + 1} onRemove={() => onChange(files.filter((_, j) => j !== i))} />
-      ))}
-      {files.length < max && (
-        <AddTile
-          onFiles={(added) => {
-            const r = pickPhotos(files, added, max);
-            onChange(r.files);
-            if (r.error) onError(r.error);
-          }}
-        />
-      )}
+    <div>
+      <div className={s.photoRow}>
+        {files.map((f, i) => (
+          <FilePreview key={`${f.name}-${f.size}-${i}`} file={f} n={i + 1} onRemove={() => onChange(files.filter((_, j) => j !== i))} />
+        ))}
+        {files.length < max && (
+          <AddTile
+            onFiles={(added) => {
+              const r = pickPhotos(files, added, max);
+              onChange(r.files);
+              if (r.error) onError(r.error);
+            }}
+          />
+        )}
+      </div>
+      <p className={s.hint} style={{ marginTop: 6 }}>
+        Можно прикрепить до 3 фото (JPEG или PNG до 5 МБ)
+      </p>
     </div>
   );
 }
@@ -166,6 +171,7 @@ export function IssuePhotos({
       // Сервер сохраняет пачку целиком или ничего: после ошибки список не меняется.
       await api.uploadPhotos(issueId, r.files);
       res.reload();
+      onToast(r.files.length > 1 ? 'Фотографии добавлены к заявке' : 'Фото добавлено к заявке');
     } catch (err) {
       onToast(err instanceof ApiError ? err.message : 'Не получилось загрузить фото');
     } finally {
@@ -198,13 +204,15 @@ export function IssuePhotos({
         ))}
         {canAdd && left > 0 && <AddTile onFiles={upload} disabled={busy} />}
       </div>
-      <Sheet open={open !== null} title="Фото" onClose={() => setOpen(null)} locked={removing}>
-        {open && <img className={s.photoFull} src={open.url} alt="Фото к заявке" />}
-        {open?.photo.mine && (
-          <Button variant="secondary" size="medium" stretched loading={removing} onClick={remove}>
-            Убрать фото
-          </Button>
-        )}
+      <Sheet open={open !== null} title="Просмотр фото" onClose={() => setOpen(null)} locked={removing}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          {open && <img className={s.photoFull} src={open.url} alt="Фото к заявке" />}
+          {open?.photo.mine && (
+            <Button variant="secondary" size="medium" stretched loading={removing} onClick={remove}>
+              Убрать фото
+            </Button>
+          )}
+        </div>
       </Sheet>
     </section>
   );

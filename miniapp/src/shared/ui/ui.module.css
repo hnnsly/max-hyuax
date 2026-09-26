@@ -387,12 +387,15 @@
   margin: 0;
   width: auto;
   border: 0;
-  border-radius: 12px;
-  padding: 12px 14px;
+  border-radius: 14px;
+  padding: 12px 18px;
   background: var(--text);
   color: var(--surface-card);
   font: inherit;
   font-size: var(--fs-secondary);
+  font-weight: 550;
+  text-align: center;
+  box-shadow: 0 6px 20px rgb(0 0 0 / 0.22);
   line-height: 1.35;
   opacity: 1;
   transition: opacity 200ms, display 200ms allow-discrete, overlay 200ms allow-discrete;

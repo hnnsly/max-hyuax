@@ -167,7 +167,7 @@ func (h *Handler) councilItem(ctx context.Context, cb *maxapi.Callback, u user.U
 		if !u.HasConsent(h.svc.ConsentVersion) {
 			return consentAnswer("Чтобы написать совету, нужно ваше согласие на обработку персональных данных. Председатель увидит текст без вашего имени.", cb.Payload), nil
 		}
-		action, prompt = pendPropose, "Напишите предложение одним сообщением: что и где стоит сделать. Председатель совета увидит текст без вашего имени."
+		action, prompt = pendPropose, "Пожалуйста, опишите вашу идею или предложение по дому: что и где стоит улучшить. Председатель совета внимательно изучит его (анонимно, без вашего имени)."
 	case councilNewPoll:
 		if !u.IsChairmanOf(u.HouseID) {
 			return maxapi.CallbackAnswer{Notification: "Создавать опросы может только председатель совета."}, nil

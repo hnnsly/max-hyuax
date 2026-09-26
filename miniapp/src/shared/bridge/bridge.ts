@@ -135,11 +135,18 @@ export const bridge = {
     const url = new URL(path, window.location.origin).href;
     const w = wa();
     if (w?.initData && w.downloadFile) {
-      return (await w.downloadFile(url, fileName)).status;
+      try {
+        const res = await w.downloadFile(url, fileName);
+        return res?.status ?? 'downloading';
+      } catch {
+        // Fallback for iOS PWA / Webview:
+      }
     }
     const a = document.createElement('a');
     a.href = url;
     a.download = fileName;
+    a.target = '_blank';
+    a.rel = 'noopener';
     a.click();
     return 'downloading';
   },

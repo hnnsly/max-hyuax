@@ -272,10 +272,14 @@ func (h *Handler) houseScreen(ctx context.Context, u user.User) (maxapi.NewMessa
 		fmt.Fprintf(&b, "Диспетчерская: %s\n", p)
 	}
 	fmt.Fprintf(&b, "Открытых заявок: %d", open)
-	return screenMsg(b.String(),
-		[]maxapi.Button{maxapi.OpenAppButton("Открыть дом в приложении", h.botName, "")},
-		navRow(),
-	), nil
+	rows := [][]maxapi.Button{
+		{maxapi.OpenAppButton("Открыть дом в приложении", h.botName, "")},
+	}
+	if u.PhoneShared() {
+		rows = append(rows, []maxapi.Button{maxapi.CallbackButton("Не показывать телефон мастеру", pack(cbHidePhone, ""))})
+	}
+	rows = append(rows, navRow())
+	return screenMsg(b.String(), rows...), nil
 }
 
 // issueScreen — карточка заявки с кнопками по её состоянию и роли: житель присоединяется
@@ -324,10 +328,25 @@ func (h *Handler) issueScreen(ctx context.Context, u user.User, issueID, back st
 		rows = append(rows, []maxapi.Button{maxapi.CallbackButton("Это и у меня", pack(cbJoin, is.ID()))})
 	case open && is.HasParticipant(u.ID) && !u.PhoneShared():
 		rows = append(rows, []maxapi.Button{maxapi.ContactButton("Оставить телефон для мастера")})
+	case is.HasParticipant(u.ID) && u.PhoneShared():
+		rows = append(rows, []maxapi.Button{maxapi.CallbackButton("Не показывать телефон мастеру", pack(cbHidePhone, is.ID()))})
+	}
+	if open && is.HasParticipant(u.ID) && (is.IsOverdue(h.svc.Now()) || !is.OverdueAt().IsZero()) && h.svc.Appeal != nil {
+		if sum, err := h.svc.Appeal.Summary(ctx, u, is.ID()); err == nil {
+			if sum.Mine {
+				rows = append(rows, []maxapi.Button{
+					maxapi.CallbackButton(fmt.Sprintf("Отозвать подпись ГЖИ (%d)", sum.Count), pack(cbWithdrawAppeal, is.ID())),
+				})
+			} else {
+				rows = append(rows, []maxapi.Button{
+					maxapi.CallbackButton(fmt.Sprintf("Подписать обращение в ГЖИ (%d)", sum.Count), pack(cbSignAppeal, is.ID())),
+				})
+			}
+		}
 	}
 	rows = append(rows,
 		[]maxapi.Button{
-			maxapi.OpenAppButton("Открыть в приложении", h.botName, "i_"+is.ID()),
+			maxapi.OpenAppButton("Открыть заявку", h.botName, "i_"+is.ID()),
 			maxapi.LinkButton("Поделиться", shareURL(c, h.botName)),
 		},
 		navRow(back),
@@ -451,12 +470,30 @@ func (h *Handler) reportScreen(ctx context.Context, u user.User) (maxapi.NewMess
 	if u.HouseID == "" || !u.CanTakePart() {
 		return h.homeScreen(ctx, u)
 	}
+	var hasElevator = true
+	if d, err := h.svc.Houses.Get(ctx, u.HouseID); err == nil {
+		if d.House.Floors > 0 && d.House.Floors <= 5 {
+			hasElevator = false
+			for _, o := range d.Objects {
+				if o.Category == "lift" {
+					hasElevator = true
+					break
+				}
+			}
+		}
+	}
+	var filtered []rules.Rule
+	for _, c := range rules.Categories() {
+		if c.Code == "lift" && !hasElevator {
+			continue
+		}
+		filtered = append(filtered, c)
+	}
 	var rows [][]maxapi.Button
-	cats := rules.Categories()
-	for i := 0; i < len(cats); i += 2 {
-		row := []maxapi.Button{maxapi.CallbackButton(cats[i].Title, win(scrPlace, cats[i].Code))}
-		if i+1 < len(cats) {
-			row = append(row, maxapi.CallbackButton(cats[i+1].Title, win(scrPlace, cats[i+1].Code)))
+	for i := 0; i < len(filtered); i += 2 {
+		row := []maxapi.Button{maxapi.CallbackButton(filtered[i].Title, win(scrPlace, filtered[i].Code))}
+		if i+1 < len(filtered) {
+			row = append(row, maxapi.CallbackButton(filtered[i+1].Title, win(scrPlace, filtered[i+1].Code)))
 		}
 		rows = append(rows, row)
 	}

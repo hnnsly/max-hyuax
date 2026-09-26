@@ -2,7 +2,7 @@ import { Button, CellList, CellSimple, Counter, Input, Radio } from '@maxhub/max
 import { WarningCircle } from '@phosphor-icons/react';
 import { useId, useState, type FormEvent } from 'react';
 import { useRouter } from '../app/router';
-import { useUser } from '../app/session';
+import { useSession, useUser } from '../app/session';
 import { api, ApiError } from '../shared/api/client';
 import type { Poll, Proposal } from '../shared/api/types';
 import { useResource } from '../shared/api/useResource';
@@ -199,6 +199,8 @@ function TextSheet(props: {
   required: boolean;
   minLength?: number;
   emptyError: string;
+  disabled?: boolean;
+  children?: React.ReactNode;
   onClose: () => void;
   onSubmit: (text: string) => Promise<void>;
 }) {
@@ -262,7 +264,8 @@ function TextSheet(props: {
             {error}
           </p>
         )}
-        <Button type="submit" variant="primary" size="large" stretched loading={busy}>
+        {props.children}
+        <Button type="submit" variant="primary" size="large" stretched loading={busy} disabled={props.disabled}>
           {props.submit}
         </Button>
       </form>
@@ -271,6 +274,10 @@ function TextSheet(props: {
 }
 
 function ProposeSheet({ open, onClose, onDone }: { open: boolean; onClose: () => void; onDone: () => void }) {
+  const user = useUser();
+  const { setUser } = useSession();
+  const [agree, setAgree] = useState(user.has_consent);
+
   return (
     <TextSheet
       open={open}
@@ -280,13 +287,24 @@ function ProposeSheet({ open, onClose, onDone }: { open: boolean; onClose: () =>
       submit="Отправить председателю"
       required
       minLength={10}
+      disabled={!agree}
       emptyError="Напишите предложение, хотя бы 10 символов"
       onClose={onClose}
       onSubmit={async (text) => {
+        if (!user.has_consent) {
+          setUser(await api.acceptConsent(user.consent_version));
+        }
         await api.propose(text);
         onDone();
       }}
-    />
+    >
+      {!user.has_consent && (
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 'var(--fs-secondary)', margin: '4px 0 12px', cursor: 'pointer' }}>
+          <input type="checkbox" checked={agree} onChange={(e) => setAgree(e.target.checked)} />
+          <span>Согласен на обработку персональных данных</span>
+        </label>
+      )}
+    </TextSheet>
   );
 }
 
@@ -326,7 +344,10 @@ export function CouncilFolder() {
           size="medium"
           stretched
           onClick={() => {
-            bridge.download(`/api/v1/houses/${encodeURIComponent(user.house_id!)}/report.pdf`, `house-${user.house_id}-report.pdf`).catch(() => showToast('Не удалось скачать отчёт'));
+            bridge.download(`/api/v1/houses/${encodeURIComponent(user.house_id!)}/report.pdf`, `house-${user.house_id}-report.pdf`).catch(() => {
+              const url = `${window.location.origin}/api/v1/houses/${encodeURIComponent(user.house_id!)}/report.pdf`;
+              bridge.share(`Сводный отчёт по дому`, url).catch(() => showToast('Не удалось скачать отчёт'));
+            });
           }}
         >
           Скачать сводный отчёт по дому (PDF)
