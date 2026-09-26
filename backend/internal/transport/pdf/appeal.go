@@ -73,7 +73,11 @@ func Appeal(d appeal.Document) ([]byte, error) {
 		due += " Основание срока: " + d.Basis + "."
 	}
 	w.text(due, "regular", 11, left, 6)
-	w.text(fmt.Sprintf("Число жителей, сообщивших о проблеме: %d.", d.Participants), "regular", 11, left, 12)
+	w.text(fmt.Sprintf("Число жителей, сообщивших о проблеме: %d.", d.Participants), "regular", 11, left, 6)
+	if d.Signed > 0 {
+		w.text(fmt.Sprintf("Обращение поддержали жители дома: %d %s.", d.Signed, plural(d.Signed, "человек", "человека", "человек")), "bold", 11, left, 6)
+	}
+	w.y += 6
 
 	if lines := timelineLines(d.Events); len(lines) > 0 {
 		w.text(fmt.Sprintf("Хронология заявки № %d", d.Number), "bold", 11, left, 4)
@@ -85,6 +89,17 @@ func Appeal(d appeal.Document) ([]byte, error) {
 
 	w.text("Прошу провести проверку, обязать управляющую организацию устранить нарушение и дать ответ жителям.", "regular", 11, left, 24)
 	w.text("Дата: «____» ______________ 20___ г.          Подпись: ____________________", "regular", 11, left, 28)
+
+	// Соседи, которые согласились указать ФИО: подписывают распечатку сами (ADR-023).
+	if len(d.Signers) > 0 {
+		w.text("Обращение поддерживаем", "bold", 11, left, 6)
+		cols := []float64{left, left + 26, left + 300, left + 370}
+		w.row(cols, []string{"№", "Фамилия, имя, отчество", "Квартира", "Подпись"}, "bold", 10)
+		for i, s := range d.Signers {
+			w.row(cols, []string{fmt.Sprint(i + 1), s.FullName, s.Apartment, ""}, "regular", 10)
+		}
+		w.y += 14
+	}
 	w.text(fmt.Sprintf("Черновик подготовлен %s по данным заявки № %d в сервисе «Заявки по дому в MAX». "+
 		"Проверьте, дополните и подпишите перед отправкой. Подать обращение можно на mos.ru или лично в Мосжилинспекции.",
 		date(d.GeneratedAt), d.Number), "regular", 8, left, 0)
@@ -162,6 +177,52 @@ func newWriter() (*writer, error) {
 	}
 	p.AddPage()
 	return &writer{pdf: p, y: top}, nil
+}
+
+// row пишет строку таблицы: колонка i начинается в xs[i], текст переносится внутри колонки,
+// под строкой линия. Строка целиком переходит на новую страницу, если не помещается.
+func (w *writer) row(xs []float64, cells []string, font string, size float64) {
+	if w.err != nil {
+		return
+	}
+	if w.err = w.pdf.SetFont(font, "", size); w.err != nil {
+		return
+	}
+	lh := size * 1.35
+	split := make([][]string, len(cells))
+	height := lh
+	for i, c := range cells {
+		if c == "" {
+			split[i] = []string{""}
+			continue
+		}
+		end := right
+		if i+1 < len(xs) {
+			end = xs[i+1] - 6
+		}
+		lines, err := w.pdf.SplitTextWithWordWrap(c, end-xs[i])
+		if err != nil {
+			w.err = err
+			return
+		}
+		split[i] = lines
+		height = max(height, float64(len(lines))*lh)
+	}
+	if w.y+height+6 > bottom {
+		w.pdf.AddPage()
+		w.y = top
+	}
+	for i, lines := range split {
+		for j, l := range lines {
+			w.pdf.SetXY(xs[i], w.y+float64(j)*lh)
+			if w.err = w.pdf.Cell(nil, l); w.err != nil {
+				return
+			}
+		}
+	}
+	w.y += height + 2
+	w.pdf.Line(left, w.y, right, w.y)
+	w.y += 4
 }
 
 func (w *writer) text(s, font string, size, x, gapAfter float64) {

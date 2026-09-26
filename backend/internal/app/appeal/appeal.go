@@ -14,6 +14,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"dommax/internal/app"
 	"dommax/internal/domain/house"
@@ -26,9 +27,10 @@ import (
 var ErrNotOverdue = errors.New("appeal: issue is not overdue")
 
 type Config struct {
-	Secret []byte        // ключ подписи ссылок; из него выводится отдельный ключ
-	TTL    time.Duration // сколько действует ссылка
-	Now    func() time.Time
+	Secret         []byte        // ключ подписи ссылок; из него выводится отдельный ключ
+	TTL            time.Duration // сколько действует ссылка
+	ConsentVersion string        // подпись под обращением требует согласия на обработку ПДн
+	Now            func() time.Time
 }
 
 type Service struct {
@@ -64,6 +66,87 @@ type Document struct {
 	Basis        string
 	Events       []issue.Event
 	GeneratedAt  time.Time
+	Signed       int      // сколько жителей поддержали обращение (ADR-023)
+	Signers      []Signer // те из них, кто согласился указать ФИО и квартиру
+}
+
+// Signer — подписавший обращение с ФИО; квартира может быть пустой.
+type Signer struct {
+	FullName  string
+	Apartment string
+}
+
+// Пределы полей подписи: как в таблице appeal_signatures.
+const (
+	MaxNameRunes      = 100
+	MaxApartmentRunes = 10
+)
+
+// Summary — сколько жителей поддержали обращение и есть ли среди них текущий.
+type Summary struct {
+	Count int
+	Mine  bool
+	Named bool // текущий житель подписал с ФИО
+}
+
+// Sign — житель поддерживает обращение по просроченной заявке. ФИО и квартира необязательны:
+// с ними житель попадает в таблицу подписавших в PDF, без них только в счётчик.
+func (s *Service) Sign(ctx context.Context, u user.User, issueID, fullName, apartment string) (Summary, error) {
+	if !u.HasConsent(s.cfg.ConsentVersion) {
+		return Summary{}, app.ErrConsentRequired
+	}
+	fullName, apartment = strings.TrimSpace(fullName), strings.TrimSpace(apartment)
+	if utf8.RuneCountInString(fullName) > MaxNameRunes || utf8.RuneCountInString(apartment) > MaxApartmentRunes {
+		return Summary{}, fmt.Errorf("%w: name up to %d, apartment up to %d characters", app.ErrInvalidInput, MaxNameRunes, MaxApartmentRunes)
+	}
+	if fullName == "" {
+		apartment = "" // квартира без имени в таблице подписавших ничего не значит
+	}
+	is, err := s.store.Issues().Get(ctx, issueID)
+	if err != nil {
+		return Summary{}, err
+	}
+	if err := allowed(is, u.ID, s.cfg.Now()); err != nil {
+		return Summary{}, err
+	}
+	err = s.store.Appeals().Sign(ctx, app.Signature{IssueID: issueID, UserID: u.ID, FullName: fullName, Apartment: apartment, SignedAt: s.cfg.Now()})
+	if err != nil {
+		return Summary{}, err
+	}
+	return s.Summary(ctx, u, issueID)
+}
+
+// Withdraw — житель отзывает подпись; отозвать можно и после закрытия заявки.
+func (s *Service) Withdraw(ctx context.Context, u user.User, issueID string) (Summary, error) {
+	if err := s.store.Appeals().Withdraw(ctx, issueID, u.ID); err != nil {
+		return Summary{}, err
+	}
+	return s.Summary(ctx, u, issueID)
+}
+
+// ForgetUser удаляет подписи пользователя: часть удаления аккаунта, в подписи бывают ФИО.
+func (s *Service) ForgetUser(ctx context.Context, userID int64) error {
+	return s.store.Appeals().ForgetUser(ctx, userID)
+}
+
+// Summary — число подписей; видно участникам заявки.
+func (s *Service) Summary(ctx context.Context, u user.User, issueID string) (Summary, error) {
+	is, err := s.store.Issues().Get(ctx, issueID)
+	if err != nil {
+		return Summary{}, err
+	}
+	if !is.HasParticipant(u.ID) && !u.CanManageIssues(is.ResponsibleOrgID()) {
+		return Summary{}, app.ErrForbidden
+	}
+	list, err := s.store.Appeals().Signatures(ctx, issueID)
+	if err != nil {
+		return Summary{}, err
+	}
+	out := Summary{Count: len(list)}
+	if i := slices.IndexFunc(list, func(x app.Signature) bool { return x.UserID == u.ID }); i >= 0 {
+		out.Mine, out.Named = true, list[i].FullName != ""
+	}
+	return out, nil
 }
 
 // Prepare выдаёт ссылку на обращение: только участнику открытой заявки с истёкшим сроком.
@@ -131,6 +214,16 @@ func (s *Service) Document(ctx context.Context, token string) (Document, error) 
 	}
 	if r, err := rules.Lookup(is.Category()); err == nil {
 		d.Category, d.Basis = r.Title, r.Basis
+	}
+	signs, err := s.store.Appeals().Signatures(ctx, is.ID())
+	if err != nil {
+		return Document{}, err
+	}
+	d.Signed = len(signs)
+	for _, x := range signs {
+		if x.FullName != "" {
+			d.Signers = append(d.Signers, Signer{FullName: x.FullName, Apartment: x.Apartment})
+		}
 	}
 	if is.ObjectID() != "" {
 		objects, err := houses.Objects(ctx, is.HouseID())

@@ -217,6 +217,14 @@ export interface DistrictMetrics {
   organizations: DistrictOrg[];
 }
 
+/** Подписи под коллективным обращением в жилинспекцию (ADR-023). */
+export interface AppealSummary {
+  count: number;
+  mine: boolean;
+  /** Текущий житель подписал с ФИО. */
+  named: boolean;
+}
+
 /** УК в рейтинге района (ADR-022); score null — мало данных. */
 export interface RatingOrg {
   id: string;

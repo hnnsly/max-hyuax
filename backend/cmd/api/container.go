@@ -210,7 +210,7 @@ func Open(ctx context.Context, cfg config, log *slog.Logger) (*Container, error)
 	c.http = sync.OnceValues(func() (*fiber.App, error) {
 		deps := httpapi.Deps{
 			Auth: c.Auth(), Issues: c.Issues(), Houses: c.Houses(), Hints: c.Hints(),
-			Appeal:  appeal.NewService(store, appeal.Config{Secret: []byte(cfg.SessionSecret), TTL: appealLinkTTL, Now: time.Now}),
+			Appeal:  appeal.NewService(store, appeal.Config{Secret: []byte(cfg.SessionSecret), TTL: appealLinkTTL, ConsentVersion: cfg.ConsentVersion, Now: time.Now}),
 			Photos:  c.Photos(),
 			Council: c.council(),
 			Ping:    store.Ping, ConsentVersion: cfg.ConsentVersion, Now: time.Now, Log: log,

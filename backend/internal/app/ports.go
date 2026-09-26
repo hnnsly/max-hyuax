@@ -255,6 +255,27 @@ type BotPendingRepo interface {
 	Take(ctx context.Context, userID int64, now time.Time) (p BotPending, ok bool, err error)
 }
 
+// Signature — житель поддержал обращение в жилинспекцию по просроченной заявке (ADR-023).
+// ФИО и квартира необязательны: без них подпись идёт в счётчик «поддержали».
+type Signature struct {
+	IssueID   string
+	UserID    int64
+	FullName  string
+	Apartment string
+	SignedAt  time.Time
+}
+
+// AppealRepo — подписи под коллективным обращением: одна на жителя и заявку.
+type AppealRepo interface {
+	// Sign ставит или обновляет подпись жителя.
+	Sign(ctx context.Context, s Signature) error
+	Withdraw(ctx context.Context, issueID string, userID int64) error
+	// Signatures — подписи заявки по времени.
+	Signatures(ctx context.Context, issueID string) ([]Signature, error)
+	// ForgetUser удаляет все подписи пользователя: часть удаления аккаунта.
+	ForgetUser(ctx context.Context, userID int64) error
+}
+
 // Store — доступ к репозиториям; InTx выполняет fn в одной транзакции.
 type Store interface {
 	Issues() IssueRepo
@@ -264,5 +285,6 @@ type Store interface {
 	Photos() PhotoRepo
 	Council() CouncilRepo
 	Pending() BotPendingRepo
+	Appeals() AppealRepo
 	InTx(ctx context.Context, fn func(tx Store) error) error
 }

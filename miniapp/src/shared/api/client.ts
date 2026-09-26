@@ -1,6 +1,6 @@
 // Клиент API: JSON, токен сессии, единый формат ошибок {"error": {"code", "message"}}.
 import type {
-  AppealLink, Category, CategoryHint, DistrictMetrics, DistrictRating, GeoPlace, House, HouseDetails, Issue, IssueEvent, AssetObject, MapHouse, Photo, Poll, Proposal, ReportInput, Session, Status, UkMetrics, User,
+  AppealLink, AppealSummary, Category, CategoryHint, DistrictMetrics, DistrictRating, GeoPlace, House, HouseDetails, Issue, IssueEvent, AssetObject, MapHouse, Photo, Poll, Proposal, ReportInput, Session, Status, UkMetrics, User,
 } from './types';
 
 export class ApiError extends Error {
@@ -107,6 +107,10 @@ export const api = {
     request<Issue>('POST', `/issues/${encodeURIComponent(issueId)}/reopen`, { comment }),
   appeal: (issueId: string) =>
     request<AppealLink>('POST', `/issues/${encodeURIComponent(issueId)}/appeal`),
+  appealSignatures: (issueId: string) => request<AppealSummary>('GET', `/issues/${encodeURIComponent(issueId)}/appeal/signatures`),
+  signAppeal: (issueId: string, input: { full_name?: string; apartment?: string }) =>
+    request<AppealSummary>('POST', `/issues/${encodeURIComponent(issueId)}/appeal/sign`, input),
+  withdrawAppeal: (issueId: string) => request<AppealSummary>('DELETE', `/issues/${encodeURIComponent(issueId)}/appeal/sign`),
   searchHouses: (query: string) => request<House[]>('GET', `/houses?${q({ query })}`),
   nearestHouses: (lat: number, lon: number) => request<House[]>('GET', `/houses/nearest?${q({ lat: String(lat), lon: String(lon) })}`),
   reverseGeocode: (lat: number, lon: number) => request<GeoPlace>('GET', `/geo/reverse?${q({ lat: String(lat), lon: String(lon) })}`),

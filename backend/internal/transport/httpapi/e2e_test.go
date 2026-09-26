@@ -88,7 +88,7 @@ func TestMain(m *testing.M) {
 			Issues:         issues.NewService(store, issues.Config{Now: time.Now, NewID: func() string { return uuid.NewV7().String() }, ConsentVersion: "v1"}),
 			Houses:         houses.NewService(store, nil),
 			Hints:          hints.NewService(nil, time.Second, log),
-			Appeal:         appeal.NewService(store, appeal.Config{Secret: []byte("s"), TTL: 10 * time.Minute, Now: time.Now}),
+			Appeal:         appeal.NewService(store, appeal.Config{Secret: []byte("s"), TTL: 10 * time.Minute, ConsentVersion: "v1", Now: time.Now}),
 			Photos:         photos.NewService(store, &apptest.MemFiles{}, photos.Config{Now: time.Now, NewID: func() string { return uuid.NewV7().String() }, ConsentVersion: "v1"}),
 			Council:        council.NewService(store, council.Config{Now: time.Now, NewID: func() string { return uuid.NewV7().String() }, ConsentVersion: "v1"}),
 			Webhook:        bot.NewWebhook("hook-secret", webhooks, store, log),
@@ -289,6 +289,24 @@ func TestAppealPDFForOverdueIssue(t *testing.T) {
 	}
 
 	expect(t, call(t, "POST", path, sergey, nil), 403, "not a participant")
+
+	// Коллективное обращение (ADR-023): сосед присоединяется и поддерживает обращение без ФИО,
+	// автор подписывает с ФИО; отозвать подпись можно.
+	expect(t, call(t, "POST", "/api/v1/issues/"+id+"/join", sergey, nil), 200, "join")
+	if s := expect(t, call(t, "POST", path+"/sign", sergey, map[string]string{}), 200, "sign anonymously").body; s["count"] != 1.0 || s["mine"] != true || s["named"] != false {
+		t.Fatalf("sergey sign = %v", s)
+	}
+	if s := expect(t, call(t, "POST", path+"/sign", anna, map[string]string{"full_name": "Анна Петрова", "apartment": "12"}), 200, "sign with name").body; s["count"] != 2.0 || s["named"] != true {
+		t.Fatalf("anna sign = %v", s)
+	}
+	expect(t, call(t, "POST", path+"/sign", anna, map[string]string{"apartment": "12345678901"}), 422, "apartment too long")
+	if s := expect(t, call(t, "GET", path+"/signatures", sergey, nil), 200, "signatures").body; s["count"] != 2.0 {
+		t.Fatalf("signatures = %v", s)
+	}
+	if s := expect(t, call(t, "DELETE", path+"/sign", sergey, nil), 200, "withdraw").body; s["count"] != 1.0 || s["mine"] != false {
+		t.Fatalf("withdraw = %v", s)
+	}
+
 	link := expect(t, call(t, "POST", path, anna, nil), 200, "appeal link").body
 	url, _ := link["url"].(string)
 	if !strings.HasPrefix(url, "/api/v1/appeal/") || link["expires_at"] == nil || link["file_name"] == nil {

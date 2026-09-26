@@ -33,6 +33,46 @@ type MemStore struct {
 	outbox   MemOutbox
 	council  memCouncil
 	pending  map[int64]app.BotPending
+	appeals  []app.Signature
+}
+
+func (s *MemStore) Appeals() app.AppealRepo { return appealRepo{s} }
+
+type appealRepo struct{ s *MemStore }
+
+func (r appealRepo) Sign(_ context.Context, sig app.Signature) error {
+	r.s.mu.Lock()
+	defer r.s.mu.Unlock()
+	r.s.appeals = slices.DeleteFunc(r.s.appeals, func(x app.Signature) bool { return x.IssueID == sig.IssueID && x.UserID == sig.UserID })
+	r.s.appeals = append(r.s.appeals, sig)
+	return nil
+}
+
+func (r appealRepo) Withdraw(_ context.Context, issueID string, userID int64) error {
+	r.s.mu.Lock()
+	defer r.s.mu.Unlock()
+	r.s.appeals = slices.DeleteFunc(r.s.appeals, func(x app.Signature) bool { return x.IssueID == issueID && x.UserID == userID })
+	return nil
+}
+
+func (r appealRepo) Signatures(_ context.Context, issueID string) ([]app.Signature, error) {
+	r.s.mu.Lock()
+	defer r.s.mu.Unlock()
+	var out []app.Signature
+	for _, x := range r.s.appeals {
+		if x.IssueID == issueID {
+			out = append(out, x)
+		}
+	}
+	slices.SortStableFunc(out, func(a, b app.Signature) int { return a.SignedAt.Compare(b.SignedAt) })
+	return out, nil
+}
+
+func (r appealRepo) ForgetUser(_ context.Context, userID int64) error {
+	r.s.mu.Lock()
+	defer r.s.mu.Unlock()
+	r.s.appeals = slices.DeleteFunc(r.s.appeals, func(x app.Signature) bool { return x.UserID == userID })
+	return nil
 }
 
 // MemOutbox — очередь уведомлений в памяти: Pending виден тестам напрямую.

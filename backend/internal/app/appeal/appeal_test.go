@@ -48,7 +48,7 @@ func setup(t *testing.T) fixture {
 	}
 	clock := func() time.Time { return *f.now }
 	f.issues = issues.NewService(s, issues.Config{Now: clock, NewID: func() string { return "i-1" }, ConsentVersion: "v1"})
-	f.svc = appeal.NewService(s, appeal.Config{Secret: []byte("0123456789abcdef"), TTL: 10 * time.Minute, Now: clock})
+	f.svc = appeal.NewService(s, appeal.Config{Secret: []byte("0123456789abcdef"), TTL: 10 * time.Minute, ConsentVersion: "v1", Now: clock})
 	is, err := f.issues.Report(t.Context(), f.anna, issues.ReportInput{HouseID: "h-1", ObjectID: "h-1-e2-lift", Description: "Кабина не приходит"})
 	if err != nil {
 		t.Fatal(err)
@@ -81,6 +81,59 @@ func TestParticipantGetsLinkAndDocument(t *testing.T) {
 	}
 	if len(doc.Events) != 2 || doc.Events[1].Kind != issue.EventStatusChanged || doc.Events[1].Comment != "Мастер приедет" {
 		t.Fatalf("events = %+v", doc.Events)
+	}
+}
+
+// Коллективное обращение (ADR-023): соседи подписывают по просроченной заявке, ФИО по желанию,
+// в документ идут число подписавших и таблица тех, кто указал ФИО.
+func TestSignAppeal(t *testing.T) {
+	f := setup(t)
+	sergey := user.User{ID: 4, Role: user.RoleResident, HouseID: "h-1", ConsentVersion: "v1"}
+	f.store.AddUser(sergey)
+	if _, err := f.issues.Join(t.Context(), sergey, f.is.ID()); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.svc.Sign(t.Context(), f.anna, f.is.ID(), "", ""); !errors.Is(err, appeal.ErrNotOverdue) {
+		t.Fatalf("before deadline err = %v", err)
+	}
+	f.after(3 * 24 * time.Hour)
+	if _, err := f.svc.Sign(t.Context(), f.stranger, f.is.ID(), "", ""); !errors.Is(err, app.ErrForbidden) {
+		t.Fatalf("stranger err = %v", err)
+	}
+	if _, err := f.svc.Sign(t.Context(), f.anna, f.is.ID(), strings.Repeat("я", 101), ""); !errors.Is(err, app.ErrInvalidInput) {
+		t.Fatalf("long name err = %v", err)
+	}
+	noConsent := user.User{ID: 5, Role: user.RoleResident}
+	if _, err := f.svc.Sign(t.Context(), noConsent, f.is.ID(), "", ""); !errors.Is(err, app.ErrConsentRequired) {
+		t.Fatalf("no consent err = %v", err)
+	}
+
+	sum, err := f.svc.Sign(t.Context(), f.anna, f.is.ID(), " Анна Петрова ", "12")
+	if err != nil || sum.Count != 1 || !sum.Mine || !sum.Named {
+		t.Fatalf("anna signs = %+v, %v", sum, err)
+	}
+	// Квартира без ФИО не сохраняется: в таблице подписавших она ничего не значит.
+	if sum, err = f.svc.Sign(t.Context(), sergey, f.is.ID(), "", "7"); err != nil || sum.Count != 2 || sum.Named {
+		t.Fatalf("sergey signs = %+v, %v", sum, err)
+	}
+	link, err := f.svc.Prepare(t.Context(), f.anna, f.is.ID())
+	if err != nil {
+		t.Fatal(err)
+	}
+	doc, err := f.svc.Document(t.Context(), link.Token)
+	if err != nil || doc.Signed != 2 || len(doc.Signers) != 1 || doc.Signers[0] != (appeal.Signer{FullName: "Анна Петрова", Apartment: "12"}) {
+		t.Fatalf("document signers = %d %+v, %v", doc.Signed, doc.Signers, err)
+	}
+
+	if sum, err = f.svc.Withdraw(t.Context(), sergey, f.is.ID()); err != nil || sum.Count != 1 || sum.Mine {
+		t.Fatalf("withdraw = %+v, %v", sum, err)
+	}
+	// Удаление аккаунта стирает подписи.
+	if err := f.store.Appeals().ForgetUser(t.Context(), f.anna.ID); err != nil {
+		t.Fatal(err)
+	}
+	if sum, _ = f.svc.Summary(t.Context(), f.anna, f.is.ID()); sum.Count != 0 {
+		t.Fatalf("after forget = %+v", sum)
 	}
 }
 

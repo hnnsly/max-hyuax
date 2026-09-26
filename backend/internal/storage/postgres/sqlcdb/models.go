@@ -10,6 +10,14 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type AppealSignature struct {
+	IssueID   string
+	UserID    int64
+	FullName  string
+	Apartment string
+	SignedAt  time.Time
+}
+
 type AssetObject struct {
 	ID         string
 	HouseID    string

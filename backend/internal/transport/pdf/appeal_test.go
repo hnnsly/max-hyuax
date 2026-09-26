@@ -82,6 +82,27 @@ func TestLongAppealBreaksPages(t *testing.T) {
 	}
 }
 
+// Коллективное обращение: таблица подписавших с переносом длинного ФИО, много подписей — новая страница.
+func TestAppealWithSigners(t *testing.T) {
+	d := sample()
+	d.Signed = 30
+	for i := range 30 {
+		name := "Петрова Анна Сергеевна"
+		if i == 0 {
+			name = strings.Repeat("Константинопольская ", 5)
+		}
+		d.Signers = append(d.Signers, appeal.Signer{FullName: name, Apartment: ""})
+	}
+	d.Signers[1].Apartment = "12"
+	out, err := Appeal(d)
+	if err != nil {
+		t.Fatalf("Appeal with signers: %v", err)
+	}
+	if countPages(out) < 2 {
+		t.Fatalf("pages = %d, want the signers table to continue on a new page", countPages(out))
+	}
+}
+
 func TestAppealWithoutOptionalFields(t *testing.T) {
 	d := sample()
 	d.Place, d.Description, d.Events = "", "", nil

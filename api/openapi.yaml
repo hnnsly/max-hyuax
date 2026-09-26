@@ -703,6 +703,56 @@ paths:
         "403": { $ref: "#/components/responses/Error" }
         "404": { $ref: "#/components/responses/Error" }
 
+  /issues/{id}/appeal/signatures:
+    get:
+      tags: [issues]
+      summary: Сколько жителей поддержали обращение
+      description: Видят участники заявки и сотрудник ответственной УК.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200": { $ref: "#/components/responses/AppealSummary" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+
+  /issues/{id}/appeal/sign:
+    post:
+      tags: [issues]
+      summary: Поддержать коллективное обращение в жилинспекцию
+      description: |
+        Участник открытой заявки с истёкшим сроком (иначе 409 not_overdue или issue_closed), нужно согласие
+        на обработку ПДн (403 consent_required). ФИО (до 100 символов) и квартира (до 10) необязательны:
+        с ними житель попадает в таблицу подписавших в PDF обращения, без них только в счётчик.
+        Повторная подпись обновляет ФИО и квартиру.
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                full_name: { type: string, maxLength: 100, example: Анна Петрова }
+                apartment: { type: string, maxLength: 10, example: "12" }
+      responses:
+        "200": { $ref: "#/components/responses/AppealSummary" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+        "422": { $ref: "#/components/responses/Error" }
+    delete:
+      tags: [issues]
+      summary: Отозвать подпись под обращением
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200": { $ref: "#/components/responses/AppealSummary" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+
   /appeal/{token}:
     get:
       tags: [issues]
@@ -1057,6 +1107,17 @@ components:
       content:
         application/json:
           schema: { $ref: "#/components/schemas/User" }
+    AppealSummary:
+      description: Подписи под коллективным обращением
+      content:
+        application/json:
+          schema:
+            type: object
+            required: [count, mine, named]
+            properties:
+              count: { type: integer, description: Сколько жителей поддержали обращение }
+              mine: { type: boolean, description: Текущий житель среди подписавших }
+              named: { type: boolean, description: Текущий житель подписал с ФИО }
     IssueList:
       description: Список заявок
       content:

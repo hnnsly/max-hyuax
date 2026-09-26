@@ -10,6 +10,7 @@ import (
 	"github.com/gofiber/fiber/v3"
 
 	"dommax/internal/app"
+	"dommax/internal/app/appeal"
 	"dommax/internal/app/auth"
 	"dommax/internal/app/houses"
 	"dommax/internal/app/issues"
@@ -122,6 +123,10 @@ func (h *handlers) hidePhone(c fiber.Ctx) error {
 func (h *handlers) deleteAccount(c fiber.Ctx) error {
 	u := currentUser(c)
 	if err := h.Photos.ForgetUser(c.Context(), u.ID); err != nil {
+		return err
+	}
+	// В подписях под обращениями бывают ФИО и квартира.
+	if err := h.Appeal.ForgetUser(c.Context(), u.ID); err != nil {
 		return err
 	}
 	if err := h.Auth.DeleteAccount(c.Context(), u); err != nil {
@@ -500,6 +505,51 @@ func (h *handlers) prepareAppeal(c fiber.Ctx) error {
 		URL: "/api/v1/appeal/" + link.Token, ExpiresAt: link.ExpiresAt,
 		FileName: fmt.Sprintf("obrashchenie-%d.pdf", is.Number()),
 	})
+}
+
+// appealSummaryDTO — сколько жителей поддержали обращение (ADR-023).
+type appealSummaryDTO struct {
+	Count int  `json:"count"`
+	Mine  bool `json:"mine"`
+	Named bool `json:"named"` // текущий житель подписал с ФИО
+}
+
+func toAppealSummaryDTO(s appeal.Summary) appealSummaryDTO {
+	return appealSummaryDTO{Count: s.Count, Mine: s.Mine, Named: s.Named}
+}
+
+// appealSignatures — число подписей под обращением; видят участники заявки и ответственная УК.
+func (h *handlers) appealSignatures(c fiber.Ctx) error {
+	sum, err := h.Appeal.Summary(c.Context(), currentUser(c), c.Params("id"))
+	if err != nil {
+		return err
+	}
+	return c.JSON(toAppealSummaryDTO(sum))
+}
+
+// signAppeal — житель поддерживает обращение по просроченной заявке; ФИО и квартира по желанию.
+func (h *handlers) signAppeal(c fiber.Ctx) error {
+	var in struct {
+		FullName  string `json:"full_name"`
+		Apartment string `json:"apartment"`
+	}
+	if err := bind(c, &in); err != nil {
+		return err
+	}
+	sum, err := h.Appeal.Sign(c.Context(), currentUser(c), c.Params("id"), in.FullName, in.Apartment)
+	if err != nil {
+		return err
+	}
+	return c.JSON(toAppealSummaryDTO(sum))
+}
+
+// withdrawAppeal — житель отзывает подпись.
+func (h *handlers) withdrawAppeal(c fiber.Ctx) error {
+	sum, err := h.Appeal.Withdraw(c.Context(), currentUser(c), c.Params("id"))
+	if err != nil {
+		return err
+	}
+	return c.JSON(toAppealSummaryDTO(sum))
 }
 
 // appealPDF отдаёт PDF по подписанной ссылке; заголовок авторизации не нужен.
