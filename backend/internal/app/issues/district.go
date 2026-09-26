@@ -28,17 +28,23 @@ func (s *Service) DistrictMetrics(ctx context.Context, u user.User) (DistrictMet
 	if !u.CanViewDistrict() {
 		return DistrictMetrics{}, app.ErrForbidden
 	}
-	orgs, err := s.store.Houses().OrganizationsInDistrict(ctx, u.District)
+	orgs, err := s.districtOrgs(ctx, u.District)
+	return DistrictMetrics{District: u.District, Orgs: orgs}, err
+}
+
+// districtOrgs — показатели каждой УК, у которой есть дома в районе.
+func (s *Service) districtOrgs(ctx context.Context, district string) ([]OrgMetrics, error) {
+	orgs, err := s.store.Houses().OrganizationsInDistrict(ctx, district)
 	if err != nil {
-		return DistrictMetrics{}, err
+		return nil, err
 	}
-	out := DistrictMetrics{District: u.District, Orgs: make([]OrgMetrics, 0, len(orgs))}
+	out := make([]OrgMetrics, 0, len(orgs))
 	for _, o := range orgs {
 		m, err := s.orgMetrics(ctx, o.ID)
 		if err != nil {
-			return DistrictMetrics{}, err
+			return nil, err
 		}
-		out.Orgs = append(out.Orgs, OrgMetrics{Org: o, Metrics: m})
+		out = append(out, OrgMetrics{Org: o, Metrics: m})
 	}
 	return out, nil
 }

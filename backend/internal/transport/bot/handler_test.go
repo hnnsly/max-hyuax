@@ -313,6 +313,24 @@ func TestConfirmRepairFromBot(t *testing.T) {
 	if txt, _ := e.max.last("cb3"); !strings.Contains(txt, "уже ответили") {
 		t.Fatalf("second answer = %q", txt)
 	}
+
+	// После «Починили» бот просит оценку 1–5: она идёт в рейтинг УК района.
+	_, bs = e.max.last("cb2")
+	e.handle(t, press(3030, "cb4", findButton(t, bs, "5").Payload))
+	if txt, _ := e.max.last("cb4"); !strings.Contains(txt, "Ваша оценка ремонта: 5 из 5") {
+		t.Fatalf("rating = %q", txt)
+	}
+	if got, _ := e.store.Issues().Get(t.Context(), is.ID()); func() int { a, _ := got.AnswerOf(3030); return a.Stars }() != 5 {
+		t.Fatal("rating not saved")
+	}
+	e.handle(t, press(3030, "cb5", findButton(t, bs, "4").Payload))
+	if txt, _ := e.max.last("cb5"); !strings.Contains(txt, "уже оценили") {
+		t.Fatalf("second rating = %q", txt)
+	}
+	e.handle(t, text(3030, "/rating"))
+	if txt, _ := e.max.last(""); !strings.Contains(txt, "Рейтинг УК района") || !strings.Contains(txt, "Как считается") {
+		t.Fatalf("/rating = %q", txt)
+	}
 }
 
 // Альбом из нескольких снимков прикладывается целиком, а не только первое фото.

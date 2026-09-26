@@ -82,6 +82,7 @@ var Commands = []maxapi.Command{
 	{Name: "my", Description: "Мои заявки"},
 	{Name: "house", Description: "Мой дом и контакты УК"},
 	{Name: "polls", Description: "Совет дома и опросы"},
+	{Name: "rating", Description: "Рейтинг УК района"},
 	{Name: "role", Description: "Роль для проверки: УК, район, председатель"},
 	{Name: "help", Description: "Как это работает"},
 }
@@ -92,7 +93,7 @@ const greetingText = "Здравствуйте! Я помогаю соседям
 const helpText = "Нажмите «Сообщить о проблеме» в меню или напишите одним сообщением, что сломалось и где, например: «не горит свет на 5 этаже во втором подъезде». " +
 	"Можно не печатать, а наговорить голосовым сообщением. " +
 	"Я определю категорию, ответственного и срок и проверю, не сообщали ли уже соседи.\n\n" +
-	"Команды:\n/menu главное меню\n/new сообщить о проблеме\n/my мои заявки\n/house мой дом и контакты УК\n/polls совет дома и опросы\n\n" +
+	"Команды:\n/menu главное меню\n/new сообщить о проблеме\n/my мои заявки\n/house мой дом и контакты УК\n/polls совет дома и опросы\n/rating рейтинг УК района\n\n" +
 	"Соседи видят только число сообщивших. Имя получает только управляющая компания."
 
 func (h *Handler) Handle(ctx context.Context, u maxapi.Update) error {
@@ -190,6 +191,8 @@ func (h *Handler) onCommand(ctx context.Context, to maxapi.Target, from maxapi.U
 		return h.sendScreen(ctx, to, u, scrHouse, "")
 	case "polls":
 		return h.sendScreen(ctx, to, u, scrCouncil, "")
+	case "rating":
+		return h.sendScreen(ctx, to, u, scrRating, "")
 	case "role":
 		return h.roleCommand(ctx, to, u, arg)
 	}
@@ -414,6 +417,9 @@ func (h *Handler) callbackReply(ctx context.Context, cb *maxapi.Callback) (maxap
 	case cbStatus:
 		return h.changeStatus(ctx, u, rest)
 
+	case cbRate:
+		return h.rate(ctx, u, rest)
+
 	case cbSkip:
 		h.dropPending(ctx, u)
 		category, object, _ := strings.Cut(rest, ":")
@@ -501,7 +507,10 @@ func (h *Handler) confirmRepair(ctx context.Context, u user.User, issueID string
 	_, err := h.svc.Issues.Confirm(ctx, u, issueID)
 	switch {
 	case err == nil:
-		return maxapi.CallbackAnswer{Notification: "Спасибо, отметили: починили. Соседи и УК увидят это в заявке."}, nil
+		// Сразу просим оценку: из оценок складывается рейтинг УК района (ADR-022).
+		m := screenMsg("Спасибо, отметили: починили. Соседи и УК увидят это в заявке.\n\nОцените, как сделали ремонт, от 1 до 5:",
+			starsRow(issueID), menuRow())
+		return maxapi.CallbackAnswer{Message: &m, Notification: "Отметили: починили"}, nil
 	case errors.Is(err, issue.ErrAlreadyAnswered):
 		return maxapi.CallbackAnswer{Notification: "Вы уже ответили по этому ремонту."}, nil
 	case errors.Is(err, issue.ErrWindowClosed):

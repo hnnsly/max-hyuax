@@ -278,6 +278,17 @@ checks:
       body: array
       required_fields: ["[].id", "[].number", "[].title", "[].status", "[].deadline", "[].overdue", "[].address"]
 
+  - id: district_rating
+    name: Рейтинг УК района для жителя
+    method: GET
+    path: /district/rating
+    role: resident
+    expect:
+      status: [200]
+      content_type: application/json
+      body: object
+      required_fields: [district, period_days, sample_data, organizations]
+
   - id: district_map
     name: Карта домов района с нагрузкой
     method: GET

@@ -101,6 +101,11 @@ export function repairCheck(
   return now < new Date(it.answer_until) ? 'ask' : null;
 }
 
+/** Можно ли оценить ремонт: житель ответил «Починили», ещё не оценил, 7 дней не прошли (ADR-022). */
+export function canRate(it: { my_answer: 'fixed' | null; my_rating?: number; answer_until: string | null }, now: Date): boolean {
+  return it.my_answer === 'fixed' && !it.my_rating && !!it.answer_until && now < new Date(it.answer_until);
+}
+
 const transitions: Record<Status, Status[]> = {
   sent: ['accepted', 'in_progress', 'rejected'],
   accepted: ['in_progress', 'done', 'rejected'],

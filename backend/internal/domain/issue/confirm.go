@@ -22,16 +22,46 @@ var (
 	ErrWindowClosed    = errors.New("issue: confirmation window is closed")
 	ErrAlreadyAnswered = errors.New("issue: user already answered")
 	ErrCommentRequired = errors.New("issue: comment required to reopen")
+	ErrNotConfirmed    = errors.New("issue: only a confirmed repair is rated")
+	ErrAlreadyRated    = errors.New("issue: repair already rated")
 )
 
 // Answer — ответ участника на «выполнено»: починили или нет. DoneAt — к какой отметке «выполнено»
 // относится ответ: после возврата в работу и нового «выполнено» жители отвечают заново.
+// Stars — оценка ремонта 1–5 после «Починили»; 0 — житель не оценивал (ADR-022).
 type Answer struct {
 	UserID int64
 	Fixed  bool
 	DoneAt time.Time
 	At     time.Time
+	Stars  int
 }
+
+// Rate — участник, подтвердивший ремонт, оценивает его от 1 до 5 звёзд; оценка одна на ремонт.
+// Из оценок складывается рейтинг УК района.
+func (is *Issue) Rate(userID int64, stars int, at time.Time) error {
+	if stars < 1 || stars > 5 {
+		return fmt.Errorf("%w: stars must be from 1 to 5", ErrInvalid)
+	}
+	if !is.HasParticipant(userID) {
+		return ErrNotParticipant
+	}
+	i := slices.IndexFunc(is.answers, func(a Answer) bool { return a.UserID == userID })
+	switch {
+	case i < 0 || !is.answers[i].Fixed:
+		return ErrNotConfirmed
+	case is.answers[i].Stars != 0:
+		return ErrAlreadyRated
+	case at.After(is.statusAt.Add(ConfirmWindow)):
+		return ErrWindowClosed
+	}
+	is.answers[i].Stars = stars
+	is.newRatings = append(is.newRatings, is.answers[i])
+	return nil
+}
+
+// NewRatings — оценки, которых ещё нет в хранилище.
+func (is *Issue) NewRatings() []Answer { return slices.Clone(is.newRatings) }
 
 // Confirm — участник подтверждает, что ремонт сделан.
 func (is *Issue) Confirm(userID int64, at time.Time) error {

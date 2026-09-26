@@ -134,6 +134,8 @@ export interface Issue {
   confirmed_count: number;
   /** Ответ текущего пользователя на текущее «выполнено». */
   my_answer: 'fixed' | null;
+  /** Оценка ремонта текущим пользователем 1–5; нет, если не оценивал. */
+  my_rating?: number;
   /** До какого момента можно подтвердить или вернуть; null, если заявка не выполнена. */
   answer_until: string | null;
   /** Когда жители в последний раз вернули заявку в работу. */
@@ -201,6 +203,9 @@ export interface DistrictOrg {
   closed_on_time: number;
   confirmed_by_residents: number;
   reopened_by_residents: number;
+  /** Средняя оценка ремонтов жителями 1–5; null — оценок нет. */
+  rating_avg: number | null;
+  ratings: number;
   sample_data: boolean;
 }
 
@@ -210,6 +215,28 @@ export interface DistrictMetrics {
   period_days: number;
   sample_data: boolean;
   organizations: DistrictOrg[];
+}
+
+/** УК в рейтинге района (ADR-022); score null — мало данных. */
+export interface RatingOrg {
+  id: string;
+  name: string;
+  score: number | null;
+  rating_avg: number | null;
+  ratings: number;
+  closed_total: number;
+  closed_on_time: number;
+  confirmed_by_residents: number;
+  overdue_open: number;
+}
+
+/** Рейтинг УК района для жителей. */
+export interface DistrictRating {
+  district: string;
+  period_days: number;
+  my_org_id?: string;
+  sample_data: boolean;
+  organizations: RatingOrg[];
 }
 
 /** Дом на карте кабинета УК или района: открытые и просроченные заявки. */
@@ -239,5 +266,8 @@ export interface UkMetrics {
   reopened_by_residents: number;
   open_total: number;
   overdue_open: number;
+  /** Средняя оценка ремонтов жителями 1–5; null — оценок нет. */
+  rating_avg: number | null;
+  ratings: number;
   sample_data: boolean;
 }

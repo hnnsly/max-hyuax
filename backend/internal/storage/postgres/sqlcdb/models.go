@@ -79,6 +79,7 @@ type IssueConfirmation struct {
 	DoneAt  time.Time
 	Fixed   bool
 	At      time.Time
+	Stars   pgtype.Int2
 }
 
 type IssueEvent struct {

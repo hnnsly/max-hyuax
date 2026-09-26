@@ -401,6 +401,43 @@
   .toast { opacity: 0; }
 }
 
+/* --- Оценка ремонта звёздами (ADR-022) --- */
+.stars {
+  display: flex;
+  gap: 4px;
+}
+.starButton {
+  display: grid;
+  place-items: center;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--radius-control);
+  background: var(--control);
+  color: var(--enamel-text);
+  cursor: pointer;
+}
+.starButton:hover,
+.starButton:focus-visible {
+  background: var(--enamel);
+  color: var(--plate-ink);
+}
+.starButton:focus-visible {
+  outline: 2px solid var(--enamel);
+  outline-offset: 2px;
+}
+.starButton:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.starsValue {
+  display: inline-flex;
+  gap: 2px;
+  color: var(--enamel-text);
+  vertical-align: -3px;
+}
+
 /* --- Переключатель разделов --- */
 /* Колонки равные, но не уже подписи: в крупном режиме длинная подпись забирает место у соседей,
    а если не хватает и так, сегмент прокручивается, а не обрезает текст. */

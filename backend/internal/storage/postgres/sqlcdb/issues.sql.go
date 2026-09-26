@@ -8,6 +8,8 @@ package sqlcdb
 import (
 	"context"
 	"time"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const findSimilarIssues = `-- name: FindSimilarIssues :many
@@ -255,7 +257,7 @@ func (q *Queries) InsertParticipant(ctx context.Context, arg InsertParticipantPa
 }
 
 const listCurrentAnswers = `-- name: ListCurrentAnswers :many
-SELECT c.issue_id, c.user_id, c.fixed, c.done_at, c.at
+SELECT c.issue_id, c.user_id, c.fixed, c.done_at, c.at, COALESCE(c.stars, 0)::int AS stars
 FROM issue_confirmations c
 JOIN issues i ON i.id = c.issue_id
 WHERE c.issue_id = ANY ($1::uuid[])
@@ -270,6 +272,7 @@ type ListCurrentAnswersRow struct {
 	Fixed   bool
 	DoneAt  time.Time
 	At      time.Time
+	Stars   int32
 }
 
 // Ответы на текущее «выполнено»: у заявки в другом статусе их нет.
@@ -288,6 +291,7 @@ func (q *Queries) ListCurrentAnswers(ctx context.Context, issueIds []string) ([]
 			&i.Fixed,
 			&i.DoneAt,
 			&i.At,
+			&i.Stars,
 		); err != nil {
 			return nil, err
 		}
@@ -730,6 +734,30 @@ SELECT 1 FROM issues WHERE id = $1 FOR UPDATE
 
 func (q *Queries) LockIssue(ctx context.Context, id string) error {
 	_, err := q.db.Exec(ctx, lockIssue, id)
+	return err
+}
+
+const rateAnswer = `-- name: RateAnswer :exec
+UPDATE issue_confirmations
+SET stars = $1
+WHERE issue_id = $2 AND user_id = $3 AND done_at = $4 AND stars IS NULL
+`
+
+type RateAnswerParams struct {
+	Stars   pgtype.Int2
+	IssueID string
+	UserID  int64
+	DoneAt  time.Time
+}
+
+// Оценка ставится один раз: повтор в гонке двух нажатий не перезапишет первую.
+func (q *Queries) RateAnswer(ctx context.Context, arg RateAnswerParams) error {
+	_, err := q.db.Exec(ctx, rateAnswer,
+		arg.Stars,
+		arg.IssueID,
+		arg.UserID,
+		arg.DoneAt,
+	)
 	return err
 }
 

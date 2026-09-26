@@ -4,6 +4,7 @@ import { useResource } from '../shared/api/useResource';
 import { plural } from '../shared/lib/format';
 import { chartTopHours, compareWeeks, formatResponse, longestDay, onTimeShare, residentCheck, shortResponse, weekdayShort } from '../shared/lib/metrics';
 import { EmptyState, ErrorState, Island, Loading } from '../shared/ui/Layout';
+import { StarsValue } from '../shared/ui/Stars';
 import s from './metrics.module.css';
 
 /** Метрики УК по холсту UkMetrics: первый ответ, сколько сообщений на проблему, закрыто в срок. */
@@ -153,6 +154,14 @@ function ResidentCheck({ m }: { m: UkMetrics }) {
           <div className={s.line}>
             <span className={`${s.midNum} ${s.bad}`}>{m.reopened_by_residents}</span>
             <span className={s.text}>{labels.reopened}: жители сообщили, что не починили</span>
+          </div>
+        )}
+        {m.rating_avg !== null && (
+          <div className={s.line}>
+            <span className={`${s.midNum} ${s.ink}`}>{m.rating_avg.toFixed(1).replace('.', ',')}</span>
+            <span className={s.text}>
+              <StarsValue value={m.rating_avg} /> средняя оценка ремонтов, {m.ratings} {plural(m.ratings, 'оценка', 'оценки', 'оценок')}
+            </span>
           </div>
         )}
       </div>

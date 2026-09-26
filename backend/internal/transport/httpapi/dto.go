@@ -146,6 +146,7 @@ type issueDTO struct {
 	// пользователя (fixed или null) и до какого момента можно ответить.
 	ConfirmedCount int        `json:"confirmed_count"`
 	MyAnswer       *string    `json:"my_answer"`
+	MyRating       int        `json:"my_rating,omitzero"` // оценка ремонта 1–5 от текущего пользователя (ADR-022)
 	AnswerUntil    *time.Time `json:"answer_until"`
 	ReopenedAt     time.Time  `json:"reopened_at,omitzero"` // когда жители в последний раз вернули заявку в работу
 	// Contacts — только в карточке и только для сотрудника ответственной УК.
@@ -178,7 +179,46 @@ func toIssueDTO(is *issue.Issue, viewer user.User, now time.Time) issueDTO {
 	// Ответ «не починили» закрывает круг и возвращает заявку в работу, поэтому здесь бывает только fixed.
 	if a, ok := is.AnswerOf(viewer.ID); ok && a.Fixed {
 		d.MyAnswer = new("fixed")
+		d.MyRating = a.Stars
 	}
+	return d
+}
+
+// districtRatingDTO — рейтинг УК района для жителей (ADR-022). score null — мало данных.
+type districtRatingDTO struct {
+	District      string                 `json:"district"`
+	PeriodDays    int                    `json:"period_days"`
+	MyOrgID       string                 `json:"my_org_id,omitempty"`
+	SampleData    bool                   `json:"sample_data"`
+	Organizations []districtRatingOrgDTO `json:"organizations"`
+}
+
+type districtRatingOrgDTO struct {
+	ID           string   `json:"id"`
+	Name         string   `json:"name"`
+	Score        *int     `json:"score"`
+	RatingAvg    *float64 `json:"rating_avg"`
+	Ratings      int      `json:"ratings"`
+	ClosedTotal  int      `json:"closed_total"`
+	ClosedOnTime int      `json:"closed_on_time"`
+	Confirmed    int      `json:"confirmed_by_residents"`
+	OverdueOpen  int      `json:"overdue_open"`
+}
+
+func toDistrictRatingDTO(r issues.DistrictRating) districtRatingDTO {
+	d := districtRatingDTO{District: r.District, PeriodDays: issues.MetricsPeriodDays, MyOrgID: r.MyOrgID}
+	d.Organizations = mapSlice(r.Orgs, func(o issues.OrgRating) districtRatingOrgDTO {
+		d.SampleData = d.SampleData || o.SampleData
+		out := districtRatingOrgDTO{
+			ID: o.Org.ID, Name: o.Org.Name, Ratings: o.Ratings,
+			ClosedTotal: o.ClosedTotal, ClosedOnTime: o.ClosedOnTime, Confirmed: o.Confirmed, OverdueOpen: o.OverdueOpen,
+		}
+		if o.Enough {
+			out.Score = new(o.Score)
+		}
+		out.RatingAvg = ratingAvg(o.OrgCounts)
+		return out
+	})
 	return d
 }
 
@@ -196,7 +236,17 @@ type metricsDTO struct {
 	Reopened         int            `json:"reopened_by_residents"`  // жители вернули в работу
 	OpenTotal        int            `json:"open_total"`
 	OverdueOpen      int            `json:"overdue_open"`
+	RatingAvg        *float64       `json:"rating_avg"` // средняя оценка ремонтов жителями 1–5; null — оценок нет
+	Ratings          int            `json:"ratings"`
 	SampleData       bool           `json:"sample_data"`
+}
+
+// ratingAvg — средняя оценка с одним знаком после запятой; nil, если оценок нет.
+func ratingAvg(c app.OrgCounts) *float64 {
+	if c.Ratings == 0 {
+		return nil
+	}
+	return new(math.Round(c.RatingAvg()*10) / 10)
 }
 
 type dayMedianDTO struct {
@@ -218,6 +268,7 @@ func toMetricsDTO(m issues.Metrics) metricsDTO {
 		PeriodDays: issues.MetricsPeriodDays, IssuesTotal: m.Issues,
 		ClosedTotal: m.ClosedTotal, ClosedOnTime: m.ClosedOnTime, Confirmed: m.Confirmed, Reopened: m.Reopened,
 		OpenTotal: m.OpenTotal, OverdueOpen: m.OverdueOpen,
+		RatingAvg: ratingAvg(m.OrgCounts), Ratings: m.Ratings,
 		SampleData: m.SampleData,
 	}
 	if m.Issues > 0 {
@@ -238,17 +289,19 @@ type districtMetricsDTO struct {
 }
 
 type districtOrgDTO struct {
-	ID               string `json:"id"`
-	Name             string `json:"name"`
-	FirstResponseMin *int   `json:"first_response_median_min"`
-	IssuesTotal      int    `json:"issues_total"`
-	OpenTotal        int    `json:"open_total"`
-	OverdueOpen      int    `json:"overdue_open"`
-	ClosedTotal      int    `json:"closed_total"`
-	ClosedOnTime     int    `json:"closed_on_time"`
-	Confirmed        int    `json:"confirmed_by_residents"`
-	Reopened         int    `json:"reopened_by_residents"`
-	SampleData       bool   `json:"sample_data"`
+	ID               string   `json:"id"`
+	Name             string   `json:"name"`
+	FirstResponseMin *int     `json:"first_response_median_min"`
+	IssuesTotal      int      `json:"issues_total"`
+	OpenTotal        int      `json:"open_total"`
+	OverdueOpen      int      `json:"overdue_open"`
+	ClosedTotal      int      `json:"closed_total"`
+	ClosedOnTime     int      `json:"closed_on_time"`
+	Confirmed        int      `json:"confirmed_by_residents"`
+	Reopened         int      `json:"reopened_by_residents"`
+	RatingAvg        *float64 `json:"rating_avg"`
+	Ratings          int      `json:"ratings"`
+	SampleData       bool     `json:"sample_data"`
 }
 
 // mapHouseDTO — дом на карте кабинета УК или района (ADR-020).
@@ -277,6 +330,7 @@ func toDistrictMetricsDTO(m issues.DistrictMetrics) districtMetricsDTO {
 			ID: o.Org.ID, Name: o.Org.Name, FirstResponseMin: minutes(o.Week),
 			IssuesTotal: o.Issues, OpenTotal: o.OpenTotal, OverdueOpen: o.OverdueOpen,
 			ClosedTotal: o.ClosedTotal, ClosedOnTime: o.ClosedOnTime, Confirmed: o.Confirmed, Reopened: o.Reopened,
+			RatingAvg: ratingAvg(o.OrgCounts), Ratings: o.Ratings,
 			SampleData: o.SampleData,
 		}
 	})

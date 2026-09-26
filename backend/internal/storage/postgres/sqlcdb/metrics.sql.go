@@ -70,9 +70,14 @@ SELECT count(*) FILTER (WHERE i.created_at >= $1)::int AS issues,
        count(*) FILTER (WHERE i.reopened_at >= $1)::int AS reopened,
        count(*) FILTER (WHERE i.status NOT IN ('done', 'rejected'))::int AS open_total,
        count(*) FILTER (WHERE i.status NOT IN ('done', 'rejected') AND i.deadline_at < $2)::int AS overdue_open,
+       COALESCE(sum(r.s), 0)::int AS rating_sum,
+       COALESCE(sum(r.n), 0)::int AS ratings,
        COALESCE(bool_or(i.sample), false)::boolean AS sample_data
 FROM issues i
 LEFT JOIN LATERAL (SELECT count(*) AS n FROM issue_participants ip WHERE ip.issue_id = i.id) p ON true
+LEFT JOIN LATERAL (SELECT sum(c.stars) AS s, count(c.stars) AS n
+                   FROM issue_confirmations c
+                   WHERE c.issue_id = i.id AND c.done_at >= $1) r ON true
 WHERE i.responsible_org_id = $3
 `
 
@@ -91,9 +96,12 @@ type OrgMetricCountsRow struct {
 	Reopened     int32
 	OpenTotal    int32
 	OverdueOpen  int32
+	RatingSum    int32
+	Ratings      int32
 	SampleData   bool
 }
 
+// Оценки ремонтов, отмеченных выполненными за период (ADR-022).
 func (q *Queries) OrgMetricCounts(ctx context.Context, arg OrgMetricCountsParams) (OrgMetricCountsRow, error) {
 	row := q.db.QueryRow(ctx, orgMetricCounts, arg.Since, arg.Now, arg.OrgID)
 	var i OrgMetricCountsRow
@@ -106,6 +114,8 @@ func (q *Queries) OrgMetricCounts(ctx context.Context, arg OrgMetricCountsParams
 		&i.Reopened,
 		&i.OpenTotal,
 		&i.OverdueOpen,
+		&i.RatingSum,
+		&i.Ratings,
 		&i.SampleData,
 	)
 	return i, err

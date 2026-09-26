@@ -98,7 +98,7 @@ ON CONFLICT DO NOTHING;
 
 -- name: ListCurrentAnswers :many
 -- Ответы на текущее «выполнено»: у заявки в другом статусе их нет.
-SELECT c.issue_id, c.user_id, c.fixed, c.done_at, c.at
+SELECT c.issue_id, c.user_id, c.fixed, c.done_at, c.at, COALESCE(c.stars, 0)::int AS stars
 FROM issue_confirmations c
 JOIN issues i ON i.id = c.issue_id
 WHERE c.issue_id = ANY (@issue_ids::uuid[])
@@ -110,6 +110,12 @@ ORDER BY c.at, c.user_id;
 INSERT INTO issue_confirmations (issue_id, user_id, done_at, fixed, at)
 VALUES (@issue_id, @user_id, @done_at, @fixed, @at)
 ON CONFLICT DO NOTHING;
+
+-- name: RateAnswer :exec
+-- Оценка ставится один раз: повтор в гонке двух нажатий не перезапишет первую.
+UPDATE issue_confirmations
+SET stars = @stars
+WHERE issue_id = @issue_id AND user_id = @user_id AND done_at = @done_at AND stars IS NULL;
 
 -- name: InsertEvent :exec
 INSERT INTO issue_events (issue_id, kind, user_id, status, comment, at)

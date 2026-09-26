@@ -22,6 +22,7 @@ func (r issueRepo) OrgCounts(ctx context.Context, orgID string, since, now time.
 		ClosedTotal: int(row.ClosedTotal), ClosedOnTime: int(row.ClosedOnTime),
 		Confirmed: int(row.Confirmed), Reopened: int(row.Reopened),
 		OpenTotal: int(row.OpenTotal), OverdueOpen: int(row.OverdueOpen),
+		RatingSum: int(row.RatingSum), Ratings: int(row.Ratings),
 		SampleData: row.SampleData,
 	}, err
 }

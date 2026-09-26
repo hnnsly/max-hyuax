@@ -1,6 +1,6 @@
 // Клиент API: JSON, токен сессии, единый формат ошибок {"error": {"code", "message"}}.
 import type {
-  AppealLink, Category, CategoryHint, DistrictMetrics, GeoPlace, House, HouseDetails, Issue, IssueEvent, AssetObject, MapHouse, Photo, Poll, Proposal, ReportInput, Session, Status, UkMetrics, User,
+  AppealLink, Category, CategoryHint, DistrictMetrics, DistrictRating, GeoPlace, House, HouseDetails, Issue, IssueEvent, AssetObject, MapHouse, Photo, Poll, Proposal, ReportInput, Session, Status, UkMetrics, User,
 } from './types';
 
 export class ApiError extends Error {
@@ -101,6 +101,8 @@ export const api = {
   photoBlob: async (photoId: string) => (await send('GET', `/photos/${encodeURIComponent(photoId)}`)).blob(),
   removePhoto: (photoId: string) => request<void>('DELETE', `/photos/${encodeURIComponent(photoId)}`),
   confirmRepair: (issueId: string) => request<Issue>('POST', `/issues/${encodeURIComponent(issueId)}/confirm`),
+  rateRepair: (issueId: string, stars: number) => request<Issue>('POST', `/issues/${encodeURIComponent(issueId)}/rating`, { stars }),
+  districtRating: () => request<DistrictRating>('GET', '/district/rating'),
   reopenRepair: (issueId: string, comment: string) =>
     request<Issue>('POST', `/issues/${encodeURIComponent(issueId)}/reopen`, { comment }),
   appeal: (issueId: string) =>

@@ -8,6 +8,7 @@ import { useResource } from '../shared/api/useResource';
 import { plural } from '../shared/lib/format';
 import { rankDistrict } from '../shared/lib/metrics';
 import { IssueList } from '../shared/ui/IssueRow';
+import { StarsValue } from '../shared/ui/Stars';
 import { EmptyState, ErrorState, Island, Loading, Screen, Section } from '../shared/ui/Layout';
 import { RoleSwitcher } from './Other';
 import s from './pages.module.css';
@@ -87,6 +88,11 @@ export function District() {
                   Жители подтвердили {o.confirmed_by_residents} {plural(o.confirmed_by_residents, 'ремонт', 'ремонта', 'ремонтов')}
                   {o.reopened_by_residents > 0 &&
                     `, вернули в работу ${o.reopened_by_residents} ${plural(o.reopened_by_residents, 'заявку', 'заявки', 'заявок')}`}
+                </p>
+              )}
+              {o.rating_avg !== null && (
+                <p className={s.hint}>
+                  Оценка ремонтов жителями: <StarsValue value={o.rating_avg} /> {o.rating_avg.toFixed(1).replace('.', ',')}
                 </p>
               )}
             </div>

@@ -119,6 +119,7 @@ export function Home() {
             bridge.download(`/api/v1/houses/${encodeURIComponent(house.id)}/report.pdf`, `house-${house.id}-report.pdf`).catch(() => showToast('Не удалось скачать отчёт'));
           }}
         />
+        <CellSimple title="Рейтинг УК района" showChevron onClick={() => push({ name: 'rating' })} />
         <CellSimple title="Другой дом" showChevron onClick={() => push({ name: 'houseSearch' })} />
       </CellList>
       <A11yToggle />

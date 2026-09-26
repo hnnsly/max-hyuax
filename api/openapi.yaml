@@ -557,6 +557,37 @@ paths:
         "409": { $ref: "#/components/responses/Error" }
         "422": { $ref: "#/components/responses/Error" }
 
+  /issues/{id}/rating:
+    post:
+      tags: [issues]
+      summary: Оценить ремонт от 1 до 5
+      description: |
+        Только участник, ответивший «Починили» на текущее «выполнено», в течение 7 дней после отметки.
+        Оценка одна: повтор — 409 already_rated, без подтверждения — 409 not_confirmed. Оценки входят
+        в рейтинг УК района (GET /district/rating).
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [stars]
+              properties:
+                stars: { type: integer, minimum: 1, maximum: 5, example: 5 }
+      responses:
+        "200":
+          description: Заявка с оценкой (my_rating)
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Issue" }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+        "409": { $ref: "#/components/responses/Error" }
+        "422": { $ref: "#/components/responses/Error" }
+
   /issues/{id}/appeal:
     post:
       tags: [issues]
@@ -884,6 +915,46 @@ paths:
         "401": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
 
+  /district/rating:
+    get:
+      tags: [district, issues]
+      summary: Рейтинг УК района
+      description: |
+        Жителю — по району его дома (my_org_id — УК его дома), управе — по её району, сотруднику УК — по району домов УК.
+        score 0–100 = 50% доля закрытых в срок + 30% средняя оценка ремонтов / 5 + 20% доля подтверждённых жителями;
+        без оценок их вес делится между двумя другими. Меньше 3 закрытых за period_days — score null («мало данных»),
+        такие УК в конце списка. Житель без дома получает 403.
+      responses:
+        "200":
+          description: Рейтинг
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [district, period_days, sample_data, organizations]
+                properties:
+                  district: { type: string }
+                  period_days: { type: integer }
+                  my_org_id: { type: string }
+                  sample_data: { type: boolean }
+                  organizations:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, name, score, rating_avg, ratings, closed_total, closed_on_time, confirmed_by_residents, overdue_open]
+                      properties:
+                        id: { type: string }
+                        name: { type: string }
+                        score: { type: [integer, "null"] }
+                        rating_avg: { type: [number, "null"], description: средняя оценка 1–5 с одним знаком после запятой }
+                        ratings: { type: integer }
+                        closed_total: { type: integer }
+                        closed_on_time: { type: integer }
+                        confirmed_by_residents: { type: integer }
+                        overdue_open: { type: integer }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+
   /map/houses:
     get:
       tags: [uk, district]
@@ -1155,6 +1226,7 @@ components:
         basis: { type: string, description: Основание срока (только в карточке) }
         confirmed_count: { type: integer, description: Сколько участников подтвердили текущее «выполнено» }
         my_answer: { type: [string, "null"], enum: [fixed, null], description: Ответ текущего пользователя на текущее «выполнено» }
+        my_rating: { type: integer, minimum: 1, maximum: 5, description: Оценка ремонта текущим пользователем; нет поля, если не оценивал }
         answer_until: { type: [string, "null"], format: date-time, description: До какого момента можно подтвердить или вернуть; null, если заявка не выполнена }
         reopened_at: { type: string, format: date-time, description: Когда жители в последний раз вернули заявку в работу; нет поля, если не возвращали }
         contacts:

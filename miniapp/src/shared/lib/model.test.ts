@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildRail,
   buildTimeline,
+  canRate,
   groupQueue,
   hintOffer,
   houseOpenIssues,
@@ -102,6 +103,13 @@ describe('проверка ремонта жителем', () => {
 
   it('благодарит за ответ «починили»', () => {
     expect(repairCheck({ ...done, my_answer: 'fixed' }, now)).toBe('thanks');
+  });
+
+  it('оценку просит один раз после «починили», пока открыто окно', () => {
+    expect(canRate({ ...done, my_answer: 'fixed' }, now)).toBe(true);
+    expect(canRate(done, now)).toBe(false);
+    expect(canRate({ ...done, my_answer: 'fixed', my_rating: 4 }, now)).toBe(false);
+    expect(canRate({ ...done, my_answer: 'fixed' }, new Date('2026-09-26T10:00:00+03:00'))).toBe(false);
   });
 
   it('молчит для соседа не из заявки, после окна и у невыполненной заявки', () => {

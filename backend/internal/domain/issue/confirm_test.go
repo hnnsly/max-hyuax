@@ -54,6 +54,45 @@ func TestParticipantConfirmsRepairOnce(t *testing.T) {
 	}
 }
 
+// Оценка ремонта: только после своего «Починили», одна, от 1 до 5 звёзд.
+func TestRateConfirmedRepairOnce(t *testing.T) {
+	is, doneAt := doneIssue(t)
+	at := doneAt.Add(time.Hour)
+	if err := is.Rate(1002, 5, at); !errors.Is(err, issue.ErrNotConfirmed) {
+		t.Fatalf("rate before confirm err = %v", err)
+	}
+	if err := is.Confirm(1002, at); err != nil {
+		t.Fatal(err)
+	}
+	for _, stars := range []int{0, 6} {
+		if err := is.Rate(1002, stars, at); !errors.Is(err, issue.ErrInvalid) {
+			t.Fatalf("stars %d err = %v", stars, err)
+		}
+	}
+	if err := is.Rate(9999, 4, at); !errors.Is(err, issue.ErrNotParticipant) {
+		t.Fatalf("stranger err = %v", err)
+	}
+	if err := is.Rate(1002, 4, at); err != nil {
+		t.Fatalf("Rate: %v", err)
+	}
+	if a, _ := is.AnswerOf(1002); a.Stars != 4 {
+		t.Fatalf("answer = %+v", a)
+	}
+	if r := is.NewRatings(); len(r) != 1 || r[0].Stars != 4 || !r[0].DoneAt.Equal(doneAt) {
+		t.Fatalf("new ratings = %+v", r)
+	}
+	if err := is.Rate(1002, 5, at); !errors.Is(err, issue.ErrAlreadyRated) {
+		t.Fatalf("second rate err = %v", err)
+	}
+	// Анна ответила «Не починили»: такой ответ не оценивается.
+	if err := is.Reopen(1001, "Опять стоит", at, at.Add(48*time.Hour)); err != nil {
+		t.Fatal(err)
+	}
+	if err := is.Rate(1001, 1, at); !errors.Is(err, issue.ErrNotConfirmed) {
+		t.Fatalf("rate after reopen err = %v", err)
+	}
+}
+
 func TestConfirmRules(t *testing.T) {
 	open := newIssue(t)
 	if err := open.Confirm(1001, created.Add(time.Hour)); !errors.Is(err, issue.ErrNotDone) {

@@ -62,7 +62,17 @@ type OrgCounts struct {
 	Reopened     int  // жители вернули в работу за период
 	OpenTotal    int  // открыто сейчас
 	OverdueOpen  int  // из открытых срок уже прошёл
+	RatingSum    int  // сумма оценок жителей 1–5 за ремонты, выполненные за период
+	Ratings      int  // сколько оценок
 	SampleData   bool // среди заявок УК есть синтетические (пример данных)
+}
+
+// RatingAvg — средняя оценка ремонтов; 0, если оценок нет.
+func (c OrgCounts) RatingAvg() float64 {
+	if c.Ratings == 0 {
+		return 0
+	}
+	return float64(c.RatingSum) / float64(c.Ratings)
 }
 
 type HouseRepo interface {

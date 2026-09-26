@@ -313,6 +313,30 @@ func (h *handlers) confirmRepair(c fiber.Ctx) error {
 	return h.sendOne(c, fiber.StatusOK, is)
 }
 
+// rateRepair — житель, подтвердивший ремонт, оценивает его от 1 до 5 (ADR-022).
+func (h *handlers) rateRepair(c fiber.Ctx) error {
+	var in struct {
+		Stars int `json:"stars"`
+	}
+	if err := bind(c, &in); err != nil {
+		return err
+	}
+	is, err := h.Issues.Rate(c.Context(), currentUser(c), c.Params("id"), in.Stars)
+	if err != nil {
+		return err
+	}
+	return h.sendOne(c, fiber.StatusOK, is)
+}
+
+// districtRating — рейтинг УК района: жителю по его дому, управе и сотруднику УК по их району.
+func (h *handlers) districtRating(c fiber.Ctx) error {
+	r, err := h.Issues.DistrictRating(c.Context(), currentUser(c))
+	if err != nil {
+		return err
+	}
+	return c.JSON(toDistrictRatingDTO(r))
+}
+
 // reopenRepair — участник сообщает, что не починили; комментарий обязателен.
 func (h *handlers) reopenRepair(c fiber.Ctx) error {
 	var in struct {

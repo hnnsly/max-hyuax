@@ -86,6 +86,7 @@ type Issue struct {
 	participants     []Participant
 	answers          []Answer // ответы на текущее «выполнено»
 	newAnswers       []Answer
+	newRatings       []Answer // ответы, которым только что поставили оценку
 	events           []Event
 }
 

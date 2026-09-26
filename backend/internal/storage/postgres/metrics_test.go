@@ -40,8 +40,10 @@ func TestSampleSeedGivesMetrics(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	// Оценки примера данных (00017): у каждого подтверждённого ремонта Орехового квартала 3–5 звёзд.
 	want := app.OrgCounts{
-		Issues: 25, Reports: 98, ClosedTotal: 17, ClosedOnTime: 14, Confirmed: 14, Reopened: 1, OpenTotal: 8, OverdueOpen: 2, SampleData: true,
+		Issues: 25, Reports: 98, ClosedTotal: 17, ClosedOnTime: 14, Confirmed: 14, Reopened: 1, OpenTotal: 8, OverdueOpen: 2,
+		RatingSum: 55, Ratings: 14, SampleData: true,
 	}
 	if got != want {
 		t.Errorf("counts = %+v, want %+v", got, want)

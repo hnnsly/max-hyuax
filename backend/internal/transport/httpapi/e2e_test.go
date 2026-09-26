@@ -431,6 +431,45 @@ func TestPhotosUploadListAndOpen(t *testing.T) {
 	expect(t, call(t, "GET", photoPath, anna, nil), 404, "removed photo")
 }
 
+// Оценка ремонта после «Починили» и рейтинг УК района для жителя (ADR-022).
+func TestRepairRatingAndDistrictRating(t *testing.T) {
+	anna, oper := login(t, "resident"), login(t, "uk_operator")
+	id := expect(t, call(t, "POST", "/api/v1/issues", anna, map[string]string{"house_id": "h-17k2", "category": "door"}), 201, "report").body["id"].(string)
+	path := "/api/v1/issues/" + id
+	for _, st := range []string{"in_progress", "done"} {
+		expect(t, call(t, "POST", path+"/status", oper, map[string]string{"status": st, "comment": "Починили домофон"}), 200, st)
+	}
+	if nc := expect(t, call(t, "POST", path+"/rating", anna, map[string]int{"stars": 5}), 409, "rate before confirm").body; nc["error"].(map[string]any)["code"] != "not_confirmed" {
+		t.Fatalf("before confirm = %v", nc)
+	}
+	expect(t, call(t, "POST", path+"/confirm", anna, nil), 200, "confirm")
+	expect(t, call(t, "POST", path+"/rating", anna, map[string]int{"stars": 7}), 422, "stars out of range")
+	card := expect(t, call(t, "POST", path+"/rating", anna, map[string]int{"stars": 4}), 200, "rate").body
+	if card["my_rating"] != 4.0 {
+		t.Fatalf("after rating = %v", card)
+	}
+	if again := expect(t, call(t, "POST", path+"/rating", anna, map[string]int{"stars": 5}), 409, "rate twice").body; again["error"].(map[string]any)["code"] != "already_rated" {
+		t.Fatalf("twice = %v", again)
+	}
+
+	r := expect(t, call(t, "GET", "/api/v1/district/rating", anna, nil), 200, "resident rating").body
+	orgs := r["organizations"].([]any)
+	if r["district"] != "Зябликово" || r["my_org_id"] != "org-orekh" || len(orgs) != 3 {
+		t.Fatalf("rating = %v", r)
+	}
+	first := orgs[0].(map[string]any)
+	if first["score"] == nil || first["rating_avg"] == nil || first["ratings"].(float64) < 1 {
+		t.Fatalf("first org = %v", first)
+	}
+	for i := 1; i < len(orgs); i++ {
+		prev, cur := orgs[i-1].(map[string]any)["score"], orgs[i].(map[string]any)["score"]
+		if cur != nil && (prev == nil || prev.(float64) < cur.(float64)) {
+			t.Fatalf("rating order: %v", orgs)
+		}
+	}
+	expect(t, call(t, "GET", "/api/v1/district/rating", login(t, "district"), nil), 200, "district rating")
+}
+
 // Жители проверяют ремонт: один подтверждает, другой возвращает заявку в работу с комментарием.
 func TestConfirmAndReopenRepair(t *testing.T) {
 	anna, sergey, oper := login(t, "resident"), login(t, "resident_2"), login(t, "uk_operator")

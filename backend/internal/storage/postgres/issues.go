@@ -7,6 +7,8 @@ import (
 	"dommax/internal/app"
 	"dommax/internal/domain/issue"
 	"dommax/internal/storage/postgres/sqlcdb"
+
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 type issueRepo struct{ s *Store }
@@ -67,6 +69,12 @@ func saveChildren(ctx context.Context, q *sqlcdb.Queries, is *issue.Issue) error
 	}
 	for _, a := range is.NewAnswers() {
 		err := q.InsertAnswer(ctx, sqlcdb.InsertAnswerParams{IssueID: is.ID(), UserID: a.UserID, DoneAt: a.DoneAt, Fixed: a.Fixed, At: a.At})
+		if err != nil {
+			return err
+		}
+	}
+	for _, a := range is.NewRatings() {
+		err := q.RateAnswer(ctx, sqlcdb.RateAnswerParams{Stars: pgtype.Int2{Int16: int16(a.Stars), Valid: true}, IssueID: is.ID(), UserID: a.UserID, DoneAt: a.DoneAt})
 		if err != nil {
 			return err
 		}
@@ -193,7 +201,7 @@ func (r issueRepo) restore(ctx context.Context, rows []sqlcdb.GetIssueRow) ([]*i
 	}
 	answers := map[string][]issue.Answer{}
 	for _, a := range answerRows {
-		answers[a.IssueID] = append(answers[a.IssueID], issue.Answer{UserID: a.UserID, Fixed: a.Fixed, DoneAt: a.DoneAt, At: a.At})
+		answers[a.IssueID] = append(answers[a.IssueID], issue.Answer{UserID: a.UserID, Fixed: a.Fixed, DoneAt: a.DoneAt, At: a.At, Stars: int(a.Stars)})
 	}
 	out := make([]*issue.Issue, len(rows))
 	for i, row := range rows {

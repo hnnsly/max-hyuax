@@ -252,6 +252,13 @@ func (r issueRepo) OrgCounts(_ context.Context, orgID string, since, now time.Ti
 				c.Confirmed++
 			}
 		}
+		// В памяти хранятся только ответы на текущее «выполнено»: оценок прошлых кругов тут нет.
+		for _, a := range is.Answers() {
+			if a.Stars > 0 && !a.DoneAt.Before(since) {
+				c.RatingSum += a.Stars
+				c.Ratings++
+			}
+		}
 	}
 	return c, nil
 }

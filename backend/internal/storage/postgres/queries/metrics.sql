@@ -17,9 +17,15 @@ SELECT count(*) FILTER (WHERE i.created_at >= @since)::int AS issues,
        count(*) FILTER (WHERE i.reopened_at >= @since)::int AS reopened,
        count(*) FILTER (WHERE i.status NOT IN ('done', 'rejected'))::int AS open_total,
        count(*) FILTER (WHERE i.status NOT IN ('done', 'rejected') AND i.deadline_at < @now)::int AS overdue_open,
+       COALESCE(sum(r.s), 0)::int AS rating_sum,
+       COALESCE(sum(r.n), 0)::int AS ratings,
        COALESCE(bool_or(i.sample), false)::boolean AS sample_data
 FROM issues i
 LEFT JOIN LATERAL (SELECT count(*) AS n FROM issue_participants ip WHERE ip.issue_id = i.id) p ON true
+-- Оценки ремонтов, отмеченных выполненными за период (ADR-022).
+LEFT JOIN LATERAL (SELECT sum(c.stars) AS s, count(c.stars) AS n
+                   FROM issue_confirmations c
+                   WHERE c.issue_id = i.id AND c.done_at >= @since) r ON true
 WHERE i.responsible_org_id = @org_id;
 
 -- name: LockSampleShift :exec

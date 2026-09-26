@@ -4,10 +4,14 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"math"
 	"slices"
+	"strconv"
 	"strings"
+	"time"
 
 	"dommax/internal/app"
+	"dommax/internal/app/issues"
 	"dommax/internal/domain/council"
 	"dommax/internal/domain/issue"
 	"dommax/internal/domain/rules"
@@ -24,6 +28,7 @@ const (
 	cbWin    = "w" // w:<экран>[:<аргументы>] — открыть экран в том же сообщении
 	cbStatus = "u" // u:<issue_id>:<статус>[:c] — сотрудник УК меняет статус; c — без комментария
 	cbSkip   = "x" // x:<категория>:<объект|-> — отправить заявку без описания
+	cbRate   = "t" // t:<issue_id>:<1..5> — оценка ремонта после «Починили» (ADR-022)
 
 	pendDescribe = "describe" // Ref — категория, Text — объект («-» — без объекта)
 	pendStatus   = "status"   // Ref — заявка, Text — новый статус
@@ -46,6 +51,7 @@ const (
 	scrDistrict = "district"
 	scrOverdue  = "overdue"
 	scrRole     = "role"
+	scrRating   = "rating"
 
 	// queueInChat — сколько заявок очереди УК показывать кнопками; остальные в кабинете.
 	queueInChat = 10
@@ -154,6 +160,8 @@ func (h *Handler) screen(ctx context.Context, u user.User, name, arg string) (ma
 		return h.overdueScreen(ctx, u)
 	case scrRole:
 		return h.roleScreen(u), nil
+	case scrRating:
+		return h.ratingScreen(ctx, u)
 	}
 	return h.homeScreen(ctx, u)
 }
@@ -202,7 +210,10 @@ func (h *Handler) homeScreen(ctx context.Context, u user.User) (maxapi.NewMessag
 	if u.IsChairmanOf(u.HouseID) {
 		rows = append(rows, []maxapi.Button{maxapi.CallbackButton("Папка предложений", win(scrFolder))})
 	}
-	rows = append(rows, []maxapi.Button{maxapi.OpenAppButton("Открыть приложение", h.botName, "")})
+	rows = append(rows,
+		[]maxapi.Button{maxapi.CallbackButton("Рейтинг УК района", win(scrRating))},
+		[]maxapi.Button{maxapi.OpenAppButton("Открыть приложение", h.botName, "")},
+	)
 	return screenMsg(fmt.Sprintf("**Меню.** Ваш дом: %s.\nВыберите действие или просто напишите или наговорите проблему одним сообщением.", address), withRole(rows...)...), nil
 }
 
@@ -306,6 +317,9 @@ func (h *Handler) issueScreen(ctx context.Context, u user.User, issueID, back st
 			maxapi.CallbackButton("Починили", ConfirmPayload(is.ID())),
 			maxapi.CallbackButton("Не починили", pack(cbReopen, is.ID())),
 		})
+	case rateAsk(is, u, h.svc.Now()):
+		text += "\n\nОцените ремонт от 1 до 5:"
+		rows = append(rows, starsRow(is.ID()))
 	case open && !is.HasParticipant(u.ID) && u.CanTakePart() && u.HouseID == is.HouseID():
 		rows = append(rows, []maxapi.Button{maxapi.CallbackButton("Это и у меня", pack(cbJoin, is.ID()))})
 	case open && is.HasParticipant(u.ID) && !u.PhoneShared():
@@ -662,6 +676,88 @@ func (h *Handler) roleScreen(u user.User) maxapi.NewMessage {
 		[]maxapi.Button{maxapi.CallbackButton("Управа района", pack(cbRole, "district")), maxapi.CallbackButton("Житель", pack(cbRole, "resident"))},
 		navRow(),
 	)
+}
+
+// rateAsk — житель подтвердил ремонт, но ещё не оценил его, и 7 дней после «выполнено» не прошли.
+func rateAsk(is *issue.Issue, u user.User, now time.Time) bool {
+	a, ok := is.AnswerOf(u.ID)
+	return ok && a.Fixed && a.Stars == 0 && now.Before(is.AnswerUntil())
+}
+
+// starsRow — оценка ремонта кнопками от 1 до 5.
+func starsRow(issueID string) []maxapi.Button {
+	row := make([]maxapi.Button, 0, 5)
+	for n := range 5 {
+		s := strconv.Itoa(n + 1)
+		row = append(row, maxapi.CallbackButton(s, pack(cbRate, issueID, s)))
+	}
+	return row
+}
+
+// rate — оценка ремонта кнопкой после «Починили» (ADR-022).
+func (h *Handler) rate(ctx context.Context, u user.User, rest string) (maxapi.CallbackAnswer, error) {
+	id, n, _ := strings.Cut(rest, ":")
+	stars, err := strconv.Atoi(n)
+	if err != nil {
+		return maxapi.CallbackAnswer{Notification: "Эта кнопка устарела."}, nil
+	}
+	_, err = h.svc.Issues.Rate(ctx, u, id, stars)
+	switch {
+	case errors.Is(err, issue.ErrAlreadyRated):
+		return maxapi.CallbackAnswer{Notification: "Вы уже оценили этот ремонт."}, nil
+	case errors.Is(err, issue.ErrWindowClosed):
+		return maxapi.CallbackAnswer{Notification: "Прошло больше 7 дней после ремонта: оценить уже нельзя."}, nil
+	case errors.Is(err, issue.ErrNotConfirmed), errors.Is(err, issue.ErrNotParticipant), errors.Is(err, issue.ErrInvalid),
+		errors.Is(err, app.ErrNotFound), errors.Is(err, app.ErrForbidden):
+		return maxapi.CallbackAnswer{Notification: "Эта кнопка устарела."}, nil
+	case err != nil:
+		return maxapi.CallbackAnswer{}, err
+	}
+	m := screenMsg(fmt.Sprintf("Спасибо! Ваша оценка ремонта: %d из 5. Из оценок жителей складывается рейтинг управляющих компаний района.", stars),
+		[]maxapi.Button{maxapi.CallbackButton("Рейтинг УК района", win(scrRating))},
+		menuRow(),
+	)
+	return maxapi.CallbackAnswer{Message: &m, Notification: "Оценка сохранена"}, nil
+}
+
+// ratingScreen — рейтинг УК района (ADR-022): жителю по району его дома.
+func (h *Handler) ratingScreen(ctx context.Context, u user.User) (maxapi.NewMessage, error) {
+	r, err := h.svc.Issues.DistrictRating(ctx, u)
+	if errors.Is(err, app.ErrForbidden) || errors.Is(err, app.ErrNotFound) {
+		return h.homeScreen(ctx, u)
+	}
+	if err != nil {
+		return maxapi.NewMessage{}, err
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "**Рейтинг УК района %s** за %d дней", plain(r.District), issues.MetricsPeriodDays)
+	place := 0
+	for _, o := range r.Orgs {
+		mine := ""
+		if o.Org.ID == r.MyOrgID {
+			mine = ", ваша УК"
+		}
+		if !o.Enough {
+			fmt.Fprintf(&b, "\n\n%s%s\nМало данных: закрыто заявок %d", plain(o.Org.Name), mine, o.ClosedTotal)
+			continue
+		}
+		place++
+		fmt.Fprintf(&b, "\n\n%d. %s%s\n%d из 100", place, plain(o.Org.Name), mine, o.Score)
+		if o.Ratings > 0 {
+			fmt.Fprintf(&b, ", оценка жителей %s", ratingRU(o.RatingAvg()))
+		}
+		fmt.Fprintf(&b, ", в срок %d%%", o.ClosedOnTime*100/o.ClosedTotal)
+	}
+	if len(r.Orgs) == 0 {
+		b.WriteString("\n\nВ районе пока нет управляющих компаний с заявками.")
+	}
+	b.WriteString("\n\nКак считается: 50% заявки, закрытые в срок, 30% оценки ремонта жителями, 20% ремонты, которые жители подтвердили.")
+	return screenMsg(b.String(), navRow()), nil
+}
+
+// ratingRU — средняя оценка с одним знаком после запятой: «4,6».
+func ratingRU(v float64) string {
+	return strings.Replace(strconv.FormatFloat(math.Round(v*10)/10, 'f', 1, 64), ".", ",", 1)
 }
 
 // changeStatus — нажатие кнопки статуса сотрудником УК. «Выполнено» и «Отклонить» сначала

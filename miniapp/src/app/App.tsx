@@ -9,6 +9,7 @@ import { Home } from '../pages/Home';
 import { IssueCard } from '../pages/IssueCard';
 import { DistrictMap, HousePick } from '../pages/Map';
 import { AccountDeleted, Consent, DemoGate, HouseSearch, MyIssues, UkQueue } from '../pages/Other';
+import { Rating } from '../pages/Rating';
 import { Report } from '../pages/Report';
 import { A11yContext, useA11yState, useRoleButtonKeys } from './a11y';
 import { ErrorBoundary } from './ErrorBoundary';
@@ -80,6 +81,8 @@ function Pages() {
       return <DistrictMap />;
     case 'housePick':
       return <HousePick />;
+    case 'rating':
+      return <Rating />;
     case 'council':
       return <CouncilFolder />;
   }

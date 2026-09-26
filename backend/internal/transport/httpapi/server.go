@@ -88,6 +88,7 @@ func New(d Deps) *fiber.App {
 	api.Post("/issues/:id/status", h.auth, h.changeStatus)
 	api.Post("/issues/:id/confirm", h.auth, h.confirmRepair)
 	api.Post("/issues/:id/reopen", h.auth, h.reopenRepair)
+	api.Post("/issues/:id/rating", h.auth, h.rateRepair)
 	api.Post("/issues/:id/appeal", h.auth, h.prepareAppeal)
 	api.Post("/issues/:id/photos", h.auth, h.uploadPhotos)
 	api.Get("/issues/:id/photos", h.auth, h.listPhotos)
@@ -112,6 +113,7 @@ func New(d Deps) *fiber.App {
 	api.Get("/district/metrics", h.auth, h.districtMetrics)
 	api.Get("/district/overdue", h.auth, h.districtOverdue)
 	api.Get("/map/houses", h.auth, h.mapHouses)
+	api.Get("/district/rating", h.auth, h.districtRating)
 
 	app.Post("/webhook/max", h.webhook)
 	return app
@@ -174,6 +176,10 @@ func classify(err error) (int, string, string) {
 		return fiber.StatusConflict, "window_closed", "Ответить можно в течение 7 дней после отметки о выполнении"
 	case errors.Is(err, issue.ErrAlreadyAnswered):
 		return fiber.StatusConflict, "already_answered", "Вы уже ответили по этому ремонту"
+	case errors.Is(err, issue.ErrAlreadyRated):
+		return fiber.StatusConflict, "already_rated", "Вы уже оценили этот ремонт"
+	case errors.Is(err, issue.ErrNotConfirmed):
+		return fiber.StatusConflict, "not_confirmed", "Оценить можно ремонт, который вы подтвердили"
 	case errors.Is(err, issue.ErrCommentRequired):
 		return fiber.StatusUnprocessableEntity, "comment_required", "Напишите, что осталось не так"
 	case errors.Is(err, appeal.ErrNotOverdue):

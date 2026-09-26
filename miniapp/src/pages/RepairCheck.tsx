@@ -5,10 +5,11 @@ import { api, ApiError } from '../shared/api/client';
 import type { Issue } from '../shared/api/types';
 import { bridge } from '../shared/bridge/bridge';
 import { dayMonth } from '../shared/lib/format';
-import { repairCheck } from '../shared/lib/model';
+import { canRate, repairCheck } from '../shared/lib/model';
 import { Island } from '../shared/ui/Layout';
 import { PhotoSlots } from '../shared/ui/Photos';
 import { Sheet } from '../shared/ui/Sheet';
+import { StarsInput, StarsValue } from '../shared/ui/Stars';
 import s from './pages.module.css';
 
 const EMPTY_COMMENT = 'Напишите, что осталось не так';
@@ -23,11 +24,41 @@ export function RepairCheck({ issue, onChanged, onToast }: { issue: Issue; onCha
   const state = repairCheck(issue, new Date());
   if (!state) return null;
 
+  const rate = async (stars: number) => {
+    setBusy(true);
+    try {
+      onChanged(await api.rateRepair(issue.id, stars));
+      bridge.hapticSuccess();
+      onToast(`Спасибо за оценку: ${stars} из 5`);
+    } catch (err) {
+      onToast(err instanceof ApiError ? err.message : 'Не получилось сохранить оценку');
+    } finally {
+      setBusy(false);
+    }
+  };
+
   if (state === 'thanks') {
     return (
-      <div className={s.joinedNote}>
-        <CheckCircle size={20} weight="fill" aria-hidden="true" /> Вы подтвердили, что починили
-      </div>
+      <>
+        <div className={s.joinedNote}>
+          <CheckCircle size={20} weight="fill" aria-hidden="true" /> Вы подтвердили, что починили
+        </div>
+        {issue.my_rating ? (
+          <p className={s.text}>
+            Ваша оценка ремонта: <StarsValue value={issue.my_rating} />
+          </p>
+        ) : (
+          canRate(issue, new Date()) && (
+            <Island>
+              <div className={s.block}>
+                <h3 className={s.blockTitle}>Оцените ремонт</h3>
+                <p className={s.hint}>1 плохо, 5 отлично. Из оценок жителей складывается рейтинг управляющих компаний района.</p>
+                <StarsInput busy={busy} onRate={rate} />
+              </div>
+            </Island>
+          )
+        )}
+      </>
     );
   }
 

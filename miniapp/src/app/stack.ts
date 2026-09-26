@@ -12,6 +12,7 @@ export type Route =
   | { name: 'district' }
   | { name: 'districtMap' }
   | { name: 'housePick' }
+  | { name: 'rating' }
   | { name: 'council' };
 
 export type StackAction = { type: 'push'; route: Route } | { type: 'back' } | { type: 'reset'; routes: Route[] };

@@ -85,6 +85,8 @@ describe('сравнение УК района', () => {
     closed_on_time: onTime,
     confirmed_by_residents: 1,
     reopened_by_residents: 0,
+    rating_avg: null,
+    ratings: 0,
     sample_data: true,
   });
 

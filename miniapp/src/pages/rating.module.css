@@ -1,0 +1,75 @@
+/* Рейтинг УК района (ADR-022): место, название, цифры, итоговая оценка крупно. */
+
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.item {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: start;
+  gap: 12px;
+  padding: 14px 16px;
+  border-radius: var(--radius-island);
+  background: var(--surface-card);
+}
+
+.mine {
+  box-shadow: inset 0 0 0 2px var(--enamel);
+}
+
+.place {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-plate);
+  background: var(--enamel);
+  color: var(--plate-ink);
+  font-family: var(--font-plate);
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.name {
+  margin: 0 0 4px;
+  font-size: var(--fs-body);
+  font-weight: 650;
+}
+
+.mineTag {
+  display: block;
+  margin-top: 2px;
+  font-size: var(--fs-caption);
+  font-weight: 600;
+  color: var(--enamel-text);
+}
+
+.meta {
+  margin: 0;
+  font-size: var(--fs-caption);
+  color: var(--text-2);
+}
+
+.score {
+  font-family: var(--font-plate);
+  font-size: 34px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  text-align: end;
+}
+
+.scoreUnit {
+  display: block;
+  font-family: var(--font-ui);
+  font-size: var(--fs-caption);
+  font-weight: 500;
+  color: var(--text-3);
+}
