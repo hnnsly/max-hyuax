@@ -55,6 +55,21 @@ JOIN houses h ON h.organization_id = o.id
 WHERE h.district = @district
 ORDER BY o.name;
 
+-- name: HouseLoad :many
+-- Карта домов: дома УК (или района, если УК не задана) с открытыми и просроченными заявками.
+-- Просрочка считается так же, как в метриках района: открыта и срок прошёл. Дома без координат не входят.
+SELECT h.id, h.address, h.lat, h.lon,
+       count(i.id) FILTER (WHERE i.status NOT IN ('done', 'rejected'))::int AS open,
+       count(i.id) FILTER (WHERE i.status NOT IN ('done', 'rejected') AND i.deadline_at < @now::timestamptz)::int AS overdue,
+       COALESCE(min(i.deadline_at) FILTER (WHERE i.status NOT IN ('done', 'rejected') AND i.deadline_at < @now::timestamptz),
+                @now::timestamptz)::timestamptz AS oldest_overdue
+FROM houses h
+LEFT JOIN issues i ON i.house_id = h.id
+WHERE NOT (h.lat = 0 AND h.lon = 0)
+  AND CASE WHEN @org_id::text <> '' THEN h.organization_id = @org_id::text ELSE h.district = @district::text END
+GROUP BY h.id
+ORDER BY h.address;
+
 -- name: UpsertHouse :one
 -- Импорт реестра: дом обновляется по id. xmax = 0 только у только что вставленной строки.
 INSERT INTO houses (id, address, district, year_built, floors, entrances_count, organization_id, lat, lon, source)

@@ -2,7 +2,9 @@ package postgres
 
 import (
 	"context"
+	"time"
 
+	"dommax/internal/app"
 	"dommax/internal/domain/house"
 	"dommax/internal/storage/postgres/sqlcdb"
 )
@@ -17,6 +19,18 @@ func (r houseRepo) Search(ctx context.Context, query string) ([]house.House, err
 func (r houseRepo) Nearest(ctx context.Context, lat, lon float64, limit int) ([]house.House, error) {
 	rows, err := r.q.NearestHouses(ctx, sqlcdb.NearestHousesParams{Lat: lat, Lon: lon, MaxRows: int32(limit)})
 	return mapSlice(rows, toHouse), err
+}
+
+func (r houseRepo) Load(ctx context.Context, orgID, district string, now time.Time) ([]app.HouseLoad, error) {
+	rows, err := r.q.HouseLoad(ctx, sqlcdb.HouseLoadParams{Now: now, OrgID: orgID, District: district})
+	return mapSlice(rows, func(h sqlcdb.HouseLoadRow) app.HouseLoad {
+		return app.HouseLoad{
+			House:         house.House{ID: h.ID, Address: h.Address, Lat: h.Lat, Lon: h.Lon},
+			Open:          int(h.Open),
+			Overdue:       int(h.Overdue),
+			OldestOverdue: h.OldestOverdue,
+		}
+	}), err
 }
 
 func (r houseRepo) ByOrganization(ctx context.Context, orgID string) ([]house.House, error) {

@@ -251,6 +251,24 @@ type districtOrgDTO struct {
 	SampleData       bool   `json:"sample_data"`
 }
 
+// mapHouseDTO — дом на карте кабинета УК или района (ADR-020).
+type mapHouseDTO struct {
+	ID             string  `json:"id"`
+	Address        string  `json:"address"`
+	Lat            float64 `json:"lat"`
+	Lon            float64 `json:"lon"`
+	Open           int     `json:"open"`
+	Overdue        int     `json:"overdue"`
+	MaxOverdueDays int     `json:"max_overdue_days"`
+}
+
+func toMapHouseDTO(h issues.MapHouse) mapHouseDTO {
+	return mapHouseDTO{
+		ID: h.House.ID, Address: h.House.Address, Lat: h.House.Lat, Lon: h.House.Lon,
+		Open: h.Open, Overdue: h.Overdue, MaxOverdueDays: h.MaxOverdueDays,
+	}
+}
+
 func toDistrictMetricsDTO(m issues.DistrictMetrics) districtMetricsDTO {
 	d := districtMetricsDTO{District: m.District, PeriodDays: issues.MetricsPeriodDays}
 	d.Organizations = mapSlice(m.Orgs, func(o issues.OrgMetrics) districtOrgDTO {

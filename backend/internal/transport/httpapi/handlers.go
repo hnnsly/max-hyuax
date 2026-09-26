@@ -354,6 +354,15 @@ func (h *handlers) districtMetrics(c fiber.Ctx) error {
 	return c.JSON(toDistrictMetricsDTO(m))
 }
 
+// mapHouses — дома на карте кабинета: своей УК у сотрудника УК, района у управы.
+func (h *handlers) mapHouses(c fiber.Ctx) error {
+	list, err := h.Issues.HouseMap(c.Context(), currentUser(c))
+	if err != nil {
+		return err
+	}
+	return c.JSON(fiber.Map{"houses": mapSlice(list, toMapHouseDTO)})
+}
+
 // districtOverdue — просроченные заявки района с адресами домов.
 func (h *handlers) districtOverdue(c fiber.Ctx) error {
 	list, err := h.Issues.DistrictOverdue(c.Context(), currentUser(c))

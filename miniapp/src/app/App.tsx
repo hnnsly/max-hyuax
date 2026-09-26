@@ -7,6 +7,7 @@ import { CouncilFolder } from '../pages/Council'; // папка председа
 import { District } from '../pages/District';
 import { Home } from '../pages/Home';
 import { IssueCard } from '../pages/IssueCard';
+import { DistrictMap, HousePick } from '../pages/Map';
 import { AccountDeleted, Consent, DemoGate, HouseSearch, MyIssues, UkQueue } from '../pages/Other';
 import { Report } from '../pages/Report';
 import { ErrorBoundary } from './ErrorBoundary';
@@ -74,6 +75,10 @@ function Pages() {
       return <UkQueue />;
     case 'district':
       return <District />;
+    case 'districtMap':
+      return <DistrictMap />;
+    case 'housePick':
+      return <HousePick />;
     case 'council':
       return <CouncilFolder />;
   }

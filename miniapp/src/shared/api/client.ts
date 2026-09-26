@@ -1,6 +1,6 @@
 // Клиент API: JSON, токен сессии, единый формат ошибок {"error": {"code", "message"}}.
 import type {
-  AppealLink, Category, CategoryHint, DistrictMetrics, GeoPlace, House, HouseDetails, Issue, IssueEvent, AssetObject, Photo, Poll, Proposal, ReportInput, Session, Status, UkMetrics, User,
+  AppealLink, Category, CategoryHint, DistrictMetrics, GeoPlace, House, HouseDetails, Issue, IssueEvent, AssetObject, MapHouse, Photo, Poll, Proposal, ReportInput, Session, Status, UkMetrics, User,
 } from './types';
 
 export class ApiError extends Error {
@@ -75,6 +75,8 @@ export const api = {
   sharePhone: (c: { phone: string; auth_date: string; hash: string }) => request<User>('POST', '/me/phone', c),
   districtMetrics: () => request<DistrictMetrics>('GET', '/district/metrics'),
   districtOverdue: () => request<Issue[]>('GET', '/district/overdue'),
+  /** Дома на карте: своей УК у сотрудника УК, района у управы. */
+  mapHouses: async () => (await request<{ houses: MapHouse[] }>('GET', '/map/houses')).houses,
 
   // Совет дома
   propose: (text: string) => request<Proposal>('POST', '/proposals', { text }),

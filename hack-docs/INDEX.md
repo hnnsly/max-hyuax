@@ -106,6 +106,8 @@ tags: [index, hub]
 | [adr/018-photos-in-minio.md](adr/018-photos-in-minio.md) | фото в MinIO по S3 API (`minio-go`), образ `coollabsio/minio`, AGPL сервера не касается кода, диск запасной | accepted | 2026-09-25 |
 | [adr/017-district-and-chairman-roles.md](adr/017-district-and-chairman-roles.md) | роль района (только чтение, сравнение УК) и роль председателя совета: предложения без имени автора, опросы без юридической силы | accepted | 2026-09-25 |
 | [adr/019-bot-single-window.md](adr/019-bot-single-window.md) | бот 2.0: одно окно (экраны заменяют сообщение), меню по роли, заявка кнопками, смена статуса УК в чате | accepted | 2026-09-26 |
+| [adr/020-houses-map.md](adr/020-houses-map.md) | карта домов: MapLibre 6 и OpenFreeMap без ключей, точки HTML-кнопками, список как запасной путь, выбор дома на карте | accepted | 2026-09-27 |
+| [BUG-REPORTS.md](BUG-REPORTS.md) | баги smoke-теста 26.09 (BUG-001…013) со статусами | active | 2026-09-27 |
 | [HANDOFF.md](HANDOFF.md) | заметка передачи: кто в работе, что сделано, следующий шаг | active | 2026-09-26 |
 | [design/canvas-v2/project/](design/canvas-v2/project/canvas.json) | утверждённый дизайн v2: 12 артбордов (житель, УК, бот, наклейка, тёмная тема, разбор системы) | accepted | 2026-09-23 |
 
@@ -126,7 +128,7 @@ tags: [index, hub]
 ### Будет создано
 | Файл | Когда |
 |---|---|
-| `adr/020`…`023`: карта домов, голос и доступность, рейтинг УК, коллективное обращение | части 6–9 [GEN_V3_PLAN](GEN_V3_PLAN.md) |
+| `adr/021`…`023`: голос и доступность, рейтинг УК, коллективное обращение | части 7–9 [GEN_V3_PLAN](GEN_V3_PLAN.md) |
 | название продукта (на наклейке пока `max.ru/<бот>`, в README рабочее «Заявки по дому в MAX») | до сдачи |
 | `research/bridge-support-matrix` (или обновление max-platform-capabilities) по итогам проверки в MAX | после деплоя |
 | вычитка `docs/*` и `README.md` людьми (черновики уже написаны вместе с кодом) | 28.09 |

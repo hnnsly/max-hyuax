@@ -4,6 +4,7 @@ package apptest
 import (
 	"cmp"
 	"context"
+	"math"
 	"slices"
 	"strconv"
 	"strings"
@@ -414,6 +415,35 @@ func (r houseRepo) ByOrganization(_ context.Context, orgID string) ([]house.Hous
 		}
 	}
 	slices.SortFunc(out, func(a, b house.House) int { return strings.Compare(a.Address, b.Address) })
+	return out, nil
+}
+
+func (r houseRepo) Load(_ context.Context, orgID, district string, now time.Time) ([]app.HouseLoad, error) {
+	var out []app.HouseLoad
+	for _, h := range r.s.HouseMap {
+		mine := h.OrganizationID == orgID
+		if orgID == "" {
+			mine = h.District == district
+		}
+		if !mine || (h.Lat == 0 && h.Lon == 0) {
+			continue
+		}
+		l := app.HouseLoad{House: house.House{ID: h.ID, Address: h.Address, Lat: h.Lat, Lon: h.Lon}, OldestOverdue: now}
+		open := issueRepo{r.s}.filter(func(is *issue.Issue) bool {
+			return is.HouseID() == h.ID && !is.Status().Closed()
+		}, newestFirst, math.MaxInt)
+		for _, is := range open {
+			l.Open++
+			if now.After(is.Deadline()) {
+				l.Overdue++
+				if is.Deadline().Before(l.OldestOverdue) {
+					l.OldestOverdue = is.Deadline()
+				}
+			}
+		}
+		out = append(out, l)
+	}
+	slices.SortFunc(out, func(a, b app.HouseLoad) int { return strings.Compare(a.House.Address, b.House.Address) })
 	return out, nil
 }
 

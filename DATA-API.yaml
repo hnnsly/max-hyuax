@@ -278,6 +278,17 @@ checks:
       body: array
       required_fields: ["[].id", "[].number", "[].title", "[].status", "[].deadline", "[].overdue", "[].address"]
 
+  - id: district_map
+    name: Карта домов района с нагрузкой
+    method: GET
+    path: /map/houses
+    role: district
+    expect:
+      status: [200]
+      content_type: application/json
+      body: object
+      required_fields: [houses]
+
   - id: resident_forbidden_on_uk
     name: Житель не видит очередь УК
     method: GET

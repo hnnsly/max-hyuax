@@ -2,6 +2,7 @@ package issues
 
 import (
 	"context"
+	"time"
 
 	"dommax/internal/app"
 	"dommax/internal/domain/house"
@@ -38,6 +39,37 @@ func (s *Service) DistrictMetrics(ctx context.Context, u user.User) (DistrictMet
 			return DistrictMetrics{}, err
 		}
 		out.Orgs = append(out.Orgs, OrgMetrics{Org: o, Metrics: m})
+	}
+	return out, nil
+}
+
+// MapHouse — дом на карте кабинета: сколько заявок открыто и просрочено, сколько дней самой давней просрочке.
+type MapHouse struct {
+	House          house.House
+	Open, Overdue  int
+	MaxOverdueDays int
+}
+
+// HouseMap — дома на карте (ADR-020): сотруднику УК — дома своей УК, управе — дома района.
+// Жителю карта нагрузки не положена: по ней видно, где соседи ждут ремонта.
+func (s *Service) HouseMap(ctx context.Context, u user.User) ([]MapHouse, error) {
+	var orgID, district string
+	switch {
+	case u.Role == user.RoleOperator && u.OrganizationID != "":
+		orgID = u.OrganizationID
+	case u.CanViewDistrict():
+		district = u.District
+	default:
+		return nil, app.ErrForbidden
+	}
+	now := s.cfg.Now()
+	rows, err := s.store.Houses().Load(ctx, orgID, district, now)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]MapHouse, len(rows))
+	for i, r := range rows {
+		out[i] = MapHouse{House: r.House, Open: r.Open, Overdue: r.Overdue, MaxOverdueDays: int(now.Sub(r.OldestOverdue) / (24 * time.Hour))}
 	}
 	return out, nil
 }

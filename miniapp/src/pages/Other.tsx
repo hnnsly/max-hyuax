@@ -1,5 +1,5 @@
 import { Button, CellList, CellSimple, Input } from '@maxhub/max-ui';
-import { MagnifyingGlass, NavigationArrow } from '@phosphor-icons/react';
+import { MagnifyingGlass, MapTrifold, NavigationArrow } from '@phosphor-icons/react';
 import { useEffect, useState } from 'react';
 import { useRouter } from '../app/router';
 import { demoRoles, useSession, useUser, type DemoRole } from '../app/session';
@@ -13,6 +13,7 @@ import { groupQueue } from '../shared/lib/model';
 import { IssueList } from '../shared/ui/IssueRow';
 import { EmptyState, ErrorState, Island, Loading, Screen, Section, useToast } from '../shared/ui/Layout';
 import { Segmented } from '../shared/ui/Segmented';
+import { HouseMapView } from './Map';
 import s from './pages.module.css';
 import { StickersView } from './Stickers';
 import st from './stickers.module.css';
@@ -21,7 +22,7 @@ import { UkMetricsView } from './UkMetrics';
 /** Выбор дома: поиск по адресу или ближайшие по геопозиции браузера. */
 export function HouseSearch() {
   const { setUser } = useSession();
-  const { reset, back, canGoBack } = useRouter();
+  const { reset, back, canGoBack, push } = useRouter();
   const [query, setQuery] = useState('');
   const [found, setFound] = useState<House[] | null>(null);
   const [place, setPlace] = useState<GeoPlace | null>(null);
@@ -147,6 +148,10 @@ export function HouseSearch() {
       <Button variant="secondary" size="medium" iconBefore={<NavigationArrow size={18} />} onClick={nearby}>
         Найти дома рядом со мной
       </Button>
+      {/* На карте дом находится без геопозиции: в WebView MAX её обычно нет. */}
+      <Button variant="secondary" size="medium" iconBefore={<MapTrifold size={18} />} onClick={() => push({ name: 'housePick' })}>
+        Выбрать на карте
+      </Button>
       {error && <p className={s.hint} role="alert">{error}</p>}
       {place?.address && (
         <div role="status">
@@ -193,16 +198,17 @@ export function MyIssues() {
   );
 }
 
-type UkTab = 'queue' | 'metrics' | 'stickers';
+type UkTab = 'queue' | 'metrics' | 'map' | 'stickers';
 const ukTabs: { id: UkTab; title: string }[] = [
   { id: 'queue', title: 'Заявки' },
   { id: 'metrics', title: 'Метрики' },
+  { id: 'map', title: 'Карта' },
   { id: 'stickers', title: 'Наклейки' },
 ];
 // Вкладка переживает переход в карточку заявки и возврат назад.
 let lastUkTab: UkTab = 'queue';
 
-/** Кабинет УК: очередь заявок, метрики и наклейки с QR-кодами. */
+/** Кабинет УК: очередь заявок, метрики, карта домов и наклейки с QR-кодами. */
 export function UkQueue() {
   const [tab, setTab] = useState<UkTab>(lastUkTab);
   const choose = (t: UkTab) => {
@@ -212,7 +218,15 @@ export function UkQueue() {
   return (
     <Screen title="Кабинет УК">
       <Segmented label="Раздел кабинета УК" items={ukTabs} value={tab} onChange={choose} />
-      {tab === 'queue' ? <QueueView /> : tab === 'metrics' ? <UkMetricsView /> : <StickersView />}
+      {tab === 'queue' ? (
+        <QueueView />
+      ) : tab === 'metrics' ? (
+        <UkMetricsView />
+      ) : tab === 'map' ? (
+        <HouseMapView />
+      ) : (
+        <StickersView />
+      )}
       <RoleSwitcher />
     </Screen>
   );

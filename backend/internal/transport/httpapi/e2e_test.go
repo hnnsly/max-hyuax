@@ -565,6 +565,40 @@ func TestDistrictCabinet(t *testing.T) {
 	}
 }
 
+// Карта домов (ADR-020): управа видит дома района, сотрудник УК — дома своей УК, житель — 403.
+func TestHouseMap(t *testing.T) {
+	houses := func(token string) []any {
+		t.Helper()
+		body := expect(t, call(t, "GET", "/api/v1/map/houses", token, nil), 200, "map").body
+		return body["houses"].([]any)
+	}
+	district := houses(login(t, "district"))
+	if len(district) < 3 {
+		t.Fatalf("district houses = %d", len(district))
+	}
+	overdue := 0
+	for _, h := range district {
+		h := h.(map[string]any)
+		if h["lat"] == 0.0 || h["address"] == "" {
+			t.Fatalf("house without coordinates or address: %v", h)
+		}
+		if h["overdue"].(float64) > 0 {
+			overdue++
+			if h["max_overdue_days"].(float64) < 1 || h["open"].(float64) < h["overdue"].(float64) {
+				t.Fatalf("overdue house = %v", h)
+			}
+		}
+	}
+	if overdue == 0 {
+		t.Fatal("sample district has overdue issues, map shows none")
+	}
+	uk := houses(login(t, "uk_operator"))
+	if len(uk) == 0 || len(uk) > len(district) {
+		t.Fatalf("uk houses = %d, district = %d", len(uk), len(district))
+	}
+	expect(t, call(t, "GET", "/api/v1/map/houses", login(t, "resident"), nil), 403, "resident on map")
+}
+
 func TestClassifyHint(t *testing.T) {
 	anna := login(t, "resident")
 	got := expect(t, call(t, "POST", "/api/v1/classify", anna, map[string]string{"text": "Не горит свет на пятом этаже"}), 200, "classify").body

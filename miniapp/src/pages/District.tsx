@@ -1,3 +1,5 @@
+import { Button } from '@maxhub/max-ui';
+import { MapTrifold } from '@phosphor-icons/react';
 import { useRouter } from '../app/router';
 import { useUser } from '../app/session';
 import { api } from '../shared/api/client';
@@ -44,6 +46,15 @@ export function District() {
 
   return (
     <Screen title={title}>
+      <Button
+        variant="secondary"
+        size="medium"
+        stretched
+        iconBefore={<MapTrifold size={20} />}
+        onClick={() => push({ name: 'districtMap' })}
+      >
+        Карта района
+      </Button>
       <Section title="Управляющие компании" aside={`${rows.length} УК`} />
       {rows.length === 0 ? (
         <EmptyState title="В районе пока нет УК" text="Когда дома района подключат к сервису, здесь появится сравнение управляющих компаний." />

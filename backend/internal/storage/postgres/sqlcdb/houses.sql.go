@@ -7,6 +7,7 @@ package sqlcdb
 
 import (
 	"context"
+	"time"
 )
 
 const ensureEntrances = `-- name: EnsureEntrances :exec
@@ -116,6 +117,66 @@ func (q *Queries) GetOrganization(ctx context.Context, id string) (Organization,
 		&i.Source,
 	)
 	return i, err
+}
+
+const houseLoad = `-- name: HouseLoad :many
+SELECT h.id, h.address, h.lat, h.lon,
+       count(i.id) FILTER (WHERE i.status NOT IN ('done', 'rejected'))::int AS open,
+       count(i.id) FILTER (WHERE i.status NOT IN ('done', 'rejected') AND i.deadline_at < $1::timestamptz)::int AS overdue,
+       COALESCE(min(i.deadline_at) FILTER (WHERE i.status NOT IN ('done', 'rejected') AND i.deadline_at < $1::timestamptz),
+                $1::timestamptz)::timestamptz AS oldest_overdue
+FROM houses h
+LEFT JOIN issues i ON i.house_id = h.id
+WHERE NOT (h.lat = 0 AND h.lon = 0)
+  AND CASE WHEN $2::text <> '' THEN h.organization_id = $2::text ELSE h.district = $3::text END
+GROUP BY h.id
+ORDER BY h.address
+`
+
+type HouseLoadParams struct {
+	Now      time.Time
+	OrgID    string
+	District string
+}
+
+type HouseLoadRow struct {
+	ID            string
+	Address       string
+	Lat           float64
+	Lon           float64
+	Open          int32
+	Overdue       int32
+	OldestOverdue time.Time
+}
+
+// Карта домов: дома УК (или района, если УК не задана) с открытыми и просроченными заявками.
+// Просрочка считается так же, как в метриках района: открыта и срок прошёл. Дома без координат не входят.
+func (q *Queries) HouseLoad(ctx context.Context, arg HouseLoadParams) ([]HouseLoadRow, error) {
+	rows, err := q.db.Query(ctx, houseLoad, arg.Now, arg.OrgID, arg.District)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []HouseLoadRow
+	for rows.Next() {
+		var i HouseLoadRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Address,
+			&i.Lat,
+			&i.Lon,
+			&i.Open,
+			&i.Overdue,
+			&i.OldestOverdue,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listDistrictOrganizations = `-- name: ListDistrictOrganizations :many

@@ -884,6 +884,38 @@ paths:
         "401": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
 
+  /map/houses:
+    get:
+      tags: [uk, district]
+      summary: Дома на карте с нагрузкой
+      description: |
+        Для uk_operator — дома своей УК, для district — дома района; остальным 403.
+        Дома без координат не входят. Просрочка — открытая заявка с прошедшим сроком, как в метриках района.
+      responses:
+        "200":
+          description: Дома
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [houses]
+                properties:
+                  houses:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, address, lat, lon, open, overdue, max_overdue_days]
+                      properties:
+                        id: { type: string }
+                        address: { type: string }
+                        lat: { type: number }
+                        lon: { type: number }
+                        open: { type: integer, description: открытые заявки дома }
+                        overdue: { type: integer, description: из них с прошедшим сроком }
+                        max_overdue_days: { type: integer, description: сколько дней просрочена самая давняя; 0 — просрочек нет }
+        "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
+
   /uk/metrics:
     get:
       tags: [uk]

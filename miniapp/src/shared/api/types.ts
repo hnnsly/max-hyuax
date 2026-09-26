@@ -212,6 +212,17 @@ export interface DistrictMetrics {
   organizations: DistrictOrg[];
 }
 
+/** Дом на карте кабинета УК или района: открытые и просроченные заявки. */
+export interface MapHouse {
+  id: string;
+  address: string;
+  lat: number;
+  lon: number;
+  open: number;
+  overdue: number;
+  max_overdue_days: number; // 0 — просрочек нет
+}
+
 /** Метрики УК; длительности в минутах, null — нет данных. */
 export interface UkMetrics {
   first_response_median_min: number | null;

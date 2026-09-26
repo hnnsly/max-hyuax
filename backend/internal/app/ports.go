@@ -82,6 +82,15 @@ type HouseRepo interface {
 	// Upsert создаёт или обновляет дом по id и добавляет недостающие подъезды и объекты с QR-кодами
 	// (лифт и свет в подъезде, кровля, мусоропровод). created — дома раньше не было.
 	Upsert(ctx context.Context, h house.House) (created bool, err error)
+	// Load — дома УК (или района, если orgID пуст) с координатами и нагрузкой на момент now: для карты.
+	Load(ctx context.Context, orgID, district string, now time.Time) ([]HouseLoad, error)
+}
+
+// HouseLoad — дом на карте: открытые и просроченные заявки.
+type HouseLoad struct {
+	House         house.House // заполнены id, адрес и координаты
+	Open, Overdue int
+	OldestOverdue time.Time // самый ранний прошедший срок; равен now, если просрочек нет
 }
 
 // GeoHouse — дом, найденный геокодером OpenStreetMap.
