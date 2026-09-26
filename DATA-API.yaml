@@ -300,6 +300,19 @@ checks:
       body: object
       required_fields: [houses]
 
+  - id: appeal_signatures
+    name: Подписи жителей под коллективным обращением
+    method: GET
+    path: /issues/{id}/appeal/signatures
+    role: resident
+    params:
+      path: { id: 0190a000-0000-7000-8000-000000000115 }
+    expect:
+      status: [200]
+      content_type: application/json
+      body: object
+      required_fields: [count]
+
   - id: resident_forbidden_on_uk
     name: Житель не видит очередь УК
     method: GET
