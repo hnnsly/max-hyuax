@@ -51,5 +51,10 @@ export const statusLabel: Record<Status, string> = {
 /** Штамп статуса. land — анимация «приземления» при смене статуса. */
 export function Stamp({ status, small, land }: { status: Status; small?: boolean; land?: boolean }) {
   const cls = [s.stamp, s[`st_${status}`], small && s.stampSmall, land && s.stampLand].filter(Boolean).join(' ');
-  return <span className={cls}>{statusLabel[status]}</span>;
+  return (
+    <span className={cls}>
+      <span className="visually-hidden">Статус: </span>
+      {statusLabel[status]}
+    </span>
+  );
 }

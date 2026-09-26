@@ -1,6 +1,7 @@
 import { Button, CellList, CellSimple, Counter } from '@maxhub/max-ui';
 import { Phone, Plus, QrCode } from '@phosphor-icons/react';
 import { useState } from 'react';
+import { A11yToggle } from '../app/a11y';
 import { useRouter } from '../app/router';
 import { useSession, useUser } from '../app/session';
 import { api, ApiError } from '../shared/api/client';
@@ -120,6 +121,7 @@ export function Home() {
         />
         <CellSimple title="Другой дом" showChevron onClick={() => push({ name: 'houseSearch' })} />
       </CellList>
+      <A11yToggle />
       <RoleSwitcher />
       <button type="button" className={s.dangerLink} onClick={() => setDeleting(true)}>
         Удалить аккаунт

@@ -1,5 +1,6 @@
 import { Button } from '@maxhub/max-ui';
 import { MapTrifold } from '@phosphor-icons/react';
+import { A11yToggle } from '../app/a11y';
 import { useRouter } from '../app/router';
 import { useUser } from '../app/session';
 import { api } from '../shared/api/client';
@@ -104,6 +105,7 @@ export function District() {
         {metrics.sample_data && 'Пример данных. '}
         Счётчики за {period}, первый ответ считается как медиана за 7 дней. УК считается целиком, со всеми своими домами.
       </p>
+      <A11yToggle />
       <RoleSwitcher />
     </Screen>
   );

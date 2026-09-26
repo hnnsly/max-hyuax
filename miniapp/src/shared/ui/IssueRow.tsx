@@ -1,7 +1,7 @@
 import { CaretRight } from '@phosphor-icons/react';
 import { isClosed, type Issue } from '../api/types';
 import { capitalize, dayMonth, deadlineLabel, plural } from '../lib/format';
-import { Stamp } from './Plate';
+import { Stamp, statusLabel } from './Plate';
 import { Rail } from './Rail';
 import s from './ui.module.css';
 
@@ -18,8 +18,13 @@ export function IssueRow({ issue, now, showAddress, onOpen }: Props) {
   const closed = isClosed(issue.status);
   const dl = deadlineLabel(issue.deadline, now, issue.overdue);
   const place = capitalize([showAddress ? issue.address : '', issue.place].filter(Boolean).join(', '));
+  const neighbours = `${n} ${plural(n, 'сосед', 'соседа', 'соседей')}`;
+  // Чтец читает строку по смыслу: что, где, сколько ждут, срок. Визуально число стоит первым.
+  const label = [issue.title, place, `Сообщили ${neighbours}`, closed ? `${statusLabel[issue.status]} ${dayMonth(issue.status_at)}` : dl.text]
+    .filter(Boolean)
+    .join('. ');
   return (
-    <button type="button" className={s.row} onClick={onOpen}>
+    <button type="button" className={s.row} onClick={onOpen} aria-label={label}>
       <span className={s.rowCount}>
         <span className={s.rowCountNumber}>{n}</span>
         <span className={s.rowCountNoun}>{plural(n, 'сосед', 'соседа', 'соседей')}</span>

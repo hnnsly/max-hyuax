@@ -111,6 +111,55 @@ body {
   color-scheme: dark;
 }
 
+/*
+ * «Крупно и контрастно» (ADR-021). MAX UI задаёт шрифты в rem: корень 20 px вместо 16 увеличивает
+ * их на четверть; наша шкала растёт до 17/19/21. Вторичный текст темнее (контраст не ниже 7:1),
+ * у кнопок MAX UI высота растёт вместе с текстом.
+ */
+html[data-a11y='large'] {
+  font-size: 125%;
+}
+
+.app-theme[data-a11y='large'] {
+  --fs-caption: 17px;
+  --fs-secondary: 19px;
+  --fs-body: 21px;
+  /* Подписи ячеек MAX UI: 0.8125rem дали бы 16 px, нужно не меньше 17. */
+  --font-size-description: 0.875rem;
+  --text-2: #2c2f36;
+  --text-3: #4a4d55;
+  --chevron: #6e727b;
+}
+
+.app-theme[data-scheme='dark'][data-a11y='large'] {
+  --text-2: rgb(255 255 255 / 0.9);
+  --text-3: rgb(255 255 255 / 0.82);
+  --chevron: rgb(255 255 255 / 0.62);
+}
+
+.app-theme[data-a11y='large'] [class*='Button_size_'] {
+  height: auto;
+  min-height: 56px;
+}
+
+/* Счётчик MAX UI задан в пикселях и в крупном режиме сам не растёт. */
+.app-theme[data-a11y='large'] [class*='Counter__'] {
+  font-size: 17px;
+}
+
+/* Системная настройка «повышенный контраст»: те же цвета подписей без увеличения шрифта. */
+@media (prefers-contrast: more) {
+  .app-theme {
+    --text-2: #2c2f36;
+    --text-3: #4a4d55;
+  }
+
+  .app-theme[data-scheme='dark'] {
+    --text-2: rgb(255 255 255 / 0.9);
+    --text-3: rgb(255 255 255 / 0.82);
+  }
+}
+
 @keyframes stamp-land {
   0% { opacity: 0; transform: scale(1.35) rotate(-10deg); }
   70% { opacity: 0.92; transform: scale(0.97) rotate(-3deg); }

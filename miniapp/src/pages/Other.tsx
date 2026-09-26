@@ -1,6 +1,7 @@
 import { Button, CellList, CellSimple, Input } from '@maxhub/max-ui';
 import { MagnifyingGlass, MapTrifold, NavigationArrow } from '@phosphor-icons/react';
 import { useEffect, useState } from 'react';
+import { A11yToggle } from '../app/a11y';
 import { useRouter } from '../app/router';
 import { demoRoles, useSession, useUser, type DemoRole } from '../app/session';
 import { api, ApiError } from '../shared/api/client';
@@ -227,6 +228,7 @@ export function UkQueue() {
       ) : (
         <StickersView />
       )}
+      <A11yToggle />
       <RoleSwitcher />
     </Screen>
   );

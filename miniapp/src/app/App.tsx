@@ -10,6 +10,7 @@ import { IssueCard } from '../pages/IssueCard';
 import { DistrictMap, HousePick } from '../pages/Map';
 import { AccountDeleted, Consent, DemoGate, HouseSearch, MyIssues, UkQueue } from '../pages/Other';
 import { Report } from '../pages/Report';
+import { A11yContext, useA11yState, useRoleButtonKeys } from './a11y';
 import { ErrorBoundary } from './ErrorBoundary';
 import { RouterProvider, useRouter } from './router';
 import { SessionProvider, useSession } from './session';
@@ -114,15 +115,19 @@ function Gate() {
 
 export function App() {
   const scheme = useColorScheme();
+  const a11y = useA11yState();
+  useRoleButtonKeys();
   return (
     <MaxUI colorScheme={scheme}>
-      <div className="app-theme" data-scheme={scheme}>
-        <SessionProvider>
-          <ErrorBoundary>
-            <Gate />
-          </ErrorBoundary>
-        </SessionProvider>
-      </div>
+      <A11yContext value={a11y}>
+        <div className="app-theme" data-scheme={scheme} data-a11y={a11y[0]}>
+          <SessionProvider>
+            <ErrorBoundary>
+              <Gate />
+            </ErrorBoundary>
+          </SessionProvider>
+        </div>
+      </A11yContext>
     </MaxUI>
   );
 }

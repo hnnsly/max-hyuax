@@ -1,21 +1,37 @@
 import { Button } from '@maxhub/max-ui';
-import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type ReactNode, type RefObject } from 'react';
 import { bridge } from '../bridge/bridge';
 import s from './ui.module.css';
 
-/** Экран: шапка только вне MAX (в MAX шапку и кнопку «Назад» рисует клиент). */
+/**
+ * Экран: шапка только вне MAX (в MAX шапку и кнопку «Назад» рисует клиент). Заголовок h1 есть
+ * всегда, в MAX он скрыт визуально: по нему экранный чтец понимает, где житель. При смене экрана
+ * фокус переходит на заголовок, иначе чтец остаётся на месте нажатой кнопки прошлого экрана.
+ */
 export function Screen({ title, onBack, children, actions }: { title: string; onBack?: () => void; children: ReactNode; actions?: ReactNode }) {
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    document.title = title;
+    // Поле с autoFocus уже забрало фокус: не отнимаем.
+    const active = document.activeElement;
+    if (!active || active === document.body) heading.current?.focus({ preventScroll: true });
+  }, [title]);
   return (
     <div className={s.screen}>
-      {!bridge.inMax() && <WebHeader title={title} onBack={onBack} />}
+      {bridge.inMax() ? (
+        <h1 ref={heading} tabIndex={-1} className={`visually-hidden ${s.screenHeading}`}>
+          {title}
+        </h1>
+      ) : (
+        <WebHeader title={title} onBack={onBack} heading={heading} />
+      )}
       <main className={s.content}>{children}</main>
       {actions && <div className={s.actionBar}>{actions}</div>}
     </div>
   );
 }
 
-
-function WebHeader({ title, onBack }: { title: string; onBack?: () => void }) {
+function WebHeader({ title, onBack, heading }: { title: string; onBack?: () => void; heading: RefObject<HTMLHeadingElement | null> }) {
   return (
     <header className={s.header}>
       {onBack ? (
@@ -25,7 +41,7 @@ function WebHeader({ title, onBack }: { title: string; onBack?: () => void }) {
       ) : (
         <span />
       )}
-      <h1 className={s.headerTitle} style={{ margin: 0 }}>
+      <h1 ref={heading} tabIndex={-1} className={`${s.headerTitle} ${s.screenHeading}`} style={{ margin: 0 }}>
         {title}
       </h1>
       <span />
@@ -115,17 +131,28 @@ export function Toast({ message, onDone }: { message: string; onDone: () => void
     const t = setTimeout(onDone, 3400);
     return () => clearTimeout(t);
   }, [message, onDone]);
+  // Текст для экранного чтеца объявляет постоянный живой регион useToast, здесь только картинка.
   return (
-    <div ref={ref} popover="manual" className={s.toast} role="status" aria-live="polite">
+    <div ref={ref} popover="manual" className={s.toast} aria-hidden="true">
       {message}
     </div>
   );
 }
 
-/** Хук для показа тоста: const [toast, show] = useToast(). */
+/**
+ * Хук для показа тоста: const [toast, show] = useToast(). Живой регион есть на экране всегда:
+ * если он появляется вместе с текстом, чтецы на телефонах сообщение пропускают.
+ */
 export function useToast(): [ReactNode, (msg: string) => void] {
   const [msg, setMsg] = useState('');
   const clear = useCallback(() => setMsg(''), []);
-  const node = msg ? <Toast key={msg} message={msg} onDone={clear} /> : null;
+  const node = (
+    <>
+      <div className="visually-hidden" role="status" aria-live="polite">
+        {msg}
+      </div>
+      {msg && <Toast key={msg} message={msg} onDone={clear} />}
+    </>
+  );
   return [node, setMsg];
 }

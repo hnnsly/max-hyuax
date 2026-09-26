@@ -365,6 +365,10 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* Фокус на заголовок ставит сам экран для экранного чтеца: рамка вокруг текста не нужна. */
+.screenHeading:focus {
+  outline: none;
+}
 .headerBack {
   justify-self: start;
   border: 0;
@@ -398,10 +402,13 @@
 }
 
 /* --- Переключатель разделов --- */
+/* Колонки равные, но не уже подписи: в крупном режиме длинная подпись забирает место у соседей,
+   а если не хватает и так, сегмент прокручивается, а не обрезает текст. */
 .segmented {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: minmax(0, 1fr);
+  grid-auto-columns: minmax(min-content, 1fr);
+  overflow-x: auto;
   gap: 3px;
   padding: 3px;
   border-radius: var(--radius-control);
