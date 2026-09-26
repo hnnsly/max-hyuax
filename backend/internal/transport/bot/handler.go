@@ -58,7 +58,7 @@ type Services struct {
 	Cards          *cards.Service // карточка заявки для показа в чате
 	Council        *appcouncil.Service
 	Pending        app.BotPendingRepo // что бот ждёт от жителя следующим сообщением
-	DemoRoles      bool               // /role доступна: демо-стенд (DEMO_AUTH_ENABLED)
+	RoleSwitch     bool               // /role и «Роль для проверки» в меню (ROLE_SWITCH_ENABLED)
 	ConsentVersion string
 	Now            func() time.Time
 }
@@ -82,7 +82,7 @@ var Commands = []maxapi.Command{
 	{Name: "my", Description: "Мои заявки"},
 	{Name: "house", Description: "Мой дом и контакты УК"},
 	{Name: "polls", Description: "Совет дома и опросы"},
-	{Name: "role", Description: "Роль для проверки на демо-стенде"},
+	{Name: "role", Description: "Роль для проверки: УК, район, председатель"},
 	{Name: "help", Description: "Как это работает"},
 }
 
@@ -520,11 +520,11 @@ func (h *Handler) join(ctx context.Context, u user.User, issueID string) (maxapi
 	return replace(fmt.Sprintf("Вы присоединились к заявке № %d. Карточка со статусом придёт следующим сообщением.", is.Number())), nil
 }
 
-// applyRole меняет роль для проверки на демо-стенде (ADR-017). text — что ответить;
+// applyRole меняет роль для проверки (ADR-017). text — что ответить;
 // пустой text — роль не распознана, нужно показать выбор.
 func (h *Handler) applyRole(ctx context.Context, u user.User, arg string) (user.User, string, error) {
-	if !h.svc.DemoRoles {
-		return u, "Смена роли работает только на демо-стенде для проверки. Ваша роль: житель.", nil
+	if !h.svc.RoleSwitch {
+		return u, roleSwitchOff, nil
 	}
 	var role, text string
 	switch strings.ToLower(strings.TrimSpace(arg)) {
@@ -555,7 +555,7 @@ func (h *Handler) roleCommand(ctx context.Context, to maxapi.Target, u user.User
 	switch {
 	case text == "":
 		return h.sendScreen(ctx, to, u, scrRole, "")
-	case !h.svc.DemoRoles:
+	case !h.svc.RoleSwitch:
 		return h.send(ctx, to, text)
 	}
 	m, err := h.homeScreen(ctx, u)

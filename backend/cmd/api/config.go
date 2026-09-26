@@ -18,6 +18,7 @@ type config struct {
 	HTTPAddr       string
 	SessionSecret  string
 	DemoAuth       bool   // POST /api/v1/auth/demo для проверяющих
+	RoleSwitch     bool   // роль для проверки (/role, POST /me/role); по умолчанию включена
 	ConsentVersion string // версия согласия на обработку ПДн
 
 	BotMode        string // off | polling | webhook
@@ -99,6 +100,7 @@ func loadConfig(getenv func(string) string) (config, error) {
 		DatabaseURL:    buildDatabaseURL(getenv),
 		HTTPAddr:       cmp.Or(getenv("HTTP_ADDR"), ":8080"),
 		SessionSecret:  getenv("SESSION_SECRET"),
+		RoleSwitch:     true,
 		ConsentVersion: cmp.Or(getenv("CONSENT_VERSION"), "v1"),
 		BotMode:        cmp.Or(getenv("BOT_MODE"), "off"),
 		BotToken:       getenv("MAX_BOT_TOKEN"),
@@ -130,6 +132,7 @@ func loadConfig(getenv func(string) string) (config, error) {
 		}
 	}
 	parseBool("DEMO_AUTH_ENABLED", &c.DemoAuth)
+	parseBool("ROLE_SWITCH_ENABLED", &c.RoleSwitch)
 	parseBool("MAX_API_INSECURE_TLS", &c.MaxInsecureTLS)
 	if getenv("S3_USE_SSL") != "" {
 		parseBool("S3_USE_SSL", &c.S3.UseSSL)

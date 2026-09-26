@@ -223,6 +223,9 @@ paths:
     post:
       tags: [me]
       summary: Переключить роль текущего пользователя для проверки кабинетов
+      description: |
+        Работает, пока не выключено ROLE_SWITCH_ENABLED=false (тогда 403). Взятой так роли
+        имена и телефоны настоящих жителей не отдаются, только синтетические демо-жителей.
       requestBody:
         required: true
         content:
@@ -235,6 +238,7 @@ paths:
       responses:
         "200": { $ref: "#/components/responses/User" }
         "401": { $ref: "#/components/responses/Error" }
+        "403": { $ref: "#/components/responses/Error" }
         "422": { $ref: "#/components/responses/Error" }
 
   /houses:
@@ -1017,6 +1021,7 @@ components:
         has_consent: { type: boolean }
         consent_version: { type: string, description: Версия согласия, которая требуется сейчас }
         phone_shared: { type: boolean, description: Житель оставил телефон для мастера; сам номер не возвращается }
+        role_switch: { type: boolean, description: На сервере включена роль для проверки (POST /me/role); выключается ROLE_SWITCH_ENABLED=false }
 
     Category:
       type: object

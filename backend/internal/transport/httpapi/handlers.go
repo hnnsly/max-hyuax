@@ -21,7 +21,7 @@ import (
 )
 
 func (h *handlers) session(c fiber.Ctx, s auth.Session) error {
-	return c.JSON(sessionDTO{Token: s.Token, ExpiresAt: s.ExpiresAt, User: toUserDTO(s.User, h.ConsentVersion), StartParam: s.StartParam})
+	return c.JSON(sessionDTO{Token: s.Token, ExpiresAt: s.ExpiresAt, User: h.userDTO(s.User), StartParam: s.StartParam})
 }
 
 func (h *handlers) loginMax(c fiber.Ctx) error {
@@ -61,7 +61,7 @@ func (h *handlers) categories(c fiber.Ctx) error {
 }
 
 func (h *handlers) me(c fiber.Ctx) error {
-	return c.JSON(toUserDTO(currentUser(c), h.ConsentVersion))
+	return c.JSON(h.userDTO(currentUser(c)))
 }
 
 func (h *handlers) acceptConsent(c fiber.Ctx) error {
@@ -75,7 +75,7 @@ func (h *handlers) acceptConsent(c fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(toUserDTO(u, h.ConsentVersion))
+	return c.JSON(h.userDTO(u))
 }
 
 func (h *handlers) setHouse(c fiber.Ctx) error {
@@ -89,7 +89,7 @@ func (h *handlers) setHouse(c fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(toUserDTO(u, h.ConsentVersion))
+	return c.JSON(h.userDTO(u))
 }
 
 // sharePhone сохраняет телефон для мастера из WebApp.requestContact; сам номер в ответ не попадает.
@@ -106,7 +106,7 @@ func (h *handlers) sharePhone(c fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(toUserDTO(u, h.ConsentVersion))
+	return c.JSON(h.userDTO(u))
 }
 
 func (h *handlers) hidePhone(c fiber.Ctx) error {
@@ -114,7 +114,7 @@ func (h *handlers) hidePhone(c fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(toUserDTO(u, h.ConsentVersion))
+	return c.JSON(h.userDTO(u))
 }
 
 // deleteAccount: сначала фото пользователя, потом сам аккаунт. Если фото удалить не вышло,
@@ -557,7 +557,7 @@ func (h *handlers) switchMyRole(c fiber.Ctx) error {
 	if err != nil {
 		return err
 	}
-	return c.JSON(toUserDTO(u, h.ConsentVersion))
+	return c.JSON(h.userDTO(u))
 }
 
 func (h *handlers) objectStickerPDF(c fiber.Ctx) error {

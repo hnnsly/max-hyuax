@@ -16,7 +16,8 @@ func TestConfigDefaultsWithBotOff(t *testing.T) {
 	if err != nil {
 		t.Fatalf("loadConfig: %v", err)
 	}
-	if c.BotMode != "off" || c.HTTPAddr != ":8080" || c.ConsentVersion != "v1" || c.DemoAuth {
+	// Роль для проверки включена по умолчанию: комиссия проходит кабинеты и без демо-входа.
+	if c.BotMode != "off" || c.HTTPAddr != ":8080" || c.ConsentVersion != "v1" || c.DemoAuth || !c.RoleSwitch {
 		t.Fatalf("config = %+v", c)
 	}
 }

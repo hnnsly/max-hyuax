@@ -25,13 +25,16 @@ type userDTO struct {
 	PhoneShared bool `json:"phone_shared"`
 	// Chairman — житель председатель совета своего дома: у него есть папка предложений.
 	Chairman bool `json:"chairman,omitzero"`
+	// RoleSwitch — на сервере включена роль для проверки: приложение показывает переключатель.
+	RoleSwitch bool `json:"role_switch"`
 }
 
-func toUserDTO(u user.User, consentVersion string) userDTO {
+// userDTO — пользователь в ответах о себе.
+func (h *handlers) userDTO(u user.User) userDTO {
 	return userDTO{
 		ID: u.ID, FirstName: u.FirstName, Role: string(u.Role), HouseID: u.HouseID,
-		OrganizationID: u.OrganizationID, District: u.District, HasConsent: u.HasConsent(consentVersion), ConsentVersion: consentVersion,
-		PhoneShared: u.PhoneShared(), Chairman: u.IsChairmanOf(u.HouseID),
+		OrganizationID: u.OrganizationID, District: u.District, HasConsent: u.HasConsent(h.ConsentVersion), ConsentVersion: h.ConsentVersion,
+		PhoneShared: u.PhoneShared(), Chairman: u.IsChairmanOf(u.HouseID), RoleSwitch: h.Auth.RoleSwitchEnabled(),
 	}
 }
 

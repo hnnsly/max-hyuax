@@ -315,6 +315,7 @@ export function RoleSwitcher() {
   const { setUser, loginDemo } = useSession();
   const { reset } = useRouter();
   const [busy, setBusy] = useState(false);
+  const [toast, showToast] = useToast();
 
   const active: DemoRole =
     user.role === 'uk_operator'
@@ -346,15 +347,26 @@ export function RoleSwitcher() {
       else if (updated.role === 'district') reset({ name: 'district' });
       else if (updated.house_id) reset({ name: 'home' });
       else reset({ name: 'houseSearch' });
-    } catch {
-      /* игнорируем при сбое сети */
+    } catch (err) {
+      showToast(
+        err instanceof ApiError && err.status === 403
+          ? 'Смена роли на этом сервере выключена'
+          : err instanceof ApiError
+            ? err.message
+            : 'Не получилось сменить роль. Попробуйте ещё раз',
+      );
     } finally {
       setBusy(false);
     }
   };
 
+  // В MAX роль меняется на сервере: без флага role_switch переключатель не показываем.
+  // В браузере это демо-вход под другой ролью, он работает всегда, когда открыт демо-стенд.
+  if (bridge.inMax() && !user.role_switch) return null;
+
   return (
     <>
+      {toast}
       <Section title="Роль для проверки" />
       <div className={st.chips} role="group" aria-label="Роль пользователя">
         {roles.map((r) => (

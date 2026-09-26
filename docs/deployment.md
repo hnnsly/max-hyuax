@@ -79,6 +79,7 @@ OLLAMA_URL=http://ollama:11434
    | `SESSION_SECRET` | случайная строка: `openssl rand -hex 32` |
    | `MINIO_ROOT_USER`, `MINIO_ROOT_PASSWORD` | свой логин и пароль MinIO (пароль не короче 8 символов). Порты MinIO открыты только на `127.0.0.1`, наружу их не пробрасывать |
    | `DEMO_AUTH_ENABLED` | `true` на стенде для жюри |
+   | `ROLE_SWITCH_ENABLED` | по умолчанию `true`: комиссия переключает роль из MAX; `false` на рабочей установке для УК |
    | `BOT_MODE` | `webhook` |
    | `MAX_BOT_TOKEN` | токен бота из кабинета MAX |
    | `MAX_WEBHOOK_SECRET` | 5–256 символов из `A-Z a-z 0-9 _ -` |

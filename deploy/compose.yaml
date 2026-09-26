@@ -79,6 +79,7 @@ services:
       # Пустые значения проверяет сам api при старте и пишет понятную ошибку в лог.
       SESSION_SECRET: ${SESSION_SECRET:-}
       DEMO_AUTH_ENABLED: ${DEMO_AUTH_ENABLED:-false}
+      ROLE_SWITCH_ENABLED: ${ROLE_SWITCH_ENABLED:-true}
       BOT_MODE: ${BOT_MODE:-off}
       MAX_BOT_TOKEN: ${MAX_BOT_TOKEN:-}
       MAX_WEBHOOK_SECRET: ${MAX_WEBHOOK_SECRET:-}

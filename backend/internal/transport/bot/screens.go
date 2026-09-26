@@ -161,7 +161,7 @@ func (h *Handler) screen(ctx context.Context, u user.User, name, arg string) (ma
 // homeScreen — главное меню по роли: у жителя, председателя, сотрудника УК и управы свои пункты.
 func (h *Handler) homeScreen(ctx context.Context, u user.User) (maxapi.NewMessage, error) {
 	var roleRow []maxapi.Button
-	if h.svc.DemoRoles {
+	if h.svc.RoleSwitch {
 		roleRow = []maxapi.Button{maxapi.CallbackButton("Роль для проверки", win(scrRole))}
 	}
 	withRole := func(rows ...[]maxapi.Button) [][]maxapi.Button {
@@ -640,10 +640,13 @@ func (h *Handler) overdueScreen(ctx context.Context, u user.User) (maxapi.NewMes
 	return issueListScreen("**Просрочено в районе**, самые давние первыми:", "Просроченных заявок в районе нет.", list, scrOverdue, scrDistrict), nil
 }
 
-// roleScreen — выбор роли для проверки на демо-стенде.
+// roleSwitchOff — ответ, когда роль для проверки выключена (ROLE_SWITCH_ENABLED=false).
+const roleSwitchOff = "Смена роли для проверки на этом сервере выключена. Ваша роль: житель."
+
+// roleScreen — выбор роли для проверки.
 func (h *Handler) roleScreen(u user.User) maxapi.NewMessage {
-	if !h.svc.DemoRoles {
-		return screenMsg("Смена роли работает только на демо-стенде для проверки.", navRow())
+	if !h.svc.RoleSwitch {
+		return screenMsg(roleSwitchOff, navRow())
 	}
 	current := "житель"
 	switch {

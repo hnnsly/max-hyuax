@@ -12,7 +12,7 @@ import (
 	"dommax/internal/domain/user"
 )
 
-// Смена роли нужна комиссии на демо-стенде; вне демо-режима её нет, а взятая роль помечается.
+// Смена роли нужна комиссии; её можно выключить флагом, а взятая роль помечается.
 func TestSwitchRole(t *testing.T) {
 	s := apptest.New()
 	s.Orgs["org-1"] = house.Organization{ID: "org-1"}
@@ -23,10 +23,10 @@ func TestSwitchRole(t *testing.T) {
 
 	prod := auth.NewService(s, auth.Config{Now: now})
 	if _, err := prod.SwitchRole(t.Context(), u, "uk_operator"); !errors.Is(err, app.ErrForbidden) {
-		t.Fatalf("switch without demo err = %v", err)
+		t.Fatalf("switch turned off err = %v", err)
 	}
 
-	demo := auth.NewService(s, auth.Config{Now: now, DemoEnabled: true})
+	demo := auth.NewService(s, auth.Config{Now: now, RoleSwitch: true})
 	op, err := demo.SwitchRole(t.Context(), u, "uk_operator")
 	if err != nil || op.Role != user.RoleOperator || op.OrganizationID != "org-1" || !op.RoleSwitched {
 		t.Fatalf("operator = %+v, err = %v", op, err)

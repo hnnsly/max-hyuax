@@ -104,6 +104,7 @@ docker compose -f deploy/compose.yaml --env-file deploy/.env.example up -d --bui
 | `POSTGRES_PASSWORD` | пароль базы | локальный |
 | `SESSION_SECRET` | подпись сессий мини-приложения, не короче 16 символов | локальный |
 | `DEMO_AUTH_ENABLED` | демо-вход по ролям для проверки | `true` |
+| `ROLE_SWITCH_ENABLED` | роль для проверки из MAX: `/role` в боте и переключатель в приложении | `true` |
 | `BOT_MODE` | `off`, `polling` или `webhook` | `off` |
 | `MAX_BOT_TOKEN` | токен бота MAX | пусто |
 | `MAX_WEBHOOK_SECRET` | секрет webhook, 5–256 символов `A-Z a-z 0-9 _ -` | пусто |

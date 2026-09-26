@@ -15,6 +15,9 @@ type Config struct {
 	SessionSecret  string
 	SessionTTL     time.Duration
 	DemoEnabled    bool   // POST /auth/demo; включается только на демо-стенде
+	// RoleSwitch — роль для проверки (/role, POST /me/role): комиссия проходит все кабинеты
+	// своим аккаунтом MAX. Контакты настоящих жителей переключённой роли не видны (role_switched).
+	RoleSwitch     bool
 	ConsentVersion string // с этой версией согласия восстанавливается удалённый демо-пользователь
 	Now            func() time.Time
 }
@@ -27,6 +30,9 @@ type Service struct {
 func NewService(store app.Store, cfg Config) *Service {
 	return &Service{store: store, cfg: cfg}
 }
+
+// RoleSwitchEnabled — показывать ли переключатель роли для проверки.
+func (s *Service) RoleSwitchEnabled() bool { return s.cfg.RoleSwitch }
 
 type Session struct {
 	Token      string
@@ -177,11 +183,11 @@ func (s *Service) DeleteAccount(ctx context.Context, u user.User) error {
 
 // SwitchRole переключает роль текущего пользователя по имени роли (resident, chairman, uk_operator, district),
 // автоматически подставляя дом, УК или район его выбранного дома. Нужна комиссии, чтобы проверить все роли
-// из MAX, поэтому работает только на демо-стенде (DEMO_AUTH_ENABLED). Взятая так роль помечается
-// RoleSwitched: имена и телефоны настоящих жителей ей не отдаются (issues.Contacts).
+// из MAX; выключается флагом ROLE_SWITCH_ENABLED=false. Взятая так роль помечается RoleSwitched:
+// имена и телефоны настоящих жителей ей не отдаются (issues.Contacts).
 func (s *Service) SwitchRole(ctx context.Context, u user.User, target string) (user.User, error) {
-	if !s.cfg.DemoEnabled {
-		return u, fmt.Errorf("%w: role switch works only on the demo stand", app.ErrForbidden)
+	if !s.cfg.RoleSwitch {
+		return u, fmt.Errorf("%w: role switch is turned off", app.ErrForbidden)
 	}
 	u.RoleSwitched = true
 	switch target {

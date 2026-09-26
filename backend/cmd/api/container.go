@@ -84,7 +84,7 @@ func Open(ctx context.Context, cfg config, log *slog.Logger) (*Container, error)
 	c.auth = sync.OnceValue(func() *auth.Service {
 		return auth.NewService(store, auth.Config{
 			BotToken: cfg.BotToken, SessionSecret: cfg.SessionSecret, SessionTTL: sessionTTL,
-			DemoEnabled: cfg.DemoAuth, ConsentVersion: cfg.ConsentVersion, Now: time.Now,
+			DemoEnabled: cfg.DemoAuth, RoleSwitch: cfg.RoleSwitch, ConsentVersion: cfg.ConsentVersion, Now: time.Now,
 		})
 	})
 	c.issues = sync.OnceValue(func() *issues.Service {
@@ -166,7 +166,7 @@ func Open(ctx context.Context, cfg config, log *slog.Logger) (*Container, error)
 		}
 		return bot.NewHandler(client, me.Username, bot.Services{
 			Auth: c.Auth(), Issues: c.Issues(), Houses: c.Houses(), Hints: c.Hints(), Photos: c.Photos(),
-			Cards: cardSvc, Council: c.council(), Pending: store.Pending(), DemoRoles: cfg.DemoAuth,
+			Cards: cardSvc, Council: c.council(), Pending: store.Pending(), RoleSwitch: cfg.RoleSwitch,
 			ConsentVersion: cfg.ConsentVersion, Now: time.Now,
 		}, log), nil
 	})

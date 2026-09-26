@@ -83,7 +83,7 @@ func TestMain(m *testing.M) {
 	deps := func(demo bool) httpapi.Deps {
 		return httpapi.Deps{
 			Auth: auth.NewService(store, auth.Config{
-				BotToken: botToken, SessionSecret: "s", SessionTTL: time.Hour, DemoEnabled: demo, ConsentVersion: "v1", Now: time.Now,
+				BotToken: botToken, SessionSecret: "s", SessionTTL: time.Hour, DemoEnabled: demo, RoleSwitch: true, ConsentVersion: "v1", Now: time.Now,
 			}),
 			Issues:         issues.NewService(store, issues.Config{Now: time.Now, NewID: func() string { return uuid.NewV7().String() }, ConsentVersion: "v1"}),
 			Houses:         houses.NewService(store, nil),
@@ -528,7 +528,7 @@ func TestPhoneForTheRepairman(t *testing.T) {
 func TestDistrictCabinet(t *testing.T) {
 	district := login(t, "district")
 	me := expect(t, call(t, "GET", "/api/v1/me", district, nil), 200, "district me").body
-	if me["role"] != "district" || me["district"] != "Зябликово" {
+	if me["role"] != "district" || me["district"] != "Зябликово" || me["role_switch"] != true {
 		t.Fatalf("me = %v", me)
 	}
 	m := expect(t, call(t, "GET", "/api/v1/district/metrics", district, nil), 200, "district metrics").body
