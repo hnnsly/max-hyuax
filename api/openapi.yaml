@@ -1081,6 +1081,156 @@ paths:
         "401": { $ref: "#/components/responses/Error" }
         "403": { $ref: "#/components/responses/Error" }
 
+  /houses/{id}/maintenance:
+    get:
+      tags: [houses]
+      summary: Активные плановые работы и отключения в доме
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string }, example: h-17k2 }
+      responses:
+        "200":
+          description: Плановые работы дома
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/MaintenanceAlert" }
+        "404": { $ref: "#/components/responses/Error" }
+
+  /uk/maintenance:
+    get:
+      tags: [uk]
+      summary: Список плановых работ домов своей УК
+      responses:
+        "200":
+          description: Плановые работы
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/MaintenanceAlert" }
+        "403": { $ref: "#/components/responses/Error" }
+    post:
+      tags: [uk]
+      summary: Объявить о плановых работах в доме
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [house_id, title]
+              properties:
+                house_id: { type: string, example: h-17k2 }
+                category: { type: string, example: heating }
+                title: { type: string, maxLength: 200 }
+                description: { type: string, maxLength: 1000 }
+                hours: { type: integer, minimum: 1, maximum: 168, default: 4 }
+      responses:
+        "201":
+          description: Объявление создано
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/MaintenanceAlert" }
+        "403": { $ref: "#/components/responses/Error" }
+        "422": { $ref: "#/components/responses/Error" }
+
+  /uk/maintenance/{id}:
+    delete:
+      tags: [uk]
+      summary: Завершить или удалить плановые работы
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "204": { description: Работы завершены }
+        "403": { $ref: "#/components/responses/Error" }
+
+  /appointments/specialists:
+    get:
+      tags: [me]
+      summary: Справочник специалистов УК для личного приёма (ПП РФ № 416)
+      responses:
+        "200":
+          description: Специалисты УК
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  required: [code, title, description, schedule]
+                  properties:
+                    code: { type: string }
+                    title: { type: string }
+                    description: { type: string }
+                    schedule: { type: string }
+
+  /appointments:
+    post:
+      tags: [me]
+      summary: Записаться на личный приём в УК
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [specialist, topic]
+              properties:
+                specialist: { type: string, example: chief_engineer }
+                topic: { type: string, minLength: 3, maxLength: 500 }
+                slot_at: { type: string, format: date-time }
+      responses:
+        "201":
+          description: Запись создана
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Appointment" }
+        "403": { $ref: "#/components/responses/Error" }
+        "422": { $ref: "#/components/responses/Error" }
+
+  /me/appointments:
+    get:
+      tags: [me]
+      summary: Мои записи на приём в УК
+      responses:
+        "200":
+          description: Записи жителя
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Appointment" }
+
+  /appointments/{id}:
+    delete:
+      tags: [me, uk]
+      summary: Отменить запись на приём
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string, format: uuid } }
+      responses:
+        "200":
+          description: Запись отменена
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/Appointment" }
+        "403": { $ref: "#/components/responses/Error" }
+        "404": { $ref: "#/components/responses/Error" }
+
+  /uk/appointments:
+    get:
+      tags: [uk]
+      summary: График приёма жителей для сотрудника УК
+      responses:
+        "200":
+          description: Записи жителей
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: "#/components/schemas/Appointment" }
+        "403": { $ref: "#/components/responses/Error" }
+
 security:
   - bearer: []
 
@@ -1146,6 +1296,36 @@ components:
                      photo_too_large, unsupported_media, reason_required, comment_required, invalid_contact,
                      invalid_input, http_error, internal]
             message: { type: string, description: Текст для показа жителю }
+
+    MaintenanceAlert:
+      type: object
+      required: [id, house_id, category, category_title, title, starts_at, ends_at, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        house_id: { type: string }
+        address: { type: string }
+        category: { type: string }
+        category_title: { type: string }
+        title: { type: string }
+        description: { type: string }
+        starts_at: { type: string, format: date-time }
+        ends_at: { type: string, format: date-time }
+        created_at: { type: string, format: date-time }
+
+    Appointment:
+      type: object
+      required: [id, house_id, specialist, specialist_title, topic, slot_at, status, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        house_id: { type: string }
+        address: { type: string }
+        user_name: { type: string }
+        specialist: { type: string }
+        specialist_title: { type: string }
+        topic: { type: string }
+        slot_at: { type: string, format: date-time }
+        status: { type: string, enum: [booked, cancelled, completed] }
+        created_at: { type: string, format: date-time }
 
     Proposal:
       type: object

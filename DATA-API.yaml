@@ -313,6 +313,41 @@ checks:
       body: object
       required_fields: [count]
 
+  - id: house_maintenance
+    name: Плановые работы в доме
+    method: GET
+    path: /houses/{id}/maintenance
+    role: resident
+    params:
+      path: { id: h-17k2 }
+    expect:
+      status: [200]
+      content_type: application/json
+      body: array
+      required_fields: ["[].id", "[].title", "[].category", "[].ends_at"]
+
+  - id: appointments_specialists
+    name: Справочник специалистов УК для личного приёма
+    method: GET
+    path: /appointments/specialists
+    role: resident
+    expect:
+      status: [200]
+      content_type: application/json
+      body: array
+      required_fields: ["[].code", "[].title", "[].schedule"]
+
+  - id: my_appointments
+    name: Записи жителя на личный приём в УК
+    method: GET
+    path: /me/appointments
+    role: resident
+    expect:
+      status: [200]
+      content_type: application/json
+      body: array
+      required_fields: ["[].id", "[].specialist", "[].topic", "[].slot_at", "[].status"]
+
   - id: resident_forbidden_on_uk
     name: Житель не видит очередь УК
     method: GET

@@ -20,6 +20,7 @@ import (
 	"dommax/internal/app/hints"
 	"dommax/internal/app/houses"
 	"dommax/internal/app/issues"
+	"dommax/internal/app/office"
 	"dommax/internal/app/photos"
 	"dommax/internal/domain/issue"
 	"dommax/internal/domain/user"
@@ -34,6 +35,7 @@ type Deps struct {
 	Appeal         *appeal.Service
 	Photos         *photos.Service
 	Council        *council.Service
+	Office         *office.Service
 	Webhook        *bot.Webhook // nil — webhook выключен (BOT_MODE не webhook)
 	Ping           func(context.Context) error
 	ConsentVersion string
@@ -117,6 +119,17 @@ func New(d Deps) *fiber.App {
 	api.Get("/district/overdue", h.auth, h.districtOverdue)
 	api.Get("/map/houses", h.auth, h.mapHouses)
 	api.Get("/district/rating", h.auth, h.districtRating)
+
+	// Плановые работы дома и запись на личный приём в УК (GEN_V4, ADR-024).
+	api.Get("/houses/:id/maintenance", h.auth, h.houseMaintenance)
+	api.Get("/uk/maintenance", h.auth, h.ukMaintenance)
+	api.Post("/uk/maintenance", h.auth, h.createMaintenance)
+	api.Delete("/uk/maintenance/:id", h.auth, h.deleteMaintenance)
+	api.Get("/appointments/specialists", h.auth, h.specialists)
+	api.Post("/appointments", h.auth, h.bookAppointment)
+	api.Get("/me/appointments", h.auth, h.myAppointments)
+	api.Delete("/appointments/:id", h.auth, h.cancelAppointment)
+	api.Get("/uk/appointments", h.auth, h.ukAppointments)
 
 	app.Post("/webhook/max", h.webhook)
 	return app

@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import type { User } from '../shared/api/types';
 import { parseStartParam } from '../shared/lib/model';
 import { ErrorState, Screen } from '../shared/ui/Layout';
+import { Appointments } from '../pages/Appointments';
 import { CouncilFolder } from '../pages/Council'; // папка председателя совета (ADR-017)
 import { District } from '../pages/District';
 import { Home } from '../pages/Home';
@@ -83,6 +84,8 @@ function Pages() {
       return <HousePick />;
     case 'rating':
       return <Rating />;
+    case 'appointments':
+      return <Appointments />;
     case 'council':
       return <CouncilFolder />;
   }

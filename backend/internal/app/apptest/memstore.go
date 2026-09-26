@@ -19,24 +19,155 @@ import (
 )
 
 type MemStore struct {
-	mu       sync.Mutex
-	HouseMap map[string]house.House
-	Orgs     map[string]house.Organization
-	Objects  []house.AssetObject
-	UserMap  map[int64]user.User
-	DemoKeys map[string]int64 // демо-ключ → ID пользователя
-	photos   []app.Photo
-	issues   map[string]*issue.Issue
-	Events   []issue.Event
-	nextNum  int64
-	nextUID  int64
-	outbox   MemOutbox
-	council  memCouncil
-	pending  map[int64]app.BotPending
-	appeals  []app.Signature
+	mu           sync.Mutex
+	HouseMap     map[string]house.House
+	Orgs         map[string]house.Organization
+	Objects      []house.AssetObject
+	UserMap      map[int64]user.User
+	DemoKeys     map[string]int64 // демо-ключ → ID пользователя
+	photos       []app.Photo
+	issues       map[string]*issue.Issue
+	Events       []issue.Event
+	nextNum      int64
+	nextUID      int64
+	outbox       MemOutbox
+	council      memCouncil
+	pending      map[int64]app.BotPending
+	appeals      []app.Signature
+	maintenance  []app.MaintenanceAlert
+	appointments []app.Appointment
 }
 
 func (s *MemStore) Appeals() app.AppealRepo { return appealRepo{s} }
+func (s *MemStore) Office() app.OfficeRepo  { return officeRepo{s} }
+
+type officeRepo struct{ s *MemStore }
+
+func (r officeRepo) AddMaintenance(_ context.Context, m app.MaintenanceAlert) error {
+	r.s.mu.Lock()
+	defer r.s.mu.Unlock()
+	r.s.maintenance = append(r.s.maintenance, m)
+	return nil
+}
+
+func (r officeRepo) ActiveMaintenanceByHouse(_ context.Context, houseID string, now time.Time) ([]app.MaintenanceAlert, error) {
+	r.s.mu.Lock()
+	defer r.s.mu.Unlock()
+	var out []app.MaintenanceAlert
+	for _, m := range r.s.maintenance {
+		if m.HouseID == houseID && m.EndsAt.After(now) {
+			out = append(out, m)
+		}
+	}
+	slices.SortFunc(out, func(a, b app.MaintenanceAlert) int { return a.StartsAt.Compare(b.StartsAt) })
+	return out, nil
+}
+
+func (r officeRepo) ListMaintenanceByOrg(_ context.Context, orgID string, limit int) ([]app.MaintenanceAlert, error) {
+	r.s.mu.Lock()
+	defer r.s.mu.Unlock()
+	var out []app.MaintenanceAlert
+	for _, m := range r.s.maintenance {
+		if h, ok := r.s.HouseMap[m.HouseID]; ok && h.OrganizationID == orgID {
+			item := m
+			item.Address = h.Address
+			out = append(out, item)
+		}
+	}
+	slices.SortFunc(out, func(a, b app.MaintenanceAlert) int { return b.EndsAt.Compare(a.EndsAt) })
+	return out[:min(len(out), limit)], nil
+}
+
+func (r officeRepo) DeleteMaintenance(_ context.Context, id string) error {
+	r.s.mu.Lock()
+	defer r.s.mu.Unlock()
+	r.s.maintenance = slices.DeleteFunc(r.s.maintenance, func(m app.MaintenanceAlert) bool { return m.ID == id })
+	return nil
+}
+
+func (r officeRepo) AddAppointment(_ context.Context, a app.Appointment) error {
+	r.s.mu.Lock()
+	defer r.s.mu.Unlock()
+	r.s.appointments = append(r.s.appointments, a)
+	return nil
+}
+
+func (r officeRepo) GetAppointment(_ context.Context, id string) (app.Appointment, error) {
+	r.s.mu.Lock()
+	defer r.s.mu.Unlock()
+	for _, a := range r.s.appointments {
+		if a.ID == id {
+			out := a
+			if h, ok := r.s.HouseMap[a.HouseID]; ok {
+				out.Address = h.Address
+			}
+			if u, ok := r.s.UserMap[a.UserID]; ok {
+				out.UserName = u.FirstName
+			}
+			return out, nil
+		}
+	}
+	return app.Appointment{}, app.ErrNotFound
+}
+
+func (r officeRepo) CancelAppointment(_ context.Context, id string) error {
+	r.s.mu.Lock()
+	defer r.s.mu.Unlock()
+	for i := range r.s.appointments {
+		if r.s.appointments[i].ID == id {
+			r.s.appointments[i].Status = "cancelled"
+		}
+	}
+	return nil
+}
+
+func (r officeRepo) ListUserAppointments(_ context.Context, userID int64, limit int) ([]app.Appointment, error) {
+	r.s.mu.Lock()
+	defer r.s.mu.Unlock()
+	var out []app.Appointment
+	for _, a := range r.s.appointments {
+		if a.UserID == userID {
+			item := a
+			if h, ok := r.s.HouseMap[a.HouseID]; ok {
+				item.Address = h.Address
+			}
+			if u, ok := r.s.UserMap[a.UserID]; ok {
+				item.UserName = u.FirstName
+			}
+			out = append(out, item)
+		}
+	}
+	slices.SortFunc(out, func(a, b app.Appointment) int {
+		if c := cmpBool(a.Status == "cancelled", b.Status == "cancelled"); c != 0 {
+			return c
+		}
+		return a.SlotAt.Compare(b.SlotAt)
+	})
+	return out[:min(len(out), limit)], nil
+}
+
+func (r officeRepo) ListOrgAppointments(_ context.Context, orgID string, limit int) ([]app.Appointment, error) {
+	r.s.mu.Lock()
+	defer r.s.mu.Unlock()
+	var out []app.Appointment
+	for _, a := range r.s.appointments {
+		if h, ok := r.s.HouseMap[a.HouseID]; ok && h.OrganizationID == orgID {
+			item := a
+			item.Address = h.Address
+			if u, ok := r.s.UserMap[a.UserID]; ok {
+				item.UserName = u.FirstName
+			}
+			out = append(out, item)
+		}
+	}
+	slices.SortFunc(out, func(a, b app.Appointment) int {
+		if c := cmpBool(a.Status == "cancelled", b.Status == "cancelled"); c != 0 {
+			return c
+		}
+		return a.SlotAt.Compare(b.SlotAt)
+	})
+	return out[:min(len(out), limit)], nil
+}
 
 type appealRepo struct{ s *MemStore }
 

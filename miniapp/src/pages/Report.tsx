@@ -4,7 +4,7 @@ import { useEffect, useState, type ComponentType } from 'react';
 import { useRouter } from '../app/router';
 import { useSession, useUser } from '../app/session';
 import { api, ApiError } from '../shared/api/client';
-import type { AssetObject, Category, CategoryHint, HouseDetails, Issue } from '../shared/api/types';
+import type { AssetObject, Category, CategoryHint, HouseDetails, Issue, MaintenanceAlert } from '../shared/api/types';
 import { useResource } from '../shared/api/useResource';
 import { bridge } from '../shared/bridge/bridge';
 import { capitalize, dayMonth, plural, time } from '../shared/lib/format';
@@ -47,6 +47,7 @@ function Steps({ current }: { current: Step }) {
 interface Context {
   house: HouseDetails;
   categories: Category[];
+  maintenance: MaintenanceAlert[];
   fixedObject?: AssetObject;
 }
 
@@ -58,9 +59,12 @@ export function Report({ objectCode, category }: { objectCode?: string; category
     const categories = await api.categories();
     if (objectCode) {
       const { object, house } = await api.objectByCode(objectCode);
-      return { house: await api.house(house.id), categories, fixedObject: object };
+      const [details, maintenance] = await Promise.all([api.house(house.id), api.houseMaintenance(house.id).catch(() => [])]);
+      return { house: details, categories, maintenance, fixedObject: object };
     }
-    return { house: await api.house(user.house_id ?? ''), categories };
+    const hid = user.house_id ?? '';
+    const [details, maintenance] = await Promise.all([api.house(hid), api.houseMaintenance(hid).catch(() => [])]);
+    return { house: details, categories, maintenance };
   }, [objectCode, user.house_id]);
 
   if (res.loading && !res.data) {
@@ -139,6 +143,7 @@ function ReportFlow({ ctx, initialCategory }: { ctx: Context; initialCategory?: 
     house.objects.some((o) => o.category === 'lift') ||
     Boolean(ctx.fixedObject && ctx.fixedObject.category === 'lift');
   const availableTiles = tiles.filter((t) => t.code !== 'lift' || hasElevator);
+  const activeAlert = ctx.maintenance.find((m) => m.category === category || (category === 'heating' && m.category === 'water'));
   const rule = ctx.categories.find((c) => c.code === category);
   const objects = house.objects.filter((o) => o.category === category);
   const object = house.objects.find((o) => o.id === objectId);
@@ -347,6 +352,18 @@ function ReportFlow({ ctx, initialCategory }: { ctx: Context; initialCategory?: 
           </button>
         ))}
       </div>
+      {activeAlert && (
+        <Island>
+          <div className={p.block}>
+            <h3 className={p.blockTitle}>В доме идут плановые работы</h3>
+            <p className={p.text}>{activeAlert.title}</p>
+            {activeAlert.description && <p className={p.hint}>{activeAlert.description}</p>}
+            <p className={p.hint}>
+              Окончание работ: до {dayMonth(activeAlert.ends_at)}. Работы уже ведутся управляющей компанией, создавать отдельную заявку обычно не требуется.
+            </p>
+          </div>
+        </Island>
+      )}
       {!ctx.fixedObject && objects.length > 0 && (
         <>
           <p className={s.label}>Где именно</p>

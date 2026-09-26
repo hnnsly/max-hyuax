@@ -279,3 +279,39 @@ export interface UkMetrics {
   ratings: number;
   sample_data: boolean;
 }
+
+/** Плановые работы и отключения в доме (GEN_V4, ADR-024). */
+export interface MaintenanceAlert {
+  id: string;
+  house_id: string;
+  address?: string;
+  category: string;
+  category_title: string;
+  title: string;
+  description?: string;
+  starts_at: string;
+  ends_at: string;
+  created_at: string;
+}
+
+/** Должностное лицо УК, ведущее личный приём граждан (ПП РФ № 416 п. 28). */
+export interface Specialist {
+  code: string;
+  title: string;
+  description: string;
+  schedule: string;
+}
+
+/** Запись жителя на личный приём в УК. */
+export interface Appointment {
+  id: string;
+  house_id: string;
+  address?: string;
+  user_name?: string;
+  specialist: string;
+  specialist_title: string;
+  topic: string;
+  slot_at: string;
+  status: 'booked' | 'cancelled' | 'completed';
+  created_at: string;
+}

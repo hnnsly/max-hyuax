@@ -110,6 +110,8 @@ tags: [index, hub]
 | [adr/021-voice-and-accessibility.md](adr/021-voice-and-accessibility.md) | голос в боте по расшифровке MAX, режим «Крупно и контрастно», аудит экранного чтеца | accepted | 2026-09-27 |
 | [adr/022-repair-rating.md](adr/022-repair-rating.md) | оценка ремонта 1–5 и рейтинг УК района 0–100 для жителей | accepted | 2026-09-27 |
 | [adr/023-collective-appeal.md](adr/023-collective-appeal.md) | коллективное обращение в ГЖИ с подписями соседей: таблица заявителей в PDF, сбор и отзыв подписи | accepted | 2026-09-27 |
+| [adr/024-maintenance-and-appointments.md](adr/024-maintenance-and-appointments.md) | плановые работы дома и запись на личный приём в УК (GEN_V4) | accepted | 2026-09-27 |
+| [GEN_V4_PLAN.md](GEN_V4_PLAN.md) | план v4: плановые работы и запись на приём в УК | accepted | 2026-09-27 |
 | [BUG-REPORTS.md](BUG-REPORTS.md) | баги smoke-теста 26.09 (BUG-001…013) со статусами | active | 2026-09-27 |
 | [HANDOFF.md](HANDOFF.md) | заметка передачи: кто в работе, что сделано, следующий шаг | active | 2026-09-26 |
 | [design/canvas-v2/project/](design/canvas-v2/project/canvas.json) | утверждённый дизайн v2: 12 артбордов (житель, УК, бот, наклейка, тёмная тема, разбор системы) | accepted | 2026-09-23 |

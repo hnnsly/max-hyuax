@@ -74,6 +74,7 @@ func (s *Store) Photos() app.PhotoRepo       { return photoRepo{s.q} }
 func (s *Store) Council() app.CouncilRepo    { return councilRepo{s.q} }
 func (s *Store) Pending() app.BotPendingRepo { return pendingRepo{s.q} }
 func (s *Store) Appeals() app.AppealRepo     { return appealRepo{s.q} }
+func (s *Store) Office() app.OfficeRepo      { return officeRepo{s.q} }
 
 // InTx выполняет fn в транзакции; вложенный вызов переиспользует текущую.
 func (s *Store) InTx(ctx context.Context, fn func(tx app.Store) error) error {

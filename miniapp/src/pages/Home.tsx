@@ -7,7 +7,7 @@ import { useSession, useUser } from '../app/session';
 import { api, ApiError } from '../shared/api/client';
 import { useResource } from '../shared/api/useResource';
 import { bridge } from '../shared/bridge/bridge';
-import { capitalize, plural } from '../shared/lib/format';
+import { capitalize, dotDateTime, plural } from '../shared/lib/format';
 import { houseOpenIssues, parseStartParam } from '../shared/lib/model';
 import { IssueList } from '../shared/ui/IssueRow';
 import { DemoMark, EmptyState, ErrorState, Facts, Island, Loading, Screen, Section, useToast } from '../shared/ui/Layout';
@@ -25,8 +25,14 @@ export function Home() {
   const [toast, showToast] = useToast();
   const houseId = user.house_id ?? '';
   const res = useResource(async () => {
-    const [house, issues, mine] = await Promise.all([api.house(houseId), api.houseIssues(houseId), api.myIssues()]);
-    return { house, issues, mine };
+    const [house, issues, mine, maintenance, appts] = await Promise.all([
+      api.house(houseId),
+      api.houseIssues(houseId),
+      api.myIssues(),
+      api.houseMaintenance(houseId).catch(() => []),
+      api.myAppointments().catch(() => []),
+    ]);
+    return { house, issues, mine, maintenance, appts };
   }, [houseId]);
 
   const scan = async () => {
@@ -67,7 +73,8 @@ export function Home() {
     );
   }
 
-  const { house, issues, mine } = res.data;
+  const { house, issues, mine, maintenance, appts } = res.data;
+  const bookedAppts = appts.filter((a) => a.status === 'booked').length;
   const open = houseOpenIssues(issues);
   const org = house.organization;
   const dispatcher = org.phone_dispatcher ?? org.phone_office;
@@ -105,6 +112,24 @@ export function Home() {
         </div>
       </Island>
 
+      {maintenance.length > 0 && (
+        <>
+          <Section title="Плановые работы" aside={`${maintenance.length}`} />
+          {maintenance.map((m) => (
+            <Island key={m.id}>
+              <div className={s.block}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'baseline', gap: 8 }}>
+                  <h3 className={s.blockTitle}>{m.title}</h3>
+                  <span className={s.hint}>до {dotDateTime(m.ends_at)}</span>
+                </div>
+                <p className={s.hint}>{m.category_title}</p>
+                {m.description && <p className={s.text} style={{ marginTop: 4 }}>{m.description}</p>}
+              </div>
+            </Island>
+          ))}
+        </>
+      )}
+
       <Section title="Сейчас в доме" aside={open.length > 0 && `${open.length} ${plural(open.length, 'открытая', 'открытые', 'открытых')}`} />
       {open.length > 0 ? (
         <IssueList issues={open} now={now} onOpen={(id) => push({ name: 'issue', id })} />
@@ -116,6 +141,7 @@ export function Home() {
 
       <CellList mode="island">
         <CellSimple title="Мои заявки" showChevron after={mine.length > 0 && <Counter value={mine.length} rounded />} onClick={() => push({ name: 'mine' })} />
+        <CellSimple title="Запись на приём в УК" showChevron after={bookedAppts > 0 && <Counter value={bookedAppts} rounded />} onClick={() => push({ name: 'appointments' })} />
         <CellSimple
           title="Отчёт по дому (PDF)"
           showChevron

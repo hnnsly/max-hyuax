@@ -12,6 +12,7 @@ import (
 
 	"dommax/internal/app"
 	"dommax/internal/app/issues"
+	"dommax/internal/app/office"
 	"dommax/internal/domain/council"
 	"dommax/internal/domain/issue"
 	"dommax/internal/domain/rules"
@@ -52,6 +53,8 @@ const (
 	scrOverdue  = "overdue"
 	scrRole     = "role"
 	scrRating   = "rating"
+	scrAlerts   = "alerts"
+	scrVisit    = "visit"
 
 	// queueInChat — сколько заявок очереди УК показывать кнопками; остальные в кабинете.
 	queueInChat = 10
@@ -162,6 +165,10 @@ func (h *Handler) screen(ctx context.Context, u user.User, name, arg string) (ma
 		return h.roleScreen(u), nil
 	case scrRating:
 		return h.ratingScreen(ctx, u)
+	case scrAlerts:
+		return h.alertsScreen(ctx, u)
+	case scrVisit:
+		return h.visitScreen(ctx, u)
 	}
 	return h.homeScreen(ctx, u)
 }
@@ -211,6 +218,7 @@ func (h *Handler) homeScreen(ctx context.Context, u user.User) (maxapi.NewMessag
 		rows = append(rows, []maxapi.Button{maxapi.CallbackButton("Папка предложений", win(scrFolder))})
 	}
 	rows = append(rows,
+		[]maxapi.Button{maxapi.CallbackButton("Плановые работы", win(scrAlerts)), maxapi.CallbackButton("Приём в УК", win(scrVisit))},
 		[]maxapi.Button{maxapi.CallbackButton("Рейтинг УК района", win(scrRating))},
 		[]maxapi.Button{maxapi.OpenAppButton("Открыть приложение", h.botName, "")},
 	)
@@ -869,4 +877,58 @@ func durationRU(d interface{ Minutes() float64 }) string {
 		return fmt.Sprintf("%d ч", mins/60)
 	}
 	return fmt.Sprintf("%d ч %d мин", mins/60, mins%60)
+}
+
+// alertsScreen — текущие плановые работы и отключения в доме жителя (GEN_V4, ADR-024).
+func (h *Handler) alertsScreen(ctx context.Context, u user.User) (maxapi.NewMessage, error) {
+	if u.HouseID == "" || h.svc.Office == nil {
+		return screenMsg("В вашем доме сейчас нет плановых отключений и работ.", navRow()), nil
+	}
+	list, err := h.svc.Office.ActiveMaintenance(ctx, u.HouseID)
+	if err != nil {
+		return maxapi.NewMessage{}, err
+	}
+	if len(list) == 0 {
+		return screenMsg("**Плановые работы.**\nВ вашем доме сейчас нет активных плановых работ и отключений.", navRow()), nil
+	}
+	var b strings.Builder
+	b.WriteString("**Плановые работы в доме:**")
+	for i, m := range list {
+		fmt.Fprintf(&b, "\n\n%d. **%s**\nДо %s", i+1, plain(m.Title), dayMonth(m.EndsAt))
+		if m.Description != "" {
+			fmt.Fprintf(&b, "\n%s", plain(m.Description))
+		}
+	}
+	return screenMsg(b.String(),
+		[]maxapi.Button{maxapi.OpenAppButton("Открыть в приложении", h.botName, "")},
+		navRow(),
+	), nil
+}
+
+// visitScreen — часы личного приёма граждан в УК и записи жителя (GEN_V4, ADR-024).
+func (h *Handler) visitScreen(ctx context.Context, u user.User) (maxapi.NewMessage, error) {
+	var b strings.Builder
+	b.WriteString("**Личный приём в УК** (по ПП РФ № 416):\n")
+	for _, s := range office.Specialists() {
+		fmt.Fprintf(&b, "\n• **%s** — %s\n  %s", plain(s.Title), plain(s.Schedule), plain(s.Description))
+	}
+	if h.svc.Office != nil {
+		if mine, err := h.svc.Office.MyAppointments(ctx, u); err == nil && len(mine) > 0 {
+			b.WriteString("\n\n**Ваши записи на приём:**")
+			for _, a := range mine {
+				if a.Status == "cancelled" {
+					continue
+				}
+				specTitle := a.Specialist
+				if sp, ok := office.LookupSpecialist(a.Specialist); ok {
+					specTitle = sp.Title
+				}
+				fmt.Fprintf(&b, "\n• %s (%s): %s", plain(specTitle), dayMonth(a.SlotAt), plain(a.Topic))
+			}
+		}
+	}
+	return screenMsg(b.String(),
+		[]maxapi.Button{maxapi.OpenAppButton("Записаться на приём в приложении", h.botName, "")},
+		navRow(),
+	), nil
 }

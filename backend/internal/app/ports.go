@@ -276,6 +276,48 @@ type AppealRepo interface {
 	ForgetUser(ctx context.Context, userID int64) error
 }
 
+// MaintenanceAlert — плановые работы и отключения в доме (ADR-024).
+type MaintenanceAlert struct {
+	ID          string
+	HouseID     string
+	Address     string // заполняется при выборке по УК
+	Category    string
+	Title       string
+	Description string
+	StartsAt    time.Time
+	EndsAt      time.Time
+	CreatedBy   int64
+	CreatedAt   time.Time
+}
+
+// Appointment — запись жителя на личный приём в управляющую компанию (ПП РФ № 416 п. 28, ADR-024).
+type Appointment struct {
+	ID         string
+	HouseID    string
+	Address    string // заполняется при выборке
+	UserID     int64
+	UserName   string // заполняется при выборке
+	Specialist string
+	Topic      string
+	SlotAt     time.Time
+	Status     string // booked | cancelled | completed
+	CreatedAt  time.Time
+}
+
+// OfficeRepo — плановые работы домов и запись на личный приём в УК.
+type OfficeRepo interface {
+	AddMaintenance(ctx context.Context, m MaintenanceAlert) error
+	ActiveMaintenanceByHouse(ctx context.Context, houseID string, now time.Time) ([]MaintenanceAlert, error)
+	ListMaintenanceByOrg(ctx context.Context, orgID string, limit int) ([]MaintenanceAlert, error)
+	DeleteMaintenance(ctx context.Context, id string) error
+
+	AddAppointment(ctx context.Context, a Appointment) error
+	GetAppointment(ctx context.Context, id string) (Appointment, error)
+	CancelAppointment(ctx context.Context, id string) error
+	ListUserAppointments(ctx context.Context, userID int64, limit int) ([]Appointment, error)
+	ListOrgAppointments(ctx context.Context, orgID string, limit int) ([]Appointment, error)
+}
+
 // Store — доступ к репозиториям; InTx выполняет fn в одной транзакции.
 type Store interface {
 	Issues() IssueRepo
@@ -286,5 +328,6 @@ type Store interface {
 	Council() CouncilRepo
 	Pending() BotPendingRepo
 	Appeals() AppealRepo
+	Office() OfficeRepo
 	InTx(ctx context.Context, fn func(tx Store) error) error
 }

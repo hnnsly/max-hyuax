@@ -20,6 +20,7 @@ import (
 	"dommax/internal/app/hints"
 	"dommax/internal/app/houses"
 	"dommax/internal/app/issues"
+	"dommax/internal/app/office"
 	"dommax/internal/app/photos"
 	"dommax/internal/domain/issue"
 	"dommax/internal/domain/rules"
@@ -62,6 +63,7 @@ type Services struct {
 	Cards          *cards.Service // карточка заявки для показа в чате
 	Council        *appcouncil.Service
 	Appeal         *appeal.Service    // коллективные обращения в ГЖИ (ADR-023)
+	Office         *office.Service    // плановые работы и запись на приём (ADR-024)
 	Pending        app.BotPendingRepo // что бот ждёт от жителя следующим сообщением
 	RoleSwitch     bool               // /role и «Роль для проверки» в меню (ROLE_SWITCH_ENABLED)
 	ConsentVersion string
@@ -199,6 +201,10 @@ func (h *Handler) onCommand(ctx context.Context, to maxapi.Target, from maxapi.U
 		return h.sendScreen(ctx, to, u, scrCouncil, "")
 	case "rating":
 		return h.sendScreen(ctx, to, u, scrRating, "")
+	case "alerts":
+		return h.sendScreen(ctx, to, u, scrAlerts, "")
+	case "visit":
+		return h.sendScreen(ctx, to, u, scrVisit, "")
 	case "role":
 		return h.roleCommand(ctx, to, u, arg)
 	}

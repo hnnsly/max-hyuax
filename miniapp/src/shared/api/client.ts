@@ -1,6 +1,6 @@
 // Клиент API: JSON, токен сессии, единый формат ошибок {"error": {"code", "message"}}.
 import type {
-  AppealLink, AppealSummary, Category, CategoryHint, DistrictMetrics, DistrictRating, GeoPlace, House, HouseDetails, Issue, IssueEvent, AssetObject, MapHouse, Photo, Poll, Proposal, ReportInput, Session, Status, UkMetrics, User,
+  AppealLink, AppealSummary, Appointment, AssetObject, Category, CategoryHint, DistrictMetrics, DistrictRating, GeoPlace, House, HouseDetails, Issue, IssueEvent, MaintenanceAlert, MapHouse, Photo, Poll, Proposal, ReportInput, Session, Specialist, Status, UkMetrics, User,
 } from './types';
 
 export class ApiError extends Error {
@@ -128,4 +128,17 @@ export const api = {
   ukQueue: () => request<Issue[]>('GET', '/uk/issues'),
   ukMetrics: () => request<UkMetrics>('GET', '/uk/metrics'),
   ukHouses: () => request<House[]>('GET', '/uk/houses'),
+
+  // Плановые работы и личный приём в УК (GEN_V4, ADR-024)
+  houseMaintenance: (houseId: string) => request<MaintenanceAlert[]>('GET', `/houses/${encodeURIComponent(houseId)}/maintenance`),
+  ukMaintenance: () => request<MaintenanceAlert[]>('GET', '/uk/maintenance'),
+  createMaintenance: (input: { house_id: string; category: string; title: string; description?: string; hours?: number }) =>
+    request<MaintenanceAlert>('POST', '/uk/maintenance', input),
+  deleteMaintenance: (id: string) => request<void>('DELETE', `/uk/maintenance/${encodeURIComponent(id)}`),
+  specialists: () => request<Specialist[]>('GET', '/appointments/specialists'),
+  bookAppointment: (input: { specialist: string; topic: string; slot_at?: string }) =>
+    request<Appointment>('POST', '/appointments', input),
+  myAppointments: () => request<Appointment[]>('GET', '/me/appointments'),
+  cancelAppointment: (id: string) => request<Appointment>('DELETE', `/appointments/${encodeURIComponent(id)}`),
+  ukAppointments: () => request<Appointment[]>('GET', '/uk/appointments'),
 };

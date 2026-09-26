@@ -14,6 +14,7 @@ import { groupQueue } from '../shared/lib/model';
 import { IssueList } from '../shared/ui/IssueRow';
 import { EmptyState, ErrorState, Island, Loading, Screen, Section, useToast } from '../shared/ui/Layout';
 import { Segmented } from '../shared/ui/Segmented';
+import { UkOfficeView } from './Appointments';
 import { HouseMapView } from './Map';
 import s from './pages.module.css';
 import { StickersView } from './Stickers';
@@ -204,9 +205,10 @@ export function MyIssues() {
   );
 }
 
-type UkTab = 'queue' | 'metrics' | 'map' | 'stickers';
+type UkTab = 'queue' | 'office' | 'metrics' | 'map' | 'stickers';
 const ukTabs: { id: UkTab; title: string }[] = [
   { id: 'queue', title: 'Заявки' },
+  { id: 'office', title: 'Приём' },
   { id: 'metrics', title: 'Метрики' },
   { id: 'map', title: 'Карта' },
   { id: 'stickers', title: 'Наклейки' },
@@ -214,7 +216,7 @@ const ukTabs: { id: UkTab; title: string }[] = [
 // Вкладка переживает переход в карточку заявки и возврат назад.
 let lastUkTab: UkTab = 'queue';
 
-/** Кабинет УК: очередь заявок, метрики, карта домов и наклейки с QR-кодами. */
+/** Кабинет УК: очередь заявок, приём и плановые работы, метрики, карта домов и наклейки с QR-кодами. */
 export function UkQueue() {
   const [tab, setTab] = useState<UkTab>(lastUkTab);
   const choose = (t: UkTab) => {
@@ -226,6 +228,8 @@ export function UkQueue() {
       <Segmented label="Раздел кабинета УК" items={ukTabs} value={tab} onChange={choose} />
       {tab === 'queue' ? (
         <QueueView />
+      ) : tab === 'office' ? (
+        <UkOfficeView />
       ) : tab === 'metrics' ? (
         <UkMetricsView />
       ) : tab === 'map' ? (

@@ -36,6 +36,7 @@ import (
 	"dommax/internal/app/hints"
 	"dommax/internal/app/houses"
 	"dommax/internal/app/issues"
+	"dommax/internal/app/office"
 	"dommax/internal/app/photos"
 	"dommax/internal/storage/maxapi"
 	"dommax/internal/storage/postgres"
@@ -91,6 +92,7 @@ func TestMain(m *testing.M) {
 			Appeal:         appeal.NewService(store, appeal.Config{Secret: []byte("s"), TTL: 10 * time.Minute, ConsentVersion: "v1", Now: time.Now}),
 			Photos:         photos.NewService(store, &apptest.MemFiles{}, photos.Config{Now: time.Now, NewID: func() string { return uuid.NewV7().String() }, ConsentVersion: "v1"}),
 			Council:        council.NewService(store, council.Config{Now: time.Now, NewID: func() string { return uuid.NewV7().String() }, ConsentVersion: "v1"}),
+			Office:         office.NewService(store, office.Config{Now: time.Now, NewID: func() string { return uuid.NewV7().String() }, ConsentVersion: "v1"}),
 			Webhook:        bot.NewWebhook("hook-secret", webhooks, store, log),
 			Ping:           store.Ping,
 			ConsentVersion: "v1",
