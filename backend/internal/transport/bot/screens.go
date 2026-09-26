@@ -203,7 +203,7 @@ func (h *Handler) homeScreen(ctx context.Context, u user.User) (maxapi.NewMessag
 		rows = append(rows, []maxapi.Button{maxapi.CallbackButton("Папка предложений", win(scrFolder))})
 	}
 	rows = append(rows, []maxapi.Button{maxapi.OpenAppButton("Открыть приложение", h.botName, "")})
-	return screenMsg(fmt.Sprintf("**Меню.** Ваш дом: %s.\nВыберите действие или просто напишите проблему одним сообщением.", address), withRole(rows...)...), nil
+	return screenMsg(fmt.Sprintf("**Меню.** Ваш дом: %s.\nВыберите действие или просто напишите или наговорите проблему одним сообщением.", address), withRole(rows...)...), nil
 }
 
 // issueListScreen — заявки кнопками; нажатие открывает карточку в том же сообщении.

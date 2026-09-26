@@ -971,6 +971,40 @@ func TestDistrictMenuInChat(t *testing.T) {
 	}
 }
 
+func voice(from int64, transcription string) maxapi.Update {
+	u := text(from, "")
+	u.Message.Body.Attachments = []maxapi.IncomingAttachment{{Type: "audio", Transcription: transcription, Payload: jsontext.Value(`{"url":"https://i.oneme.ru/a.ogg","token":"t"}`)}}
+	return u
+}
+
+// Голосовое с расшифровкой MAX работает как текст: бот показывает, как понял, и ведёт дальше.
+// Без расшифровки просит написать текстом.
+func TestVoiceMessages(t *testing.T) {
+	e := newEnv(t)
+	e.resident(9601, true)
+	e.handle(t, voice(9601, "   "))
+	if txt, _ := e.max.last(""); !strings.Contains(txt, "Напишите, пожалуйста, текстом") {
+		t.Fatalf("no transcription = %q", txt)
+	}
+
+	sentBefore := len(e.max.sent)
+	e.handle(t, voice(9601, "Не горит свет на лестнице"))
+	if echo := e.max.sent[sentBefore].msg.Text; !strings.Contains(echo, "Текст голосового: «Не горит свет на лестнице»") {
+		t.Fatalf("echo = %q", echo)
+	}
+	if txt, _ := e.max.last(""); !strings.Contains(txt, "Поняли так: Свет в подъезде") {
+		t.Fatalf("after voice = %q", txt)
+	}
+
+	// Голосом можно ответить и на вопрос бота: описание заявки, собранной кнопками.
+	e.handle(t, press(9601, "cb1", "w:desc:door:-"))
+	e.handle(t, voice(9601, "Домофон не открывает дверь"))
+	is, err := e.issues.Get(t.Context(), "i-1")
+	if err != nil || is.Category() != "door" || is.Description() != "Домофон не открывает дверь" {
+		t.Fatalf("issue = %+v, err = %v", is, err)
+	}
+}
+
 // Диплинк ?start=geo из мини-приложения сразу просит геопозицию: в WebView MAX её нет.
 func TestStartGeoAsksLocation(t *testing.T) {
 	e := newEnv(t)

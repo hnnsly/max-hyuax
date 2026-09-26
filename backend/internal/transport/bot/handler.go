@@ -90,6 +90,7 @@ const greetingText = "Здравствуйте! Я помогаю соседям
 	"Одна заявка на весь дом вместо десятка сообщений в чате. Я покажу, кто отвечает и до какого срока, и напишу, когда статус изменится."
 
 const helpText = "Нажмите «Сообщить о проблеме» в меню или напишите одним сообщением, что сломалось и где, например: «не горит свет на 5 этаже во втором подъезде». " +
+	"Можно не печатать, а наговорить голосовым сообщением. " +
 	"Я определю категорию, ответственного и срок и проверю, не сообщали ли уже соседи.\n\n" +
 	"Команды:\n/menu главное меню\n/new сообщить о проблеме\n/my мои заявки\n/house мой дом и контакты УК\n/polls совет дома и опросы\n\n" +
 	"Соседи видят только число сообщивших. Имя получает только управляющая компания."
@@ -120,6 +121,8 @@ func (h *Handler) onMessage(ctx context.Context, m *maxapi.Message) error {
 			return h.onLocation(ctx, to, m.Sender, a.Latitude, a.Longitude)
 		case "contact":
 			return h.onContact(ctx, to, m.Sender, a)
+		case "audio":
+			return h.onVoice(ctx, to, m.Sender, a.Transcription)
 		case "image":
 			urls = append(urls, a.PhotoURL())
 		}
@@ -131,11 +134,16 @@ func (h *Handler) onMessage(ctx context.Context, m *maxapi.Message) error {
 	if txt == "" {
 		return nil
 	}
+	return h.onText(ctx, to, m.Sender, txt)
+}
+
+// onText — текст жителя: команда, ответ на вопрос бота или новая проблема.
+func (h *Handler) onText(ctx context.Context, to maxapi.Target, from maxapi.User, txt string) error {
 	if cmd, ok := strings.CutPrefix(txt, "/"); ok {
 		cmd, arg, _ := strings.Cut(cmd, " ")
-		return h.onCommand(ctx, to, m.Sender, cmd, arg)
+		return h.onCommand(ctx, to, from, cmd, arg)
 	}
-	u, err := h.resident(ctx, m.Sender)
+	u, err := h.resident(ctx, from)
 	if err != nil {
 		return err
 	}
@@ -143,7 +151,23 @@ func (h *Handler) onMessage(ctx context.Context, m *maxapi.Message) error {
 	if handled, err := h.onPending(ctx, to, u, txt); handled || err != nil {
 		return err
 	}
-	return h.onProblemText(ctx, to, m.Sender, txt)
+	return h.onProblemText(ctx, to, from, txt)
+}
+
+// maxVoiceEcho — сколько символов расшифровки показать жителю, чтобы он проверил, как его поняли.
+const maxVoiceEcho = 200
+
+// onVoice — голосовое сообщение. Своего распознавания речи нет: MAX присылает расшифровку во
+// вложении, дальше это обычный текст (ADR-021). Без расшифровки просим написать текстом.
+func (h *Handler) onVoice(ctx context.Context, to maxapi.Target, from maxapi.User, transcription string) error {
+	txt := strings.TrimSpace(transcription)
+	if txt == "" {
+		return h.send(ctx, to, "Не получилось разобрать голосовое сообщение. Напишите, пожалуйста, текстом, что сломалось и где.")
+	}
+	if _, err := h.max.Send(ctx, to, maxapi.NewMessage{Text: "Текст голосового: «" + truncate(txt, maxVoiceEcho) + "»"}); err != nil {
+		return err
+	}
+	return h.onText(ctx, to, from, txt)
 }
 
 // onCommand — команды присылают экран новым сообщением внизу чата.

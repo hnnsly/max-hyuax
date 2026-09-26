@@ -61,12 +61,14 @@ type MessageBody struct {
 	Attachments []IncomingAttachment `json:"attachments"`
 }
 
-// IncomingAttachment хранит payload как есть: пока разбирается только геолокация.
+// IncomingAttachment хранит payload как есть; геолокация и расшифровка голосового лежат
+// прямо во вложении (dev-max docs-api/objects/Message.md, AudioAttachment).
 type IncomingAttachment struct {
-	Type      string         `json:"type"`
-	Latitude  float64        `json:"latitude"`
-	Longitude float64        `json:"longitude"`
-	Payload   jsontext.Value `json:"payload"`
+	Type          string         `json:"type"`
+	Latitude      float64        `json:"latitude"`
+	Longitude     float64        `json:"longitude"`
+	Transcription string         `json:"transcription"` // текст голосового сообщения от MAX; бывает пустым
+	Payload       jsontext.Value `json:"payload"`
 }
 
 type UpdatesPage struct {
