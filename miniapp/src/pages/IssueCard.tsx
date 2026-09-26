@@ -4,7 +4,7 @@ import { useEffect, useState, type FormEvent } from 'react';
 import { useRouter } from '../app/router';
 import { useUser } from '../app/session';
 import { api, ApiError } from '../shared/api/client';
-import { isClosed, type AppealLink, type AppealSummary, type Issue, type Status } from '../shared/api/types';
+import { isClosed, type AppealLink, type Issue, type Status } from '../shared/api/types';
 import { useResource } from '../shared/api/useResource';
 import { appLink, bridge } from '../shared/bridge/bridge';
 import { calendarDaysBetween, capitalize, dayMonth, dotDateTime, plural } from '../shared/lib/format';

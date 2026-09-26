@@ -306,7 +306,7 @@ checks:
     path: /issues/{id}/appeal/signatures
     role: resident
     params:
-      path: { id: 0190a000-0000-7000-8000-000000000115 }
+      path: { id: 0190a000-0000-7000-8000-000000000002 }
     expect:
       status: [200]
       content_type: application/json
