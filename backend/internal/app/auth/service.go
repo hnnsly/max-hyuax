@@ -11,10 +11,10 @@ import (
 )
 
 type Config struct {
-	BotToken       string
-	SessionSecret  string
-	SessionTTL     time.Duration
-	DemoEnabled    bool   // POST /auth/demo; включается только на демо-стенде
+	BotToken      string
+	SessionSecret string
+	SessionTTL    time.Duration
+	DemoEnabled   bool // POST /auth/demo; включается только на демо-стенде
 	// RoleSwitch — роль для проверки (/role, POST /me/role): комиссия проходит все кабинеты
 	// своим аккаунтом MAX. Контакты настоящих жителей переключённой роли не видны (role_switched).
 	RoleSwitch     bool

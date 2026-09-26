@@ -134,7 +134,7 @@ func newEnvWithLLM(t *testing.T, llm hints.LLM) env {
 		Cards:          cards.NewService(s, nil, now),
 		Council:        appcouncil.NewService(s, appcouncil.Config{Now: now, NewID: func() string { n++; return fmt.Sprintf("c-%d", n) }, ConsentVersion: "v1"}),
 		Pending:        s.Pending(),
-		RoleSwitch:      true,
+		RoleSwitch:     true,
 		ConsentVersion: "v1",
 		Now:            now,
 	}
