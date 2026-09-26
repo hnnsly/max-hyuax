@@ -29,6 +29,7 @@ export function IssueCard({ id, flash }: { id: string; flash?: string }) {
   const [appealLink, setAppealLink] = useState<(AppealLink & { until: number }) | null>(null);
   const [signOpen, setSignOpen] = useState(false);
   const [signBusy, setSignBusy] = useState(false);
+  const [photoSeq, setPhotoSeq] = useState(0);
   const res = useResource(async () => {
     const [issue, events, appealSummary] = await Promise.all([
       api.issue(id),
@@ -143,6 +144,7 @@ export function IssueCard({ id, flash }: { id: string; flash?: string }) {
   const saved = (changed: Issue) => {
     setSheet(false);
     setLanded(true);
+    setPhotoSeq((v) => v + 1);
     bridge.hapticSuccess();
     const people = changed.participant_count;
     showToast(`Статус сохранён. ${people} ${plural(people, 'житель увидит', 'жителя увидят', 'жителей увидят')} его в карточке.`);
@@ -274,19 +276,15 @@ export function IssueCard({ id, flash }: { id: string; flash?: string }) {
       )}
 
       {canSeePhotos && (
-        <Island>
-          <div className={s.block}>
-            <IssuePhotos
-              issueId={issue.id}
-              reloadKey={issue.status_at}
-              canAdd={!closed || (ownUK && issue.status === 'done')}
-              onToast={showToast}
-            />
-          </div>
-        </Island>
+        <IssuePhotos
+          issueId={issue.id}
+          reloadKey={String(photoSeq)}
+          canAdd={!closed || (ownUK && issue.status === 'done')}
+          onToast={showToast}
+        />
       )}
 
-      <RepairCheck issue={issue} onChanged={() => res.reload()} onToast={showToast} />
+      <RepairCheck issue={issue} onChanged={() => { setPhotoSeq((v) => v + 1); res.reload(); }} onToast={showToast} />
       {issue.contacts && issue.contacts.length > 0 && <ResidentContacts contacts={issue.contacts} />}
       {/* У закрытой заявки блок остаётся, только чтобы убрать уже оставленный телефон. */}
       {issue.joined && user.role === 'resident' && (!closed || user.phone_shared) && <PhoneForRepair onToast={showToast} />}
@@ -346,20 +344,28 @@ function StatusSheet({ open, issue, onClose, onSaved }: { open: boolean; issue: 
   const [files, setFiles] = useState<File[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
+  const existingPhotos = useResource(() => (open ? api.photos(issue.id).catch(() => []) : Promise.resolve([])), [issue.id, open]);
   const n = issue.participant_count;
   const rejecting = to === 'rejected';
   const valid = !rejecting || comment.trim() !== '';
+
+  useEffect(() => {
+    if (options[0] && !options.includes(to)) {
+      setTo(options[0]);
+    }
+  }, [issue.status, options, to]);
 
   const save = async () => {
     setBusy(true);
     setError('');
     try {
+      const changed = await api.changeStatus(issue.id, to, comment.trim());
       if (!rejecting && files.length > 0) {
         await api.uploadPhotos(issue.id, files);
       }
-      onSaved(await api.changeStatus(issue.id, to, comment.trim()));
       setComment('');
       setFiles([]);
+      onSaved(changed);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Не удалось сохранить статус');
     } finally {
@@ -394,9 +400,9 @@ function StatusSheet({ open, issue, onClose, onSaved }: { open: boolean; issue: 
         {!rejecting && (
           <div>
             <div className={s.blockTitle} style={{ marginBottom: 8 }}>
-              {to === 'done' ? 'Фото выполненного ремонта (по желанию)' : 'Приложить фото (по желанию)'}
+              {to === 'done' ? 'Добавить фото выполненного ремонта (по желанию)' : 'Добавить ещё фото к заявке (по желанию)'}
             </div>
-            <PhotoSlots files={files} onChange={setFiles} onError={setError} />
+            <PhotoSlots files={files} existing={existingPhotos.data} onChange={setFiles} onError={setError} />
           </div>
         )}
         <p className={s.hint}>

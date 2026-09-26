@@ -32,7 +32,8 @@ async function shrinkPhoto(file: File): Promise<File> {
   bitmap.close();
   const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.85));
   if (!blob) return file;
-  return new File([blob], `${file.name.replace(/\.[^.]*$/, '') || 'photo'}.jpg`, { type: 'image/jpeg' });
+  const base = file.name.replace(/\.[^.]*$/, '') || 'photo';
+  return new File([blob], `${base}-${Date.now().toString(36)}.jpg`, { type: 'image/jpeg' });
 }
 
 /** Кнопка «Добавить»: скрытый input с выбором файлов (в MAX UI загрузки файлов нет). */
@@ -58,13 +59,16 @@ function AddTile({ onFiles, disabled }: { onFiles: (files: File[]) => void; disa
         multiple
         hidden
         onChange={(e) => {
-          const picked = [...(e.target.files ?? [])];
-          e.target.value = ''; // тот же файл можно выбрать снова
+          const inputEl = e.target;
+          const picked = [...(inputEl.files ?? [])];
           if (picked.length === 0) return;
           setPreparing(true);
           Promise.all(picked.map(shrinkPhoto))
             .then(onFiles)
-            .finally(() => setPreparing(false));
+            .finally(() => {
+              inputEl.value = ''; // сбрасываем после чтения файла, чтобы на iOS WebKit не терялся Blob
+              setPreparing(false);
+            });
         }}
       />
     </>
@@ -89,12 +93,26 @@ function FilePreview({ file, n, onRemove }: { file: File; n: number; onRemove: (
   );
 }
 
-/** Фото в форме заявки (холст Report): до трёх снимков, загружаются после отправки. */
-export function PhotoSlots({ files, onChange, onError }: { files: File[]; onChange: (files: File[]) => void; onError: (msg: string) => void }) {
-  const max = 3;
+/** Фото в форме заявки или шторке статуса: показывает уже прикреплённые фото и позволяет добавить до трёх новых. */
+export function PhotoSlots({
+  files,
+  existing,
+  onChange,
+  onError,
+}: {
+  files: File[];
+  existing?: Photo[];
+  onChange: (files: File[]) => void;
+  onError: (msg: string) => void;
+}) {
+  const existingList = existing ?? [];
+  const max = Math.max(0, Math.min(3, ISSUE_MAX - existingList.length));
   return (
     <div>
       <div className={s.photoRow}>
+        {existingList.map((p, i) => (
+          <Thumb key={p.id} photo={p} label={`Фото заявки ${i + 1}`} onOpen={() => {}} />
+        ))}
         {files.map((f, i) => (
           <FilePreview key={`${f.name}-${f.size}-${i}`} file={f} n={i + 1} onRemove={() => onChange(files.filter((_, j) => j !== i))} />
         ))}
@@ -158,7 +176,7 @@ export function IssuePhotos({
   const [open, setOpen] = useState<{ url: string; photo: Photo } | null>(null);
   const [removing, setRemoving] = useState(false);
   const list = res.data ?? [];
-  if (res.error || (!res.data && res.loading) || (list.length === 0 && !canAdd)) return null;
+  if ((!res.data && (res.error || res.loading)) || (list.length === 0 && !canAdd)) return null;
 
   // За раз не больше трёх и не больше, чем осталось мест у заявки.
   const left = ISSUE_MAX - list.length;
@@ -196,24 +214,26 @@ export function IssuePhotos({
   };
 
   return (
-    <section className={s.photoSection} aria-label="Фото">
-      <h3 className={s.photoTitle}>Фото</h3>
-      <div className={s.photoRow}>
-        {list.map((p, i) => (
-          <Thumb key={p.id} photo={p} label={`Открыть фото ${i + 1} из ${list.length}`} onOpen={(url, photo) => setOpen({ url, photo })} />
-        ))}
-        {canAdd && left > 0 && <AddTile onFiles={upload} disabled={busy} />}
-      </div>
-      <Sheet open={open !== null} title="Просмотр фото" onClose={() => setOpen(null)} locked={removing}>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          {open && <img className={s.photoFull} src={open.url} alt="Фото к заявке" />}
-          {open?.photo.mine && (
-            <Button variant="secondary" size="medium" stretched loading={removing} onClick={remove}>
-              Убрать фото
-            </Button>
-          )}
+    <div className={s.island}>
+      <section className={s.photoSection} style={{ padding: '14px 16px 16px' }} aria-label="Фото">
+        <h3 className={s.photoTitle}>Фото</h3>
+        <div className={s.photoRow}>
+          {list.map((p, i) => (
+            <Thumb key={p.id} photo={p} label={`Открыть фото ${i + 1} из ${list.length}`} onOpen={(url, photo) => setOpen({ url, photo })} />
+          ))}
+          {canAdd && left > 0 && <AddTile onFiles={upload} disabled={busy} />}
         </div>
-      </Sheet>
-    </section>
+        <Sheet open={open !== null} title="Просмотр фото" onClose={() => setOpen(null)} locked={removing}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {open && <img className={s.photoFull} src={open.url} alt="Фото к заявке" />}
+            {open?.photo.mine && (
+              <Button variant="secondary" size="medium" stretched loading={removing} onClick={remove}>
+                Убрать фото
+              </Button>
+            )}
+          </div>
+        </Sheet>
+      </section>
+    </div>
   );
 }
